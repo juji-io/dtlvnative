@@ -29,6 +29,6 @@ jobs:
           CLOJARS_USERNAME: ${{secrets.CLOJARSUSERNAME}}
           CLOJARS_PASSWORD: ${{secrets.CLOJARSPASSWORD}}
         run: |
-          cd ${{ matrix.os }}-amd64
           script/build
+          cd ${{ matrix.os }}-amd64
           lein deploy clojars
