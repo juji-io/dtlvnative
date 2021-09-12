@@ -1,0 +1,30 @@
+name: Build
+
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Install Lein
+        uses: knicknic/os-specific-run@v1.0.3
+        with:
+          macos: brew install leiningen
+          linux: echo "lein is already installed"
+
+      - name: Build and deploy
+        run: |
+          cd ${{ matrix.os }}-amd64
+          lein deploy clojars
