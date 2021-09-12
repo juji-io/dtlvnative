@@ -25,6 +25,10 @@ jobs:
           linux: echo "lein is already installed"
 
       - name: Build and deploy
+        env:
+          CLOJARS_USERNAME: ${{secrets.CLOJARSUSERNAME}}
+          CLOJARS_PASSWORD: ${{secrets.CLOJARSPASSWORD}}
         run: |
           cd ${{ matrix.os }}-amd64
+          script/build
           lein deploy clojars
