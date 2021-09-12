@@ -44,7 +44,7 @@ build_script:
     call script\build.bat
 
 - cmd: >-
-    cd windows-amd64
+    cd ..\windows-amd64
 
     powershell -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein.bat', 'lein.bat')"
 
