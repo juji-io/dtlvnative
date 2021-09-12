@@ -50,6 +50,6 @@ build_script:
 
     cd
 
-    cd windows-amd64
+    cd ..\windows-amd64
 
     call lein.bat deploy clojars
