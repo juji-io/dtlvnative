@@ -1,4 +1,4 @@
-(defproject dtlvnative-linux-amd64 "0.1.0"
+(defproject datalalevin/dtlvnative-linux-amd64 "0.1.3"
   :description "Native dependency of Datalevin database"
   :url "https://github.com/juji-io/dtlvnative"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
