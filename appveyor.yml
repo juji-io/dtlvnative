@@ -41,13 +41,14 @@ build_script:
 - cmd: >-
     powershell -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein.bat', 'lein.bat')"
 
-
     call lein.bat self-install
 
 - cmd: >-
     call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
 
     call script\build.bat
+
+    cd
 
     cd windows-amd64
 
