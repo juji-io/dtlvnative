@@ -1,14 +1,12 @@
 # dtlvnative
 
-A Clojure library designed to ... well, that part is up to you.
-
-## Usage
-
-FIXME
+Provides pre-built native dependencies for compiling native version of Datalevin
+database with GraalVM native image technology. This is done by packaging the
+compiled static C libraries and header files in JAR files.
 
 ## License
 
-Copyright © 2021 FIXME
+Copyright © 2021 Juji, Inc.
 
 This program and the accompanying materials are made available under the
 terms of the Eclipse Public License 2.0 which is available at
