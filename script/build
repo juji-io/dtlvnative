@@ -4,7 +4,3 @@ set -eou pipefail
 
 cd src
 make
-
-cp *.a ../resources/
-cp dtlv.h ../resources/
-cp lmdb/libraries/liblmdb/lmdb.h ../resources/lmdb/libraries/liblmdb/
