@@ -30,8 +30,8 @@ jobs:
           CLOJARS_PASSWORD: ${{secrets.CLOJARSPASSWORD}}
         run: |
           script/build
-          cp src/*.a ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/
-          cp src/dtlv.h ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/
-          cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/
+          cp src/*.a ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
+          cp src/dtlv.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
+          cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/
           cd ${{ matrix.os }}-amd64
           lein deploy clojars

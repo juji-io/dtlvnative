@@ -18,6 +18,6 @@ nmake install
 
 cd %CPATH%
 
-copy *.lib ..\windows-amd64\resources\windows-amd64\
-copy dtlv.h ..\windows-amd64\resources\windows-amd64\
-copy lmdb\libraries\liblmdb\lmdb.h ..\windows-amd64\resources\windows-amd64\lmdb\libraries\liblmdb\
+copy *.lib ..\windows-amd64\resources\dtlvname\windows-amd64\
+copy dtlv.h ..\windows-amd64\resources\dtlvname\windows-amd64\
+copy lmdb\libraries\liblmdb\lmdb.h ..\windows-amd64\resources\dtlvname\windows-amd64\lmdb\libraries\liblmdb\
