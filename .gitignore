@@ -14,4 +14,3 @@ pom.xml.asc
 .hg/
 *.a
 *.o
-*.so

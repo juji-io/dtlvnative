@@ -24,21 +24,14 @@ jobs:
           macos: brew install leiningen
           linux: echo "lein is already installed"
 
-      - name: Build
-        run: |
-          script/build
-
-      - name: Copy 
-        run: |
-          cp src/*.a ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/
-          cp src/*.so ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/
-          cp src/dtlv.h ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/
-          cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/
-
-      - name: Deploy
+      - name: Build and deploy
         env:
           CLOJARS_USERNAME: ${{secrets.CLOJARSUSERNAME}}
           CLOJARS_PASSWORD: ${{secrets.CLOJARSPASSWORD}}
         run: |
+          script/build
+          cp src/*.a ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/
+          cp src/dtlv.h ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/
+          cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/
           cd ${{ matrix.os }}-amd64
           lein deploy clojars

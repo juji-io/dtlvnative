@@ -6,16 +6,13 @@ libraries := $(lib_lmdb) $(lib_dtlv)
 all: $(libraries)
 
 $(lib_lmdb):
-		$(MAKE) --directory=$@ liblmdb.a liblmdb.so
-		cp $(lib_lmdb)/liblmdb.so $(lib_dtlv)
+		$(MAKE) --directory=$@ liblmdb.a
 		cp $(lib_lmdb)/liblmdb.a $(lib_dtlv)
 
 $(lib_dtlv): $(lib_lmdb)
 		gcc -Wall -g -c dtlv.c -o dtlv.o
 		ar rcs libdtlv.a dtlv.o
-		gcc -c -fPIC -o dtlv.o dtlv.c
-		gcc -shared -fPIC -L. -llmdb -o libdtlv.so 
 
 clean:
-		rm *.o *.a *.so
+		rm *.o *.a
 		$(MAKE) --directory=$(lib_lmdb) clean
