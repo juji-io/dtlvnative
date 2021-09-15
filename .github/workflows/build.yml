@@ -24,20 +24,19 @@ jobs:
           macos: brew install leiningen
           linux: echo "lein is already installed"
 
-      - name: Build 
+      - name: Build
         run: |
           script/build
 
-      - name: Copy on mac 
+      - name: Copy on mac
         if: startsWith(matrix.os, 'macos')
         run: |
           cp src/*.a macos-latest-amd64/resources/macos-latest-amd64/
-          cp src/liblmdb.so macos-latest-amd64/resources/macos-latest-amd/liblmdb.dylib
-          cp src/libdtlv.so macos-latest-amd64/resources/macos-latest-amd/libdtlv.dylib
+          cp src/*.so macos-latest-amd64/resources/macos-latest-amd/
           cp src/dtlv.h macos-latest-amd64/resources/macos-latest-amd64/
           cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-amd64/resources/macos-latest-amd64/lmdb/libraries/liblmdb/
 
-      - name: Copy on linux 
+      - name: Copy on linux
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           cp src/*.a ubuntu-latest-amd64/resources/ubuntu-latest-amd64/
