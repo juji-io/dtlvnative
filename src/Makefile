@@ -13,8 +13,9 @@ $(lib_lmdb):
 $(lib_dtlv): $(lib_lmdb)
 		gcc -Wall -g -c dtlv.c -o dtlv.o
 		ar rcs libdtlv.a dtlv.o
-		gcc -shared -o libdtlv.so -fPIC dtlv.c
+		gcc -c -fPIC -o dtlv.o dtlv.c
+		gcc -shared -fPIC -L. -llmdb -o libdtlv.so 
 
 clean:
-		rm *.o *.a
+		rm *.o *.a *.so
 		$(MAKE) --directory=$(lib_lmdb) clean
