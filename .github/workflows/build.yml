@@ -24,14 +24,31 @@ jobs:
           macos: brew install leiningen
           linux: echo "lein is already installed"
 
-      - name: Build and deploy
+      - name: Build 
+        run: |
+          script/build
+
+      - name: Copy on mac 
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          cp src/*.a macos-latest-amd64/resources/macos-latest-amd64/
+          cp src/liblmdb.so macos-latest-amd64/resources/macos-latest-amd/liblmdb.dylib
+          cp src/libdtlv.so macos-latest-amd64/resources/macos-latest-amd/libdtlv.dylib
+          cp src/dtlv.h macos-latest-amd64/resources/macos-latest-amd64/
+          cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-amd64/resources/macos-latest-amd64/lmdb/libraries/liblmdb/
+
+      - name: Copy on linux 
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          cp src/*.a ubuntu-latest-amd64/resources/ubuntu-latest-amd64/
+          cp src/*.so ubuntu-latest-amd64/resources/ubuntu-latest-amd64/
+          cp src/dtlv.h ubuntu-latest-amd64/resources/ubuntu-latest-amd64/
+          cp src/lmdb/libraries/liblmdb/lmdb.h ubuntu-latest-amd64/resources/ubuntu-latest-amd64/lmdb/libraries/liblmdb/
+
+      - name: Deploy
         env:
           CLOJARS_USERNAME: ${{secrets.CLOJARSUSERNAME}}
           CLOJARS_PASSWORD: ${{secrets.CLOJARSPASSWORD}}
         run: |
-          script/build
-          cp src/*.a ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/
-          cp src/dtlv.h ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/
-          cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/
           cd ${{ matrix.os }}-amd64
           lein deploy clojars
