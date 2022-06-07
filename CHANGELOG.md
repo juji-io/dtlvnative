@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.5.0
+### Added
+- comparator for dupsort
+
 ## 0.4.0
 ### Changed
 - revert shared libraries

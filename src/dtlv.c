@@ -28,3 +28,10 @@ int dtlv_set_comparator(MDB_txn *txn, int dbi)
 
   return mdb_set_compare(txn, dbi, fp);
 }
+
+int dtlv_set_dupsort_comparator(MDB_txn *txn, int dbi)
+{
+  MDB_cmp_func *fp = dtlv_cmp_memn;
+
+  return mdb_set_dupsort(txn, dbi, fp);
+}
