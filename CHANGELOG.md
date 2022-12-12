@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.6.0
+### Added
+- MacOS aarch64 platform
+### Changed
+Update LMDB to 0.9.29
+
 ## 0.5.0
 ### Added
 - comparator for dupsort

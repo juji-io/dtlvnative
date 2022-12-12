@@ -1,5 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
-PROJECT(dtlv VERSION  0.9.24 LANGUAGES  C)
+PROJECT(dtlv VERSION  0.9.29 LANGUAGES  C)
 
 # Compilation switch to turn off compilation warning
 OPTION(CLOSE_WARNING "close warning,default off" OFF)
