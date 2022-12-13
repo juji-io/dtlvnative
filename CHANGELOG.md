@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.6.5
+### Fixed
+- release workflow
+
 ## 0.6.4
 ### Added
 - MacOS aarch64 platform. Build both static version for native dtlv, and shared library version for LMDBJava
