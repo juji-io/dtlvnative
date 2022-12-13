@@ -21,6 +21,7 @@ task:
     cd macos-latest-aarch64-shared
     lein deploy clojars
 
+    cd ..
     script/build
     cp src/*.a macos-latest-aarch64/resources/dtlvnative/macros-latest-aarch64/
     cp src/dtlv.h macros-latest-aarch64/resources/dtlvnative/macros-latest-aarch64/
