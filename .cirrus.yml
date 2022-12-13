@@ -23,8 +23,8 @@ task:
 
     cd ..
     script/build
-    cp src/*.a macos-latest-aarch64/resources/dtlvnative/macros-latest-aarch64/
-    cp src/dtlv.h macros-latest-aarch64/resources/dtlvnative/macros-latest-aarch64/
-    cp src/lmdb/libraries/liblmdb/lmdb.h macros-latest-aarch64/resources/dtlvnative/macros-latest-aarch64/lmdb/libraries/liblmdb/
+    cp src/*.a macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
+    cp src/dtlv.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
+    cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/lmdb/libraries/liblmdb/
     cd macos-latest-aarch64
     lein deploy clojars
