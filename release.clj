@@ -9,7 +9,6 @@
 
 (require '[clojure.string :as str])
 (require '[clojure.java.shell :as sh])
-(require '[clojure.java.io :as io])
 
 (defn update-file [f fn]
   (print "Updating" (str f "...")) (flush)
