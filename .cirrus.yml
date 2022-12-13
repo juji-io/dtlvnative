@@ -12,12 +12,6 @@ task:
     git submodule init
     git submodule update
 
-    brew install openjdk@11
-    sudo ln -sfn /opt/homebrew/opt/openjdk@11/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-11.jdk
-    echo 'export PATH="/opt/homebrew/opt/openjdk@11/bin:$PATH"' >> ~/.zshrc
-    source ~/.zshrc
-    java -version
-
     brew install leiningen
 
     script/build-macos-aarch64-shared
