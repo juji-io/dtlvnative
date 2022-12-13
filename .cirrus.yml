@@ -2,8 +2,8 @@ macos_instance:
   image: ghcr.io/cirruslabs/macos-monterey-base:latest
 
 task:
-  only_if: "changesInclude('macos-latest-aarch64/*',
-  'macos-latest-aarch64-shared/*', '.cirrus.yml')"
+  skip: !$CIRRUS_TAG
+  # only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
   env:
     LEIN_ROOT: "true"
     CLOJARS_USERNAME: ENCRYPTED[!38aa86f130316e623511e9425d88bd2be2aaa109164328b2d0c90aea35ef0ebbc32a51e5ff5b805ec20ffe6cc6fe0723!]
