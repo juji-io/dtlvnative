@@ -1,0 +1,24 @@
+macos_instance:
+  image: ghcr.io/cirruslabs/macos-monterey-base:latest
+
+task:
+  env:
+    LEIN_ROOT: "true"
+    CLOJARS_USERNAME: ENCRYPTED[!38aa86f130316e623511e9425d88bd2be2aaa109164328b2d0c90aea35ef0ebbc32a51e5ff5b805ec20ffe6cc6fe0723!]
+    CLOJARS_PASSWORD: ENCRYPTED[!c43d6967c24f7fd8bf1b02f58e11e285316b288785dd56cd58c08291c2047aa935bde02b1f366e292d85c57b038acf48!]
+  script: |
+    git submodule init
+    git submodule update
+
+    brew install leiningen
+
+    sudo /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+    java -version
+
+    script/build-macos-aarch64-shared
+
+    cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
+    cp src/dtlv.h macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
+    cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/lmdb/libraries/liblmdb/
+    cd macos-latest-aarch64-shared
+    lein deploy clojars

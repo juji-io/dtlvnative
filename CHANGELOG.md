@@ -2,9 +2,9 @@
 
 ## 0.6.0
 ### Added
-- MacOS aarch64 platform
+- MacOS aarch64 platform. Build both static version for native dtlv, and shared library version for LMDBJava
 ### Changed
-Update LMDB to 0.9.29
+Update LMDB to 0.9.29, following LMDBJava
 
 ## 0.5.0
 ### Added

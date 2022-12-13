@@ -1,8 +1,8 @@
 # dtlvnative
 
-Provides pre-built native dependencies for compiling native version of
-[Datalevin](https://github.com/juji-io/datalevin) database with GraalVM native
-image technology. This is done by packaging the compiled static C libraries and
+Provides pre-built native dependencies for
+[Datalevin](https://github.com/juji-io/datalevin) database. This is done by
+packaging the compiled static or shared C libraries and
 header files in JAR files.
 
 ## License
