@@ -20,9 +20,15 @@ task:
     brew install leiningen
 
     script/build-macos-aarch64-shared
-
     cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
     cp src/dtlv.h macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
     cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/lmdb/libraries/liblmdb/
     cd macos-latest-aarch64-shared
+    lein deploy clojars
+
+    script/build
+    cp src/*.a macos-latest-aarch64/resources/dtlvnative/macros-latest-aarch64/
+    cp src/dtlv.h macros-latest-aarch64/resources/dtlvnative/macros-latest-aarch64/
+    cp src/lmdb/libraries/liblmdb/lmdb.h macros-latest-aarch64/resources/dtlvnative/macros-latest-aarch64/lmdb/libraries/liblmdb/
+    cd macos-latest-aarch64
     lein deploy clojars
