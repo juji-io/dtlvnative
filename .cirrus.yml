@@ -2,8 +2,8 @@ macos_instance:
   image: ghcr.io/cirruslabs/macos-monterey-base:latest
 
 task:
-  only_if: $CIRRUS_TAG != ''
-  # only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
+  # only_if: $CIRRUS_TAG != ''
+  only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
   env:
     LEIN_ROOT: "true"
     CLOJARS_USERNAME: ENCRYPTED[!38aa86f130316e623511e9425d88bd2be2aaa109164328b2d0c90aea35ef0ebbc32a51e5ff5b805ec20ffe6cc6fe0723!]
@@ -15,6 +15,7 @@ task:
     brew install leiningen
 
     script/build-macos-aarch64-shared
+    ls -l src/lmdb/libraries/liblmdb
     cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
     cp src/dtlv.h macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
     cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/lmdb/libraries/liblmdb/
