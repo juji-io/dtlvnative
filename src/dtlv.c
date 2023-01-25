@@ -12,7 +12,8 @@ int endian_check() {
   return (*((uint8_t*)(&i))) == 0x67;
 }
 
-int is_little = endian_check();
+#define ENDIAN = endian_check();
+#define LITTLE = 1;
 
 int dtlv_memcmp(const void *a, const void *b, int n) {
 
@@ -34,13 +35,13 @@ int dtlv_memcmp(const void *a, const void *b, int n) {
     uint64_t lc = *li++;
     uint64_t rc = *ri++;
     if (lc != rc) {
-      if (is_little) {
-        li-=1; ri-=1;
-        rem_len = 8;
-        break;
-      } else {
-        return lc < rc ? -1 : 1;
-      }
+# if ENDIAN == LITTLE
+      li-=1; ri-=1;
+      rem_len = 8;
+      break;
+# else
+      return lc < rc ? -1 : 1;
+# endif
     }
   }
 
