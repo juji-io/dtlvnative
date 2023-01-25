@@ -7,14 +7,6 @@
 #include "unistd.h"
 #endif
 
-int endian_check() {
-  volatile uint32_t i=0x01234567;
-  return (*((uint8_t*)(&i))) == 0x67;
-}
-
-#define ENDIAN = endian_check();
-#define LITTLE = 1;
-
 int dtlv_memcmp(const void *a, const void *b, int n) {
 
 # if defined(INTS_NEED_ALIGNED)
@@ -35,12 +27,12 @@ int dtlv_memcmp(const void *a, const void *b, int n) {
     uint64_t lc = *li++;
     uint64_t rc = *ri++;
     if (lc != rc) {
-# if ENDIAN == LITTLE
+# if __BYTE_ORDER == __BIG_ENDIAN
+      return lc < rc ? -1 : 1;
+# else
       li-=1; ri-=1;
       rem_len = 8;
       break;
-# else
-      return lc < rc ? -1 : 1;
 # endif
     }
   }
