@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.7.6
 ### Improved
 - tweak gcc option
 
