@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.7.0
+### Improved
+- faster comparator
+
 ## 0.6.5
 ### Fixed
 - release workflow
