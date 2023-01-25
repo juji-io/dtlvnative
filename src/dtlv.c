@@ -7,6 +7,11 @@
 #include "unistd.h"
 #endif
 
+union {
+  uint32_t i;
+  char c[4];
+} bint = {0x01020304};
+
 int dtlv_memcmp(const void *a, const void *b, int n) {
 
 # if defined(INTS_NEED_ALIGNED)
@@ -27,13 +32,13 @@ int dtlv_memcmp(const void *a, const void *b, int n) {
     uint64_t lc = *li++;
     uint64_t rc = *ri++;
     if (lc != rc) {
-# if __BYTE_ORDER == __BIG_ENDIAN
-      return lc < rc ? -1 : 1;
-# else
-      li-=1; ri-=1;
-      rem_len = 8;
-      break;
-# endif
+      if (bint.c[0] == 1) {
+        return lc < rc ? -1 : 1;
+      } else {
+        li-=1; ri-=1;
+        rem_len = 8;
+        break;
+      }
     }
   }
 
