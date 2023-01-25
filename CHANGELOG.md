@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Improved
+- tweak gcc option
+
 ## 0.7.5
 ### Improved
 - faster comparator

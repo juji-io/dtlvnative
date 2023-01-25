@@ -10,7 +10,7 @@ $(lib_lmdb):
 		cp $(lib_lmdb)/liblmdb.a $(lib_dtlv)
 
 $(lib_dtlv): $(lib_lmdb)
-		gcc -Wall -g -c dtlv.c -o dtlv.o
+		gcc -pthread -fPIC -O2 -Wall -g -c dtlv.c -o dtlv.o
 		ar rcs libdtlv.a dtlv.o
 
 clean:
