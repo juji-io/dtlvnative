@@ -7,17 +7,19 @@
 #include "unistd.h"
 #endif
 
-int dtlv_memcmp(const void *a, const void *b, unsigned int n) {
+int dtlv_memcmp(const void *a, const void *b, int n) {
 
+# if defined ( INTS_NEED_ALIGNED )
   intptr_t lp = (intptr_t)a;
   intptr_t rp = (intptr_t)b;
   if (( lp | rp ) & 0x3 ) {
     return memcmp(a, b, n);
   }
+# endif
 
   uint64_t *li = (uint64_t *)a;
   uint64_t *ri = (uint64_t *)b;
-  int greater_len = n >> 3; 
+  int greater_len = n >> 3;
   int lesser_len = n & (0x7);
 
   int ii;
@@ -25,13 +27,19 @@ int dtlv_memcmp(const void *a, const void *b, unsigned int n) {
     uint64_t lc = *li++;
     uint64_t rc = *ri++;
     if ( lc != rc ) {
+# if __BYTE_ORDER == __BIG_ENDIAN
       return lc < rc ? -1 : 1;
+# else
+      li-=1; ri-=1;
+      lesser_len = 8;
+      break ;
+# endif
     }
   }
 
   unsigned char *l = (unsigned char *)li;
   unsigned char *r = (unsigned char *)ri;
-  for ( ii =0; ii < lesser_len; ii++) {
+  for (ii=0; ii < lesser_len; ii++) {
     unsigned char lc = *l++;
     unsigned char rc = *r++;
     if ( lc != rc ) {
