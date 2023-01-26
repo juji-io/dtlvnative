@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include "dtlv.h"
 
@@ -7,56 +6,8 @@
 #include "unistd.h"
 #endif
 
-union {
-  uint32_t i;
-  char c[4];
-} bint = {0x01020304};
-
-int dtlv_memcmp(const void *a, const void *b, int n) {
-
-# if defined(INTS_NEED_ALIGNED)
-  intptr_t lp = (intptr_t)a;
-  intptr_t rp = (intptr_t)b;
-  if (( lp | rp ) & 0x3 ) {
-    return memcmp(a, b, n);
-  }
-# endif
-
-  uint64_t *li = (uint64_t *)a;
-  uint64_t *ri = (uint64_t *)b;
-  int oct_len = n >> 3;
-  int rem_len = n & (0x7);
-
-  int ii;
-  for (ii=0; ii < oct_len; ii++) {
-    uint64_t lc = *li++;
-    uint64_t rc = *ri++;
-    if (lc != rc) {
-      if (bint.c[0] == 1) {
-        return lc < rc ? -1 : 1;
-      } else {
-        li-=1; ri-=1;
-        rem_len = 8;
-        break;
-      }
-    }
-  }
-
-  unsigned char *l = (unsigned char *)li;
-  unsigned char *r = (unsigned char *)ri;
-  for (ii=0; ii < rem_len; ii++) {
-    unsigned char lc = *l++;
-    unsigned char rc = *r++;
-    if ( lc != rc ) {
-      return lc < rc ? -1 : 1;
-    }
-  }
-
-  return 0;
-}
 
 int dtlv_cmp_memn(const MDB_val *a, const MDB_val *b) {
-  if (a==b) return 0;
 
 	int diff;
 	ssize_t len_diff;
@@ -68,7 +19,7 @@ int dtlv_cmp_memn(const MDB_val *a, const MDB_val *b) {
 		len = b->mv_size;
 	}
 
-  diff = dtlv_memcmp(a->mv_data, b->mv_data, len);
+  diff = memcmp(a->mv_data, b->mv_data, len);
 
 	return diff ? diff : len_diff;
 }
