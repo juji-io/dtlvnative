@@ -12,8 +12,7 @@ cmake .. ^
     -DCMAKE_BUILD_TYPE:STRING=RELEASE ^
     -DCMAKE_INSTALL_PREFIX=%CPATH% ^
     -DCLOSE_WARNING=on ^
-    -DBUILD_TEST=off ^
-    -DBUILD_SHARED_LIBS=off
+    -DBUILD_TEST=off 
 nmake install
 
 cd %CPATH%
@@ -21,3 +20,5 @@ cd %CPATH%
 copy *.lib ..\windows-amd64\resources\dtlvnative\windows-amd64\
 copy dtlv.h ..\windows-amd64\resources\dtlvnative\windows-amd64\
 copy lmdb\libraries\liblmdb\lmdb.h ..\windows-amd64\resources\dtlvnative\windows-amd64\lmdb\libraries\liblmdb\
+
+copy lmdbShared\*.dll ..\windows-amd64-shared\resources\dtlvnative\windows-amd64-shared\
