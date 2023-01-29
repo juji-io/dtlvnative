@@ -42,7 +42,11 @@
     (update-file "ubuntu-latest-amd64/project.clj" old->new)
     (update-file "macos-latest-amd64/project.clj" old->new)
     (update-file "macos-latest-aarch64/project.clj" old->new)
-    (update-file "macos-latest-aarch64-shared/project.clj" old->new)))
+    (update-file "windows-amd64-shared/project.clj" old->new)
+    (update-file "ubuntu-latest-amd64-shared/project.clj" old->new)
+    (update-file "macos-latest-amd64-shared/project.clj" old->new)
+    (update-file "macos-latest-aarch64-shared/project.clj" old->new)
+    ))
 
 (defn make-commit []
   (println "\n\n[ Making a commit ]\n")
@@ -52,6 +56,9 @@
       "ubuntu-latest-amd64/project.clj"
       "macos-latest-amd64/project.clj"
       "macos-latest-aarch64/project.clj"
+      "windows-amd64-shared/project.clj"
+      "ubuntu-latest-amd64-shared/project.clj"
+      "macos-latest-amd64-shared/project.clj"
       "macos-latest-aarch64-shared/project.clj")
 
   (sh "git" "commit" "-m" (str "Version " new-v))
@@ -81,7 +88,7 @@
                        (take-while #(not (re-matches #"# .+" %)))
                        (remove str/blank?)
                        (str/join "\n"))
-        request   { "tag_name"        new-v
+        request   {"tag_name"         new-v
                    "name"             new-v
                    "target_commitish" "master"
                    "body"             changelog}]

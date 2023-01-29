@@ -5,6 +5,10 @@ Provides pre-built native dependencies for
 packaging the compiled static or shared C libraries and
 header files in JAR files.
 
+The `*-shared` packages are dynamic shared libraries that are used in embedded
+library version of Datalevin, where others are static libraries that used in
+GraalVM native image version of Datalevin.
+
 ## License
 
 Copyright © 2021-2023 Juji, Inc.

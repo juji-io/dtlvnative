@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    env:
+      CLOJARS_USERNAME: ${{secrets.CLOJARSUSERNAME}}
+      CLOJARS_PASSWORD: ${{secrets.CLOJARSPASSWORD}}
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest]
@@ -24,14 +27,26 @@ jobs:
           macos: brew install leiningen
           linux: echo "lein is already installed"
 
-      - name: Build and deploy
-        env:
-          CLOJARS_USERNAME: ${{secrets.CLOJARSUSERNAME}}
-          CLOJARS_PASSWORD: ${{secrets.CLOJARSPASSWORD}}
+      - name: Build and deploy static
         run: |
-          script/build
-          cp src/*.a ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
-          cp src/dtlv.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
-          cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/
-          cd ${{ matrix.os }}-amd64
-          lein deploy clojars
+            script/build
+            cp src/*.a ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
+            cp src/dtlv.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
+            cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/
+            cd ${{ matrix.os }}-amd64
+            lein deploy clojars
+
+      - name: Build and deploy shared
+        uses: knicknic/os-specific-run@v1.0.3
+        with:
+          macos: |
+            script/build-macos-shared
+            cp src/liblmdb.dylib ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared/
+            cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared/lmdb/libraries/liblmdb/
+            cd ${{ matrix.os }}-amd64-shared
+            lein deploy clojars
+          linux: |
+            cp src/liblmdb.so ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared/
+            cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared/lmdb/libraries/liblmdb/
+            cd ${{ matrix.os }}-amd64-shared
+            lein deploy clojars
