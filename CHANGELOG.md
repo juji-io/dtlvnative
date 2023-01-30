@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.8.1
 ### Added
 - Shared library build for LMDB on all platforms
 ### Changed
