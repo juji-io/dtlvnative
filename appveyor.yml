@@ -44,10 +44,17 @@ build_script:
     call script\build.bat
 
 - cmd: >-
-    cd ..\windows-amd64
+
+    cd ..
 
     powershell -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein.bat', 'lein.bat')"
 
     call lein.bat self-install
 
-    call lein.bat deploy clojars
+    cd windows-amd64
+
+    call ..\lein.bat deploy clojars
+
+    cd ..\windows-amd64-shared
+
+    call ..\lein.bat deploy clojars
