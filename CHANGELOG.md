@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.8.2
 ### Fixed
 - Windows build
 
