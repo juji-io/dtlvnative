@@ -16,6 +16,7 @@ task:
 
     script/build-macos-shared
     ls -l src/lmdb/libraries/liblmdb
+    mkdir -p macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared
     cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
     cd macos-latest-aarch64-shared
     lein deploy clojars
