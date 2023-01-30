@@ -22,9 +22,11 @@ SET_TARGET_PROPERTIES( lmdbShared
   PROPERTIES
   OUTPUT_NAME lmdb
   ARCHIVE_OUTPUT_DIRECTORY lmdbShared
-  LIBRARY_OUTPUT_DIRECTORY lmdbShared
   RUNTIME_OUTPUT_DIRECTORY lmdbShared
 )
+
+INSTALL(TARGETS lmdbShared 
+    RUNTIME DESTINATION .)
 
 # lmdb library (static)
 ADD_LIBRARY(lmdb STATIC lmdb/libraries/liblmdb/mdb.c lmdb/libraries/liblmdb/midl.c)
@@ -32,5 +34,6 @@ ADD_LIBRARY(lmdb STATIC lmdb/libraries/liblmdb/mdb.c lmdb/libraries/liblmdb/midl
 # dtlv library (static)
 ADD_LIBRARY(dtlv STATIC dtlv.c)
 
-INSTALL(TARGETS lmdbShared lmdb dtlv
+INSTALL(TARGETS lmdb dtlv
     ARCHIVE DESTINATION .)
+

@@ -22,4 +22,4 @@ copy dtlv.h ..\windows-amd64\resources\dtlvnative\windows-amd64\
 copy lmdb\libraries\liblmdb\lmdb.h ..\windows-amd64\resources\dtlvnative\windows-amd64\lmdb\libraries\liblmdb\
 
 md ..\windows-amd64-shared\resources\dtlvnative\windows-amd64-shared
-copy lmdbShared\*.dll ..\windows-amd64-shared\resources\dtlvnative\windows-amd64-shared\
+copy *.dll ..\windows-amd64-shared\resources\dtlvnative\windows-amd64-shared\
