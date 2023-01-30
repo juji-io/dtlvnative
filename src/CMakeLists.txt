@@ -32,5 +32,5 @@ ADD_LIBRARY(lmdb STATIC lmdb/libraries/liblmdb/mdb.c lmdb/libraries/liblmdb/midl
 # dtlv library (static)
 ADD_LIBRARY(dtlv STATIC dtlv.c)
 
-INSTALL(TARGETS lmdb dtlv
+INSTALL(TARGETS lmdbShared lmdb dtlv
     ARCHIVE DESTINATION .)

@@ -1,5 +1,11 @@
 # Change Log
 
+## WIP
+### Added
+- Shared library build for LMDB on all platforms
+### Changed
+- Switch to master branch of LMDB
+
 ## 0.7.6
 ### Improved
 - tweak gcc option

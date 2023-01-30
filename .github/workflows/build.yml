@@ -42,7 +42,7 @@ jobs:
           macos: |
             script/build-macos-shared
             mkdir -p ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared
-            cp src/liblmdb.dylib ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared/
+            cp src/lmdb/libraries/liblmdb/liblmdb.dylib ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared/
             cd ${{ matrix.os }}-amd64-shared
             lein deploy clojars
           linux: |
