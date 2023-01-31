@@ -9,6 +9,8 @@
 
 int dtlv_cmp_memn(const MDB_val *a, const MDB_val *b) {
 
+  if (a == b) return 0;
+
 	int diff;
 	ssize_t len_diff;
 	unsigned int len;
