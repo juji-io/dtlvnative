@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.8.3
+### Changed
+- comparator treats address identity as equal
+
 ## 0.8.2
 ### Fixed
 - Windows build
