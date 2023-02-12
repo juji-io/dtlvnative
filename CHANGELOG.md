@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.7.9
+### Changed
+- build shared with gcc on linux
+
 ## 0.7.8
 ### Changed
 - build static with musl on linux
