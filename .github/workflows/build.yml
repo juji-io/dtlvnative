@@ -56,6 +56,7 @@ jobs:
             cd ${{ matrix.os }}-amd64-shared
             lein deploy clojars
           linux: |
+            script/build
             mkdir -p ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared
             cp src/liblmdb.so ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared/
             cd ${{ matrix.os }}-amd64-shared
