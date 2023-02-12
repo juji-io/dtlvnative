@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.7.11
 ### Fix
 - use $(RM) in make clean
 
