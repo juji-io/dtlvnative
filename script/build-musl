@@ -3,4 +3,4 @@
 set -eou pipefail
 
 cd src
-make CC=gcc
+make CC=musl-gcc

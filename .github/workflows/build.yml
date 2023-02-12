@@ -28,8 +28,18 @@ jobs:
           linux: echo "lein is already installed"
 
       - name: Build and deploy static
-        run: |
+        uses: knicknic/os-specific-run@v1.0.3
+        with:
+          macos: |
             script/build
+            cp src/*.a ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
+            cp src/dtlv.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
+            cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/
+            cd ${{ matrix.os }}-amd64
+            lein deploy clojars
+          linux: |
+            sudo script/setup-musl
+            script/build-musl
             cp src/*.a ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
             cp src/dtlv.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
             cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/

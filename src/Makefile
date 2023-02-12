@@ -1,3 +1,4 @@
+
 lib_lmdb  := lmdb/libraries/liblmdb
 lib_dtlv  := .
 libraries := $(lib_lmdb) $(lib_dtlv)
@@ -11,7 +12,7 @@ $(lib_lmdb):
 		cp $(lib_lmdb)/liblmdb.so $(lib_dtlv)
 
 $(lib_dtlv): $(lib_lmdb)
-		gcc -pthread -fPIC -O2 -Wall -g -c dtlv.c -o dtlv.o
+		$(CC) -pthread -fPIC -O2 -Wall -g -c dtlv.c -o dtlv.o
 		ar rcs libdtlv.a dtlv.o
 
 clean:

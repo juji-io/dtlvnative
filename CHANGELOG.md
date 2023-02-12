@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Changed
+- build static with musl on linux
+
 ## 0.8.3
 ### Changed
 - comparator treats address identity as equal
