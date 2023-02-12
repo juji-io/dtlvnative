@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Fix
+- make clean error when there's no prior build
+
 ## 0.7.9
 ### Changed
 - build shared with gcc on linux
