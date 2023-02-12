@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.7.8
 ### Changed
 - build static with musl on linux
 
