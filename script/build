@@ -4,4 +4,6 @@ set -eou pipefail
 
 cd src
 
+make clean
+
 make CC=gcc

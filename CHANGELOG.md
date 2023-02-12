@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Fix
+- use $(RM) in make clean
+
 ## 0.7.10
 ### Fix
 - make clean error when there's no prior build

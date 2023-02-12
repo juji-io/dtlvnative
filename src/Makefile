@@ -16,5 +16,5 @@ $(lib_dtlv): $(lib_lmdb)
 		ar rcs libdtlv.a dtlv.o
 
 clean:
-		rm *.o *.a *.so
+		$(RM) *.o *.a *.so
 		$(MAKE) --directory=$(lib_lmdb) clean
