@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Changed
+- copy musl prebuild libstdc++.a to musl lib dir
+
 ## 0.7.11
 ### Fix
 - use $(RM) in make clean
