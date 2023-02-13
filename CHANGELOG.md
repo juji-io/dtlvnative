@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.7.12
 ### Changed
 - copy musl prebuild libstdc++.a to musl lib dir
 
