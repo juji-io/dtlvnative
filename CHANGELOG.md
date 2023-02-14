@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.8.4
 ### Changed
 - also build static with musl for linux for master branch of LMDB
 
