@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Changed
+- also build static with musl for linux for master branch of LMDB
+
 ## 0.7.12
 ### Changed
 - copy musl prebuild libstdc++.a to musl lib dir
