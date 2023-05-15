@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.8.6
 ### Changed
 - use ubuntu-20.04
 
