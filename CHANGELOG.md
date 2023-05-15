@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.8.8
+### Fix
+- forgot to commit
+
 ## 0.8.7
 ### Fix
 - fix directory
