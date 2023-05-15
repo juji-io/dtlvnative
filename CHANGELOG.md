@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Changed
+- use ubuntu-20.04
+
 ## 0.8.5
 ### Changed
 - LMDB tracks mdb.master branch on openldap repo
