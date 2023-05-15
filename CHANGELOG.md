@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.8.7
+### Fix
+- fix directory
+
 ## 0.8.6
 ### Changed
 - use ubuntu-20.04
