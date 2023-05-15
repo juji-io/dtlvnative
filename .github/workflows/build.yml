@@ -40,10 +40,10 @@ jobs:
           linux: |
             sudo script/setup-musl
             script/build-musl
-            cp src/*.a ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
-            cp src/dtlv.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
-            cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/
-            cd ${{ matrix.os }}-amd64
+            cp src/*.a ubuntu-latest-amd64/resources/dtlvnative/ubuntu-latest-amd64/
+            cp src/dtlv.h ubuntu-latest-amd64/resources/dtlvnative/ubuntu-latest-amd64/
+            cp src/lmdb/libraries/liblmdb/lmdb.h ubuntu-latest-amd64/resources/dtlvnative/ubuntu-latest-amd64/lmdb/libraries/liblmdb/
+            cd ubuntu-latest-amd64
             lein deploy clojars
 
       - name: Build and deploy shared
@@ -57,7 +57,7 @@ jobs:
             lein deploy clojars
           linux: |
             script/build
-            mkdir -p ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared
-            cp src/liblmdb.so ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared/
-            cd ${{ matrix.os }}-amd64-shared
+            mkdir -p ubuntu-latest-amd64-shared/resources/dtlvnative/ubuntu-latest-amd64-shared
+            cp src/liblmdb.so ubuntu-latest-amd64-shared/resources/dtlvnative/ubuntu-latest-amd64-shared/
+            cd ubuntu-latest-amd64-shared
             lein deploy clojars
