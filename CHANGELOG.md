@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.8.9
+### Changed
+- update LMDB to latest
+
 ## 0.8.8
 ### Fix
 - forgot to commit
