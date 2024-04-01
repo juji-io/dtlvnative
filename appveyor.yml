@@ -54,7 +54,3 @@ build_script:
     cd windows-amd64
 
     call ..\lein.bat deploy clojars
-
-    cd ..\windows-amd64-shared
-
-    call ..\lein.bat deploy clojars

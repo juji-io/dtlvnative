@@ -38,14 +38,18 @@
   (let [old-v    (current-version)
         old->new #(str/replace % old-v new-v)]
     (update-file "CHANGELOG.md" #(str/replace % "# WIP" (str "# " new-v)))
+
     (update-file "windows-amd64/project.clj" old->new)
     (update-file "ubuntu-latest-amd64/project.clj" old->new)
     (update-file "macos-latest-amd64/project.clj" old->new)
     (update-file "macos-latest-aarch64/project.clj" old->new)
-    (update-file "windows-amd64-shared/project.clj" old->new)
+
     (update-file "ubuntu-latest-amd64-shared/project.clj" old->new)
     (update-file "macos-latest-amd64-shared/project.clj" old->new)
     (update-file "macos-latest-aarch64-shared/project.clj" old->new)
+
+    (update-file "x86_64-windows-gnu/project.clj" old->new)
+    (update-file "aarch64-linux-gnu/project.clj" old->new)
     ))
 
 (defn make-commit []
@@ -56,7 +60,10 @@
       "ubuntu-latest-amd64/project.clj"
       "macos-latest-amd64/project.clj"
       "macos-latest-aarch64/project.clj"
-      "windows-amd64-shared/project.clj"
+
+      "x86_64-windows-gnu/project.clj"
+      "aarch64-linux-gnu/project.clj"
+
       "ubuntu-latest-amd64-shared/project.clj"
       "macos-latest-amd64-shared/project.clj"
       "macos-latest-aarch64-shared/project.clj")

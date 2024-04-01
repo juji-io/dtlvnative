@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -eou pipefail
+
+cd src/lmdb/libraries/liblmdb
+
+# don't fix that's not broken, use existing infra for other targets
+for target in aarch64-linux-gnu \
+              x86_64-windows-gnu
+do
+  echo "##### Building $target ####"
+  make -e clean liblmdb.so CC="zig cc -target $target" AR="zig ar"
+  if [[ "$target" == *-windows-* ]]; then
+    extension="dll"
+  else
+    extension="so"
+  fi
+  mkdir -p ../../../../$target/resources/dtlvnative/$target
+  cp -v liblmdb.so ../../../../$target/resources/dtlvnative/$target/liblmdb.$extension
+  cd ../../../../$target
+  lein deploy clojars
+  cd ../src/lmdb/libraries/liblmdb
+done

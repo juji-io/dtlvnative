@@ -27,6 +27,9 @@ jobs:
           macos: brew install leiningen
           linux: echo "lein is already installed"
 
+      - name: Install Zig
+        uses: goto-bus-stop/setup-zig@v2
+
       - name: Build and deploy static
         uses: knicknic/os-specific-run@v1.0.3
         with:
@@ -61,3 +64,9 @@ jobs:
             cp src/liblmdb.so ubuntu-latest-amd64-shared/resources/dtlvnative/ubuntu-latest-amd64-shared/
             cd ubuntu-latest-amd64-shared
             lein deploy clojars
+
+      - name: Build and deploy cross compiled shared
+        uses: knicknic/os-specific-run@v1.0.3
+        with:
+          linux: |
+            script/build-zig
