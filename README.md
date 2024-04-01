@@ -2,16 +2,24 @@
 
 Provides pre-built native dependencies for
 [Datalevin](https://github.com/juji-io/datalevin) database. This is done by
-packaging the compiled static or shared C libraries and
-header files in JAR files.
+packaging the compiled static or shared C libraries and header files in JAR
+files.
 
-The `*-shared` packages are dynamic shared libraries that are used in embedded
-library version of Datalevin, where others are static libraries that used in
-GraalVM native image version of Datalevin.
+Three types of libraries are built here.
+
+1. Static libraries. These are used in GraalVM native image version of
+   Datalevin and are built using the musl tool chain.
+
+2. Shared libraries built on native platforms. These are built using native tool
+   chains of the respective platform due to good availability of these platforms
+   on free public CI/CD platforms. These are under directory `*-shared`.
+
+3. Cross compiled shared libraries. These are built using zig build tool. These
+   are under directory matching zig target names.
 
 ## License
 
-Copyright © 2021-2023 Juji, Inc.
+Copyright © 2021-2024 Juji, Inc.
 
 This program and the accompanying materials are made available under the
 terms of the Eclipse Public License 2.0 which is available at
