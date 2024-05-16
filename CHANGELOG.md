@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.9.2
+### Changed
+- update LMDB to latest
+
+## 0.9.1
+### Added
+- zig cross compilation for shared libraries on Windows/x86_64 and Linux/aarch64
+
 ## 0.8.9
 ### Changed
 - update LMDB to latest
