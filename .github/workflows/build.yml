@@ -35,10 +35,10 @@ jobs:
         with:
           macos: |
             script/build
-            cp src/*.a ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
-            cp src/dtlv.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/
-            cp src/lmdb/libraries/liblmdb/lmdb.h ${{ matrix.os }}-amd64/resources/dtlvnative/${{ matrix.os }}-amd64/lmdb/libraries/liblmdb/
-            cd ${{ matrix.os }}-amd64
+            cp src/*.a macos-latest-amd64/resources/dtlvnative/macos-latest-amd64/
+            cp src/dtlv.h macos-latest-amd64/resources/dtlvnative/macos-latest-amd64/
+            cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-amd64/resources/dtlvnative/macos-latest-amd64/lmdb/libraries/liblmdb/
+            cd macos-latest-amd64
             lein deploy clojars
           linux: |
             sudo script/setup-musl
@@ -54,9 +54,9 @@ jobs:
         with:
           macos: |
             script/build-macos-shared
-            mkdir -p ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared
-            cp src/lmdb/libraries/liblmdb/liblmdb.dylib ${{ matrix.os }}-amd64-shared/resources/dtlvnative/${{ matrix.os }}-amd64-shared/
-            cd ${{ matrix.os }}-amd64-shared
+            mkdir -p macos-latest-amd64-shared/resources/dtlvnative/macos-latest-amd64-shared
+            cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-amd64-shared/resources/dtlvnative/macos-latest-amd64-shared/
+            cd macos-latest-amd64-shared
             lein deploy clojars
           linux: |
             script/build
