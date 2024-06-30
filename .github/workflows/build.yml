@@ -42,7 +42,7 @@ jobs:
             lein deploy clojars
           linux: |
             sudo script/setup-musl
-            script/build-musl
+            script/build-musl-amd64
             cp src/*.a ubuntu-latest-amd64/resources/dtlvnative/ubuntu-latest-amd64/
             cp src/dtlv.h ubuntu-latest-amd64/resources/dtlvnative/ubuntu-latest-amd64/
             cp src/lmdb/libraries/liblmdb/lmdb.h ubuntu-latest-amd64/resources/dtlvnative/ubuntu-latest-amd64/lmdb/libraries/liblmdb/
