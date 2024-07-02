@@ -1,16 +1,18 @@
+env:
+  LEIN_ROOT: "true"
+  CLOJARS_USERNAME: ENCRYPTED[57ecc4e3c46322710eff3eecb11b85933ee46c6424967d5a33e0cbd5bcdba1b47aeccd09ed6a513768153919a98d5c19]
+  CLOJARS_PASSWORD: ENCRYPTED[456a25113c10494849f4d26a9d2006036f0d71e2997bef2972d947c59425ea89ed65bbac6933b447b545bdb53e51e678]
+  # CLOJARS_USERNAME: ENCRYPTED[!38aa86f130316e623511e9425d88bd2be2aaa109164328b2d0c90aea35ef0ebbc32a51e5ff5b805ec20ffe6cc6fe0723!]
+  # CLOJARS_PASSWORD: ENCRYPTED[!c43d6967c24f7fd8bf1b02f58e11e285316b288785dd56cd58c08291c2047aa935bde02b1f366e292d85c57b038acf48!]
+
 task:
-  arm_container: ubuntu:latest
+  arm_container:
+    image: ubuntu:latest
   only_if: $CIRRUS_TAG != ''
-  # only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
-  env:
-    LEIN_ROOT: "true"
-    CLOJARS_USERNAME: algoflora
-    CLOJARS_PASSWORD: 
-    # CLOJARS_USERNAME: ENCRYPTED[!38aa86f130316e623511e9425d88bd2be2aaa109164328b2d0c90aea35ef0ebbc32a51e5ff5b805ec20ffe6cc6fe0723!]
-    # CLOJARS_PASSWORD: ENCRYPTED[!c43d6967c24f7fd8bf1b02f58e11e285316b288785dd56cd58c08291c2047aa935bde02b1f366e292d85c57b038acf48!]
+  # only_if: "changesInclude('linux-latest-aarch64/*', '.cirrus.yml')"
   script: |
     apt-get update
-    apt-get install -y curl git wget tar openjdk-11-jre-headless liblmdb-dev
+    apt-get install -y curl git wget tar openjdk-11-jre-headless build-essential liblmdb-dev
     
     git submodule init
     git submodule update
@@ -19,41 +21,42 @@ task:
     chmod a+x lein
     mv lein /usr/local/bin/
 
+    script/build-linux-shared
+    mkdir -p ubuntu-latest-aarch64-shared/resources/dtlvnative/ubuntu-latest-aarch64-shared
+    cp src/lmdb/libraries/liblmdb/liblmdb.so ubuntu-latest-aarch64-shared/resources/dtlvnative/ubuntu-latest-aarch64-shared/
+    cd ubuntu-latest-aarch64-shared
+    lein deploy clojars
+
     cd ..
-    script/setup-musl
-    script/build-musl-aarch64
+    script/build
     cp src/*.a ubuntu-latest-aarch64/resources/dtlvnative/ubuntu-latest-aarch64/
     cp src/dtlv.h ubuntu-latest-aarch64/resources/dtlvnative/ubuntu-latest-aarch64/
     cp src/lmdb/libraries/liblmdb/lmdb.h ubuntu-latest-aarch64/resources/dtlvnative/ubuntu-latest-aarch64/lmdb/libraries/liblmdb/
     cd ubuntu-latest-aarch64
     lein deploy clojars
 
-# task:
-#   macos_instance:
-#     image: ghcr.io/cirruslabs/macos-monterey-base:latest
-#   only_if: $CIRRUS_TAG != ''
-#   # only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
-#   env:
-#     LEIN_ROOT: "true"
-#     CLOJARS_USERNAME: ENCRYPTED[!38aa86f130316e623511e9425d88bd2be2aaa109164328b2d0c90aea35ef0ebbc32a51e5ff5b805ec20ffe6cc6fe0723!]
-#     CLOJARS_PASSWORD: ENCRYPTED[!c43d6967c24f7fd8bf1b02f58e11e285316b288785dd56cd58c08291c2047aa935bde02b1f366e292d85c57b038acf48!]
-#   script: |
-#     git submodule init
-#     git submodule update
+task:
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-monterey-base:latest
+  only_if: $CIRRUS_TAG != ''
+  # only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
+  script: |
+    git submodule init
+    git submodule update
 
-#     brew install leiningen
+    brew install leiningen
 
-#     script/build-macos-shared
-#     ls -l src/lmdb/libraries/liblmdb
-#     mkdir -p macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared
-#     cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
-#     cd macos-latest-aarch64-shared
-#     lein deploy clojars
+    script/build-macos-shared
+    ls -l src/lmdb/libraries/liblmdb
+    mkdir -p macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared
+    cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
+    cd macos-latest-aarch64-shared
+    lein deploy clojars
 
-#     cd ..
-#     script/build
-#     cp src/*.a macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
-#     cp src/dtlv.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
-#     cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/lmdb/libraries/liblmdb/
-#     cd macos-latest-aarch64
-#     lein deploy clojars
+    cd ..
+    script/build
+    cp src/*.a macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
+    cp src/dtlv.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
+    cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/lmdb/libraries/liblmdb/
+    cd macos-latest-aarch64
+    lein deploy clojars
