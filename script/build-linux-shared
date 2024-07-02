@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -eou pipefail
+
+cd src/lmdb/libraries/liblmdb
+make -e SOEXT=.so
