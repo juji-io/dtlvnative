@@ -5,7 +5,7 @@ env:
 
 task:
   arm_container:
-    image: ubuntu:latest
+    image: ubuntu:focal
   only_if: $CIRRUS_TAG != ''
   # only_if: "changesInclude('linux-latest-aarch64/*', '.cirrus.yml')"
   script: |
