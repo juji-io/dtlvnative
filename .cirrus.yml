@@ -1,13 +1,43 @@
-macos_instance:
-  image: ghcr.io/cirruslabs/macos-monterey-base:latest
+env:
+  LEIN_ROOT: "true"
+  CLOJARS_USERNAME: ENCRYPTED[!38aa86f130316e623511e9425d88bd2be2aaa109164328b2d0c90aea35ef0ebbc32a51e5ff5b805ec20ffe6cc6fe0723!]
+  CLOJARS_PASSWORD: ENCRYPTED[!c43d6967c24f7fd8bf1b02f58e11e285316b288785dd56cd58c08291c2047aa935bde02b1f366e292d85c57b038acf48!]
 
 task:
+  arm_container:
+    image: ubuntu:focal
+  only_if: $CIRRUS_TAG != ''
+  # only_if: "changesInclude('linux-latest-aarch64/*', '.cirrus.yml')"
+  script: |
+    apt-get update
+    apt-get install -y curl git wget tar openjdk-11-jre-headless build-essential liblmdb-dev
+    
+    git submodule init
+    git submodule update
+
+    curl -O https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
+    chmod a+x lein
+    mv lein /usr/local/bin/
+
+    script/build-linux-shared
+    mkdir -p ubuntu-latest-aarch64-shared/resources/dtlvnative/ubuntu-latest-aarch64-shared
+    cp src/lmdb/libraries/liblmdb/liblmdb.so ubuntu-latest-aarch64-shared/resources/dtlvnative/ubuntu-latest-aarch64-shared/
+    cd ubuntu-latest-aarch64-shared
+    lein deploy clojars
+
+    cd ..
+    script/build
+    cp src/*.a ubuntu-latest-aarch64/resources/dtlvnative/ubuntu-latest-aarch64/
+    cp src/dtlv.h ubuntu-latest-aarch64/resources/dtlvnative/ubuntu-latest-aarch64/
+    cp src/lmdb/libraries/liblmdb/lmdb.h ubuntu-latest-aarch64/resources/dtlvnative/ubuntu-latest-aarch64/lmdb/libraries/liblmdb/
+    cd ubuntu-latest-aarch64
+    lein deploy clojars
+
+task:
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-monterey-base:latest
   only_if: $CIRRUS_TAG != ''
   # only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
-  env:
-    LEIN_ROOT: "true"
-    CLOJARS_USERNAME: ENCRYPTED[!38aa86f130316e623511e9425d88bd2be2aaa109164328b2d0c90aea35ef0ebbc32a51e5ff5b805ec20ffe6cc6fe0723!]
-    CLOJARS_PASSWORD: ENCRYPTED[!c43d6967c24f7fd8bf1b02f58e11e285316b288785dd56cd58c08291c2047aa935bde02b1f366e292d85c57b038acf48!]
   script: |
     git submodule init
     git submodule update
