@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.9.5
 ### Added
 - Linux aarch64 shared and static build on native platform
 ### Removed
