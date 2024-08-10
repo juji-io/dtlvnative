@@ -9,6 +9,7 @@ task:
   only_if: $CIRRUS_TAG != ''
   # only_if: "changesInclude('linux-latest-aarch64/*', '.cirrus.yml')"
   script: |
+    DEBIAN_FRONTEND=noninteractive apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y curl git wget tar openjdk-11-jre-headless build-essential liblmdb-dev
 
     git submodule init
