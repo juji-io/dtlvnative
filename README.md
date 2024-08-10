@@ -15,7 +15,8 @@ Three types of libraries are built here.
    on free public CI/CD platforms. These are under directory `*-shared`.
 
 3. Cross compiled shared libraries. These are built using zig build tool. These
-   are under directory matching zig target names.
+   are under directory matching zig target names. Right now, only windows shared
+   library is built this way.
 
 ## License
 
