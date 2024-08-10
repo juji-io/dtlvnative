@@ -1,4 +1,4 @@
-(defproject org.clojars.huahaiy/dtlvnative-macos-amd64-shared "0.9.5"
+(defproject org.clojars.huahaiy/dtlvnative-macos-amd64-shared "0.9.6"
   :description "Native dependency of JVM version of Datalevin database on MacOS Silicon"
   :url "https://github.com/juji-io/dtlvnative"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"

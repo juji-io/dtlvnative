@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.9.6
+### Changed
+- don't apt update in cirrus build, otherwise it may get stuck waiting for user input
+
 ## 0.9.5
 ### Added
 - Linux aarch64 shared and static build on native platform
