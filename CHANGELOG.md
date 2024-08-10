@@ -1,5 +1,11 @@
 # Change Log
 
+## WIP
+### Added
+- Linux aarch64 shared and static build on native platform
+### Removed
+- Linux aarch64 shared zig build
+
 ## 0.9.2
 ### Changed
 - update LMDB to latest

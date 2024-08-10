@@ -5,8 +5,7 @@ set -eou pipefail
 cd src/lmdb/libraries/liblmdb
 
 # don't fix that's not broken, use existing infra for other targets
-for target in aarch64-linux-gnu \
-              x86_64-windows-gnu
+for target in x86_64-windows-gnu
 do
   echo "##### Building $target ####"
   make -e clean liblmdb.so CC="zig cc -target $target" AR="zig ar"
