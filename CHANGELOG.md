@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.9.7
+### Changed
+- actually need apt update
+
 ## 0.9.6
 ### Changed
 - don't apt update in cirrus build, otherwise it may get stuck waiting for user input
