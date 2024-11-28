@@ -36,9 +36,9 @@ task:
 task:
   macos_instance:
     image: ghcr.io/cirruslabs/macos-monterey-base:latest
-  #only_if: $CIRRUS_TAG != ''
+  # only_if: $CIRRUS_TAG != ''
   # only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
-   only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
+    only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
   script: |
     git submodule init
     git submodule update
