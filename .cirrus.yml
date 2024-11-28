@@ -36,25 +36,41 @@ task:
 task:
   macos_instance:
     image: ghcr.io/cirruslabs/macos-monterey-base:latest
-  only_if: $CIRRUS_TAG != ''
+  #only_if: $CIRRUS_TAG != ''
   # only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
+   only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
   script: |
     git submodule init
     git submodule update
 
-    brew install leiningen
-
     script/build-macos-shared
-    ls -l src/lmdb/libraries/liblmdb
-    mkdir -p macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared
-    cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
-    cd macos-latest-aarch64-shared
+    mkdir -p src/java/dtlvnative/macosx-arm64
+    cp src/lmdb/libraries/liblmdb/liblmdb.dylib src/java/dtlvnative/macosx-arm64/
+
+    brew install leiningen
+    cd macosx-arm64
+    lein deps
+
+    cd ../src/java
+    java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.11/javacpp-1.5.11.jar dtlvnative/LMDB.java
+
+    cd ../..
+    mkdir -p macosx-arm64/resources/dtlvnative/macosx-arm64
+    cp src/java/dtlvnative/macosx-arm64/* macosx-arm64/resources/dtlvnative/macosx-arm64/
+
+    cd macosx-arm64
+    lein run
     lein deploy clojars
 
-    cd ..
-    script/build
-    cp src/*.a macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
-    cp src/dtlv.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
-    cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/lmdb/libraries/liblmdb/
-    cd macos-latest-aarch64
-    lein deploy clojars
+    #mkdir -p macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared
+    #cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
+    #cd macos-latest-aarch64-shared
+    #lein deploy clojars
+
+    # cd ..
+    # script/build
+    # cp src/*.a macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
+    # cp src/dtlv.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
+    # cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/lmdb/libraries/liblmdb/
+    # cd macos-latest-aarch64
+    # lein deploy clojars
