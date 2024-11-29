@@ -1088,7 +1088,7 @@ public static native int mdb_env_get_maxreaders(MDB_env env, @Cast("unsigned int
 	 *	<li>EINVAL - an invalid parameter was specified, or the environment is already open.
 	 * </ul>
 	 */
-public static native int mdb_env_set_maxdbs(MDB_env env, @Cast("MDB_dbi") int dbs);
+public static native int mdb_env_set_maxdbs(MDB_env env, int dbs);
 
 	/** \brief Get the maximum size of keys and #MDB_DUPSORT data we can write.
 	 *
