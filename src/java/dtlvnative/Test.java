@@ -108,11 +108,16 @@ public class Test {
 
         DTLV.mdb_txn_abort(rtxn);
 
-        Pointer.free(dbi);
-        Pointer.free(key);
-        Pointer.free(value);
-
         DTLV.mdb_env_close(env);
+
+        env.close();
+        txn.close();
+        rtxn.close();
+        dbi.close();
+        key.close();
+        kval.close();
+        value.close();
+        vval.close();
 
         System.out.println("JavaCPP binding for DTLV is working.");
     }

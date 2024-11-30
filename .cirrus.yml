@@ -35,7 +35,7 @@ task:
 
 task:
   macos_instance:
-    image: ghcr.io/cirruslabs/macos-monterey-base:latest
+    image: ghcr.io/cirruslabs/macos-runner:sonoma
   # only_if: $CIRRUS_TAG != ''
   # only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
     only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"

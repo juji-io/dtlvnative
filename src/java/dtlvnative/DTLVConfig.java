@@ -8,10 +8,10 @@ import org.bytedeco.javacpp.tools.*;
             value = @Platform(
                               includepath = {"../../src/lmdb/libraries/liblmdb/",
                                              "../../src/"},
-                              // preloadpath = {"."},
-                              linkpath = {"../../src/"},
                               include = {"lmdb.h", "dtlv.h"},
-                              // preload = {"LMDB", "DTLV"},
+                              // preloadpath = {"."},
+                              preload = {"lmdb", "dtlv"},
+                              linkpath = {"../../src/"},
                               link = {"DTLV"}
                               ),
             target = "dtlvnative.DTLV"
