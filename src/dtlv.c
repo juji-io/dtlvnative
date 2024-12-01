@@ -6,6 +6,16 @@
 #include "unistd.h"
 #endif
 
+int mycmp(const void *a, const void *b, unsigned int len) {
+  if (len >= 4) {
+    int diff = *(unsigned int *)a - *(unsigned int *)b;
+    if (diff) {
+      return diff;
+    }
+  }
+
+  return memcmp(a, b, len);
+}
 
 int dtlv_cmp_memn(const MDB_val *a, const MDB_val *b) {
 
@@ -21,7 +31,7 @@ int dtlv_cmp_memn(const MDB_val *a, const MDB_val *b) {
 		len = b->mv_size;
 	}
 
-  diff = memcmp(a->mv_data, b->mv_data, len);
+  diff = mycmp(a->mv_data, b->mv_data, len);
 
 	return diff ? diff : len_diff;
 }

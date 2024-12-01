@@ -53,21 +53,29 @@ public class Test {
 
         result = DTLV.dtlv_set_comparator(txn, dbi.get());
         if (result != 0) {
-            System.err.println("Failed to set comparator for r/w transaction: " + result);
+            System.err.println("Failed to set comparator for db: " + result);
             return;
         }
 
         String keyword = "Meaning of life?";
-        Pointer key = new BytePointer(keyword);
+        int klen = keyword.getBytes().length;
+
+        BytePointer key = new BytePointer(klen);
         DTLV.MDB_val kval = new DTLV.MDB_val();
-        kval.mv_size(keyword.getBytes().length);
+        kval.mv_size(klen);
         kval.mv_data(key);
 
-        int[] answer = {42};
-        Pointer value = new IntPointer(answer);
+        ByteBuffer kb = key.position(0).limit(klen).asByteBuffer();
+        kb.put(keyword.getBytes());
+
+        int answer = 42;
+        IntPointer value = new IntPointer(1);
         DTLV.MDB_val vval = new DTLV.MDB_val();
-        vval.mv_size(value.sizeof());
+        vval.mv_size(4);
         vval.mv_data(value);
+
+        ByteBuffer vb = value.position(0).limit(1).asByteBuffer();
+        vb.putInt(answer);
 
         result = DTLV.mdb_put(txn, dbi.get(), kval, vval, 0);
         if (result != 0) {
@@ -87,6 +95,11 @@ public class Test {
             return;
         }
 
+        IntPointer res = new IntPointer(1);
+        DTLV.MDB_val rval = new DTLV.MDB_val();
+        rval.mv_size(4);
+        rval.mv_data(res);
+
         DTLV.MDB_txn rtxn = new DTLV.MDB_txn();
         result = DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, rtxn);
         if (result != 0) {
@@ -94,30 +107,30 @@ public class Test {
             return;
         }
 
-        result = DTLV.dtlv_set_comparator(rtxn, dbi.get());
-        if (result != 0) {
-            System.err.println("Failed to set comparator for read transaction: " + result);
-            return;
-        }
-
-        result = DTLV.mdb_get(rtxn, dbi.get(), kval, vval);
+        result = DTLV.mdb_get(rtxn, dbi.get(), kval, rval);
         if (result != 0) {
             System.err.println("Failed to get key value: " + result);
             return;
         }
 
+        result = DTLV.mdb_cmp(rtxn, dbi.get(), vval, rval);
+        if (result != 0) {
+            System.err.println("Failed to compare values: " + result);
+            return;
+        }
+
+        ByteBuffer rb = rval.mv_data().limit(rval.mv_size()).asByteBuffer();
+
+        System.out.println("Got correct value? " + (rb.getInt() == answer));
+
         DTLV.mdb_txn_abort(rtxn);
 
         DTLV.mdb_env_close(env);
 
-        env.close();
-        txn.close();
-        rtxn.close();
         dbi.close();
         key.close();
-        kval.close();
         value.close();
-        vval.close();
+        res.close();
 
         System.out.println("JavaCPP binding for DTLV is working.");
     }

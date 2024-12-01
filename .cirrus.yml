@@ -56,9 +56,7 @@ task:
 
     cd ../..
     mkdir -p macosx-arm64/resources/dtlvnative/macosx-arm64
-    cp src/java/dtlvnative/macosx-arm64/libjniDTLV.dylib macosx-arm64/resources/dtlvnative/macosx-arm64/
-    cp src/java/dtlvnative/macosx-arm64/libdtlv.dylib macosx-arm64/
-    cp src/java/dtlvnative/macosx-arm64/liblmdb.dylib macosx-arm64/
+    cp src/java/dtlvnative/macosx-arm64/*.dylib macosx-arm64/resources/dtlvnative/macosx-arm64/
 
     cd macosx-arm64
     lein run
