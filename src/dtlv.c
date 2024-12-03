@@ -493,7 +493,7 @@ int list_val_advance_val(dtlv_list_val_iter *iter) {
   return list_val_check_val(iter, MDB_NEXT_DUP);
 }
 
-int dltv_list_val_iter_seek(dtlv_list_val_iter *iter, MDB_val *k) {
+int dtlv_list_val_iter_seek(dtlv_list_val_iter *iter, MDB_val *k) {
   val_in(iter->key, k);
   return list_val_init_val(iter);
 }
