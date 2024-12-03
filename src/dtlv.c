@@ -144,14 +144,14 @@ int key_check_back(dtlv_key_iter *iter, int op) {
 }
 
 int key_advance(dtlv_key_iter *iter) {
-  if (iter->forward) return key_check(iter, MDB_NEXT_NODUP);
+  if (iter->forward == DTLV_TRUE) return key_check(iter, MDB_NEXT_NODUP);
   else return key_check_back(iter, MDB_PREV_NODUP);
 }
 
 int key_init_k(dtlv_key_iter *iter) {
   iter->started = DTLV_TRUE;
 
-  if (iter->forward) return key_init(iter);
+  if (iter->forward == DTLV_TRUE) return key_init(iter);
   else return key_init_back(iter);
 }
 
@@ -255,8 +255,7 @@ int list_init_key_back(dtlv_list_iter *iter) {
 int list_init_val(dtlv_list_iter *iter) {
   if (iter->start_val) {
     val_in(iter->val, iter->start_val);
-    int rc = mdb_cursor_get(iter->cur, iter->key, iter->start_val,
-                            MDB_GET_BOTH_RANGE);
+    int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_GET_BOTH_RANGE);
     if (rc == MDB_SUCCESS) {
       if ((iter->vstart == DTLV_FALSE)
           && (dtlv_cmp_memn(iter->val, iter->start_val) == 0))
@@ -270,8 +269,7 @@ int list_init_val(dtlv_list_iter *iter) {
 int list_init_val_back(dtlv_list_iter *iter) {
   if (iter->start_val) {
     val_in(iter->val, iter->start_val);
-    int rc = mdb_cursor_get(iter->cur, iter->key, iter->start_val,
-                            MDB_GET_BOTH_RANGE);
+    int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_GET_BOTH_RANGE);
     if (rc == MDB_SUCCESS) {
       if ((iter->vstart == DTLV_TRUE)
           && (dtlv_cmp_memn(iter->val, iter->start_val) == 0))
@@ -341,9 +339,9 @@ int list_advance_key(dtlv_list_iter *iter) {
     else vpass = list_init_val_back(iter);
   }
 
-  if (kpass == DTLV_TRUE && vpass == DTLV_TRUE) return DTLV_TRUE;
+  if (vpass == DTLV_TRUE) return DTLV_TRUE;
 
-  if (iter->key_ended) return DTLV_FALSE;
+  if (iter->key_ended == DTLV_TRUE) return DTLV_FALSE;
   else return list_advance_key(iter);
 }
 
@@ -360,7 +358,7 @@ int list_init_kv(dtlv_list_iter *iter) {
     else vpass = list_init_val_back(iter);
   }
 
-  if (kpass == DTLV_TRUE && vpass == DTLV_TRUE) return DTLV_TRUE;
+  if (vpass == DTLV_TRUE) return DTLV_TRUE;
 
   return list_advance_key(iter);
 }
@@ -371,10 +369,8 @@ int list_val_continue(dtlv_list_iter *iter) {
     if (r == 0) {
       if (iter->vend == DTLV_TRUE) return DTLV_TRUE;
       else return list_val_end(iter);
-    } else {
-      if (r > 0) return list_val_end(iter);
-      else return DTLV_TRUE;
-    }
+    } else if (r > 0) return list_val_end(iter);
+    else return DTLV_TRUE;
   } else return DTLV_TRUE;
 }
 
@@ -384,10 +380,8 @@ int list_val_continue_back(dtlv_list_iter *iter) {
     if (r == 0) {
       if (iter->vend == DTLV_TRUE) return DTLV_TRUE;
       else return list_val_end(iter);
-    } else {
-      if (r > 0) return DTLV_TRUE;
-      else return list_val_end(iter);
-    }
+    } else if (r > 0) return DTLV_TRUE;
+    else return list_val_end(iter);
   } else return DTLV_TRUE;
 }
 
@@ -483,10 +477,8 @@ int list_val_val_continue(dtlv_list_val_iter *iter) {
     if (r == 0) {
       if (iter->vend == DTLV_TRUE) return DTLV_TRUE;
       else return DTLV_FALSE;
-    } else {
-      if (r > 0) return DTLV_FALSE;
-      else return DTLV_TRUE;
-    }
+    } else if (r > 0) return DTLV_FALSE;
+    else return DTLV_TRUE;
   } else return DTLV_TRUE;
 }
 

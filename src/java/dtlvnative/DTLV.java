@@ -1833,7 +1833,7 @@ public static native int mdb_reader_check(MDB_env env, IntPointer dead);
 // Parsed from dtlv.h
 
 /** \file dtlv.h
- *	\brief Native supporting functions for Datalevin: a simple, fast and
+ *	Native supporting functions for Datalevin: a simple, fast and
  *  versatile Datalog database.
  *
  *  Datalevin works with LMDB, a Btree based key value store. This library
@@ -1851,24 +1851,26 @@ public static native int mdb_reader_check(MDB_env env, IntPointer dead);
 // #ifdef __cplusplus
 // #endif
 
-public static final int DTLV_TRUE  =	255;
+public static final int DTLV_TRUE =	  255;
 public static final int DTLV_FALSE =	256;
 
- /** \brief The main comparator.
+ /**
+  * The main comparator that compare bytes in order.
   */
   public static native int dtlv_cmp_memn(@Const MDB_val a, @Const MDB_val b);
 
- /** \brief Set the comparator for a DBI to the main comparator.
+ /**
+  * Set the comparator for a DBI to the main comparator.
   */
   public static native int dtlv_set_comparator(MDB_txn txn, int dbi);
 
- /** \brief Set the comparator for a list DBI.
+ /**
+  * Set the comparator for a list DBI to the main comparator.
   */
   public static native int dtlv_set_dupsort_comparator(MDB_txn txn, int dbi);
 
- /** \brief Opaque structure for a key iterator
-  *
-  * Iterate by keys only.
+ /**
+  * Opaque structure for a iterator that iterates by keys only.
   */
   @Opaque public static class dtlv_key_iter extends Pointer {
       /** Empty constructor. Calls {@code super((Pointer)null)}. */
@@ -1877,17 +1879,18 @@ public static final int DTLV_FALSE =	256;
       public dtlv_key_iter(Pointer p) { super(p); }
   }
 
- /** \brief A function to create a key iterator.
+ /**
+  * A function to create a key iterator.
   *
-  * @param iter [out] The address where the iterator will be stored.
-  * @param cur [in] The cursor.
-  * @param key [in] Holder for the key.
-  * @param val [in] Holder for the value.
-  * @param forward [in] iterate forward (DTLV_TRUE) or backward (DTLV_FALSE).
-  * @param start [in] if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
-  * @param end [in] if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
-  * @param start_key [in] The start key, could be null
-  * @param end_key [in] The end key, could be null.
+  * @param iter The address where the iterator will be stored.
+  * @param cur The cursor.
+  * @param key Holder for the key.
+  * @param val Holder for the value.
+  * @param forward iterate forward (DTLV_TRUE) or backward (DTLV_FALSE).
+  * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+  * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+  * @param start_key The start key, could be null
+  * @param end_key The end key, could be null.
   * @return A non-zero error value on failure and 0 on success.
   */
   public static native int dtlv_key_iter_create(@Cast("dtlv_key_iter**") PointerPointer iter,
@@ -1899,23 +1902,27 @@ public static final int DTLV_FALSE =	256;
                              int forward, int start, int end,
                              MDB_val start_key, MDB_val end_key);
 
-  /** \brief A function to indicate if the iterator has the next item.
+  /**
+   * A function to indicate if the key iterator has the next item. If it does,
+   * the key will be in the key argument passed to dtlv_key_iter_create, same
+   * with value.
    *
-   * @param iter [in] The iterator handle.
-   * @return DTLV_TRUE on true,  DTLV_FALSE on false, or other error code.
+   * @param iter The iterator handle.
+   * @return DTLV_TRUE on true,  DTLV_FALSE on false, or an error code.
    */
   public static native int dtlv_key_iter_has_next(dtlv_key_iter iter);
 
- /** \brief A function to destroy the iterator.
+ /**
+  * A function to release memory of the iterator.
   *
-  * @param iter [in] The iterator handle.
+  * @param iter The iterator handle.
   */
   public static native void dtlv_key_iter_destroy(dtlv_key_iter iter);
 
- /** \brief Opaque structure for a list iterator
-  *
-  * Iterate both key and values (list) for a dupsort DBI.
-  */
+  /**
+   * Opaque structure for a list iterator that iterates both key and values (list)
+   * for a dupsort DBI.
+   */
   @Opaque public static class dtlv_list_iter extends Pointer {
       /** Empty constructor. Calls {@code super((Pointer)null)}. */
       public dtlv_list_iter() { super((Pointer)null); }
@@ -1923,22 +1930,23 @@ public static final int DTLV_FALSE =	256;
       public dtlv_list_iter(Pointer p) { super(p); }
   }
 
-/** \brief A function to create a list iterator.
+ /**
+  * A function to create a list iterator.
   *
-  * @param iter [out] The address where the iterator will be stored.
-  * @param cur [in] The cursor.
-  * @param key [in] Holder for the key.
-  * @param val [in] Holder for the value.
-  * @param kforward [in] iterate keys forward (DTLV_TRUE) or not.
-  * @param kstart [in] if to include (DTLV_TRUE) or not the start_key.
-  * @param kend [in] if to include (DTLV_TRUE) or not the end_key.
-  * @param start_key [in] The start key.
-  * @param end_key [in] The end key..
-  * @param vforward [in] iterate values forward (DTLV_TRUE) or not.
-  * @param vstart [in] if to include (DTLV_TRUE) or not the start_val.
-  * @param vend [in] if to include (DTLV_TRUE) or not the end_val.
-  * @param start_val [in] The start value.
-  * @param end_val [in] The end value.
+  * @param iter The address where the iterator will be stored.
+  * @param cur The cursor.
+  * @param key Holder for the key.
+  * @param val Holder for the value.
+  * @param kforward iterate keys forward (DTLV_TRUE) or not.
+  * @param kstart if to include (DTLV_TRUE) or not the start_key.
+  * @param kend if to include (DTLV_TRUE) or not the end_key.
+  * @param start_key The start key.
+  * @param end_key The end key..
+  * @param vforward iterate values forward (DTLV_TRUE) or not.
+  * @param vstart if to include (DTLV_TRUE) or not the start_val.
+  * @param vend if to include (DTLV_TRUE) or not the end_val.
+  * @param start_val The start value.
+  * @param end_val The end value.
   * @return A non-zero error value on failure and 0 on success.
   */
   public static native int dtlv_list_iter_create(@Cast("dtlv_list_iter**") PointerPointer iter,
@@ -1954,22 +1962,26 @@ public static final int DTLV_FALSE =	256;
                               int vforward, int vstart, int vend,
                               MDB_val start_val, MDB_val end_val);
 
- /** \brief A function to indicate if the iterator has the next item.
+ /**
+  * A function to indicate if the list iterator has the next item. If it
+  * does, the key will be in the key argument passed to dtlv_list_iter_create,
+  * the same with value.
   *
-  * @param iter [in] The iterator handle.
+  * @param iter The iterator handle.
   * @return DTLV_TRUE on true and DTLV_FALSE on false.
   */
   public static native int dtlv_list_iter_has_next(dtlv_list_iter iter);
 
- /** \brief A function to destroy the list iterator.
+ /**
+  * A function to destroy the list iterator.
   *
-  * @param iter [in] The iterator handle.
+  * @param iter The iterator handle.
   */
   public static native void dtlv_list_iter_destroy(dtlv_list_iter iter);
 
- /** \brief Opaque structure for a list value iterator
-  *
-  * Iterate values (forward only currently) of keys for a dupsort DBI.
+ /**
+  * Opaque structure for a list value iterator that iterates values
+  * (forward only currently) of keys for a dupsort DBI.
   */
   @Opaque public static class dtlv_list_val_iter extends Pointer {
       /** Empty constructor. Calls {@code super((Pointer)null)}. */
@@ -1978,16 +1990,17 @@ public static final int DTLV_FALSE =	256;
       public dtlv_list_val_iter(Pointer p) { super(p); }
   }
 
- /** \brief A function to create a list values iterator.
+ /**
+  * A function to create a list values iterator.
   *
-  * @param iter [out] The address where the iterator will be stored.
-  * @param cur [in] The cursor.
-  * @param key [in] Holder for the key.
-  * @param val [in] Holder for the value.
-  * @param vstart [in] if to include (DTLV_TRUE) or not the start_val.
-  * @param vend [in] if to include (DTLV_TRUE) or not the end_val.
-  * @param start_val [in] The start value..
-  * @param end_val [in] The end value.
+  * @param iter The address where the iterator will be stored.
+  * @param cur The cursor.
+  * @param key Holder for the key.
+  * @param val Holder for the value.
+  * @param vstart if to include (DTLV_TRUE) or not the start_val.
+  * @param vend if to include (DTLV_TRUE) or not the end_val.
+  * @param start_val The start value..
+  * @param end_val The end value.
   * @return A non-zero error value on failure and 0 on success.
   */
   public static native int dtlv_list_val_iter_create(@Cast("dtlv_list_val_iter**") PointerPointer iter,
@@ -1999,24 +2012,28 @@ public static final int DTLV_FALSE =	256;
                                   int vstart, int vend,
                                   MDB_val start_val, MDB_val end_val);
 
- /** \brief A function to seek to a key.
+ /**
+  * A function to seek to a key.
   *
-  * @param iter [in] The iterator handle.
-  * @param k [in] The key to seek.
+  * @param iter The iterator handle.
+  * @param k The key to seek.
   * @return DTLV_TRUE on found and DTLV_FALSE when not found.
   */
   public static native int dtlv_list_val_iter_seek(dtlv_list_val_iter iter, MDB_val k);
 
- /** \brief A function to indicate if the iterator has the next item.
+ /**
+  * A function to indicate if the iterator has the next item. If it does,
+  * the value will be in val argument passed to dtlv_list_val_iter_create.
   *
-  * @param iter [in] The iterator handle.
+  * @param iter The iterator handle.
   * @return DTLV_TRUE on true and DTLV_FALSE on false.
   */
   public static native int dtlv_list_val_iter_has_next(dtlv_list_val_iter iter);
 
- /** \brief A function to destroy the list iterator.
+ /**
+  * A function to destroy the list val iterator.
   *
-  * @param iter [in] The iterator handle.
+  * @param iter The iterator handle.
   */
   public static native void dtlv_list_val_iter_destroy(dtlv_list_val_iter iter);
 
