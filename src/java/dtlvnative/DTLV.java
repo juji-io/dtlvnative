@@ -1851,7 +1851,7 @@ public static native int mdb_reader_check(MDB_env env, IntPointer dead);
 // #ifdef __cplusplus
 // #endif
 
-public static final int DTLV_TRUE =	  255;
+public static final int DTLV_TRUE  =	255;
 public static final int DTLV_FALSE =	256;
 
  /** \brief The main comparator.
@@ -1905,14 +1905,6 @@ public static final int DTLV_FALSE =	256;
    * @return DTLV_TRUE on true,  DTLV_FALSE on false, or other error code.
    */
   public static native int dtlv_key_iter_has_next(dtlv_key_iter iter);
-
-  /** \brief A function to return the next item.
-   *
-   * @param iter [in] The iterator handle.
-   * @param key [out] The key of the next item.
-   * @param val [out] The value of the next item.
-   */
-  public static native void dtlv_key_iter_next(dtlv_key_iter iter, MDB_val key, MDB_val val);
 
  /** \brief A function to destroy the iterator.
   *
@@ -1969,14 +1961,6 @@ public static final int DTLV_FALSE =	256;
   */
   public static native int dtlv_list_iter_has_next(dtlv_list_iter iter);
 
- /** \brief A function to return the next item.
-  *
-  * @param iter [in] The iterator handle.
-  * @param key [out] The key of the next item.
-  * @param val [out] The value of the next item.
-  */
-  public static native void dtlv_list_iter_next(dtlv_list_iter iter, MDB_val key, MDB_val val);
-
  /** \brief A function to destroy the list iterator.
   *
   * @param iter [in] The iterator handle.
@@ -2029,13 +2013,6 @@ public static final int DTLV_FALSE =	256;
   * @return DTLV_TRUE on true and DTLV_FALSE on false.
   */
   public static native int dtlv_list_val_iter_has_next(dtlv_list_val_iter iter);
-
- /** \brief A function to return the next item.
-  *
-  * @param iter [in] The iterator handle.
-  * @param val [out] The next value.
-  */
-  public static native void dtlv_list_val_iter_next(dtlv_list_val_iter iter, MDB_val val);
 
  /** \brief A function to destroy the list iterator.
   *

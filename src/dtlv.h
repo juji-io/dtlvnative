@@ -64,14 +64,6 @@ extern "C" {
    */
   int dtlv_key_iter_has_next(dtlv_key_iter *iter);
 
-  /** @brief A function to return the next item.
-   *
-   * @param[in] iter The iterator handle.
-   * @param[out] key The key of the next item.
-   * @param[out] val The value of the next item.
-   */
-  void dtlv_key_iter_next(dtlv_key_iter *iter, MDB_val *key, MDB_val *val);
-
  /** @brief A function to destroy the iterator.
   *
   * @param[in] iter The iterator handle.
@@ -116,14 +108,6 @@ extern "C" {
   */
   int dtlv_list_iter_has_next(dtlv_list_iter *iter);
 
- /** @brief A function to return the next item.
-  *
-  * @param[in] iter The iterator handle.
-  * @param[out] key The key of the next item.
-  * @param[out] val The value of the next item.
-  */
-  void dtlv_list_iter_next(dtlv_list_iter *iter, MDB_val *key, MDB_val *val);
-
  /** @brief A function to destroy the list iterator.
   *
   * @param[in] iter The iterator handle.
@@ -167,13 +151,6 @@ extern "C" {
   * @return DTLV_TRUE on true and DTLV_FALSE on false.
   */
   int dtlv_list_val_iter_has_next(dtlv_list_val_iter *iter);
-
- /** @brief A function to return the next item.
-  *
-  * @param[in] iter The iterator handle.
-  * @param[out] val The next value.
-  */
-  void dtlv_list_val_iter_next(dtlv_list_val_iter *iter, MDB_val *val);
 
  /** @brief A function to destroy the list iterator.
   *

@@ -38,6 +38,11 @@ int dtlv_set_dupsort_comparator(MDB_txn *txn, int dbi) {
   return mdb_set_dupsort(txn, dbi, fp);
 }
 
+void val_in(MDB_val *this, MDB_val *other) {
+  this->mv_size = other->mv_size;
+  this->mv_data = other->mv_data;
+}
+
 struct dtlv_key_iter {
   MDB_cursor *cur;
   MDB_val *key;
@@ -80,6 +85,7 @@ int key_check_back(dtlv_key_iter *iter, int op);
 
 int key_init(dtlv_key_iter *iter) {
   if (iter->start_key) {
+    val_in(iter->key, iter->start_key);
     int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
     if (rc == MDB_SUCCESS) {
       if ((iter->start == DTLV_FALSE)
@@ -93,6 +99,7 @@ int key_init(dtlv_key_iter *iter) {
 
 int key_init_back(dtlv_key_iter *iter) {
   if (iter->start_key) {
+    val_in(iter->key, iter->start_key);
     int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
     if (rc == MDB_SUCCESS) {
       if ((iter->start == DTLV_TRUE)
@@ -151,11 +158,6 @@ int key_init_k(dtlv_key_iter *iter) {
 int dtlv_key_iter_has_next(dtlv_key_iter *iter) {
   if (iter->started == DTLV_TRUE) return key_advance(iter);
   else return key_init_k(iter);
-}
-
-void dtlv_key_iter_next(dtlv_key_iter *iter, MDB_val *key, MDB_val *val) {
-  key = iter->key;
-  val = iter->val;
 }
 
 void dtlv_key_iter_destroy(dtlv_key_iter *iter) {
@@ -224,6 +226,7 @@ int list_advance_key(dtlv_list_iter *iter);
 
 int list_init_key(dtlv_list_iter *iter) {
   if (iter->start_key) {
+    val_in(iter->key, iter->start_key);
     int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
     if (rc == MDB_SUCCESS) {
       if ((iter->kstart == DTLV_FALSE)
@@ -237,6 +240,7 @@ int list_init_key(dtlv_list_iter *iter) {
 
 int list_init_key_back(dtlv_list_iter *iter) {
   if (iter->start_key) {
+    val_in(iter->key, iter->start_key);
     int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
     if (rc == MDB_SUCCESS) {
       if ((iter->kstart == DTLV_TRUE)
@@ -250,6 +254,7 @@ int list_init_key_back(dtlv_list_iter *iter) {
 
 int list_init_val(dtlv_list_iter *iter) {
   if (iter->start_val) {
+    val_in(iter->val, iter->start_val);
     int rc = mdb_cursor_get(iter->cur, iter->key, iter->start_val,
                             MDB_GET_BOTH_RANGE);
     if (rc == MDB_SUCCESS) {
@@ -264,6 +269,7 @@ int list_init_val(dtlv_list_iter *iter) {
 
 int list_init_val_back(dtlv_list_iter *iter) {
   if (iter->start_val) {
+    val_in(iter->val, iter->start_val);
     int rc = mdb_cursor_get(iter->cur, iter->key, iter->start_val,
                             MDB_GET_BOTH_RANGE);
     if (rc == MDB_SUCCESS) {
@@ -414,11 +420,6 @@ int dtlv_list_iter_has_next(dtlv_list_iter *iter) {
   } else return list_init_kv(iter);
 }
 
-void dtlv_list_iter_next(dtlv_list_iter *iter, MDB_val *key, MDB_val *val) {
-  key = iter->key;
-  val = iter->val;
-}
-
 void dtlv_list_iter_destroy(dtlv_list_iter *iter) {
   if (iter) free(iter);
 }
@@ -459,8 +460,8 @@ int list_val_check_val(dtlv_list_val_iter *iter, int op);
 
 int list_val_init_val(dtlv_list_val_iter *iter) {
   if (iter->start_val) {
-    int rc = mdb_cursor_get(iter->cur, iter->key, iter->start_val,
-                            MDB_GET_BOTH_RANGE);
+    val_in(iter->val, iter->start_val);
+    int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_GET_BOTH_RANGE);
     if (rc == MDB_SUCCESS) {
       if ((iter->vstart == DTLV_FALSE)
           && (dtlv_cmp_memn(iter->val, iter->start_val) == 0))
@@ -501,16 +502,12 @@ int list_val_advance_val(dtlv_list_val_iter *iter) {
 }
 
 int dltv_list_val_iter_seek(dtlv_list_val_iter *iter, MDB_val *k) {
-  iter->key = k;
+  val_in(iter->key, k);
   return list_val_init_val(iter);
 }
 
 int dtlv_list_val_iter_has_next(dtlv_list_val_iter *iter) {
   return list_val_advance_val(iter);
-}
-
-void dtlv_list_val_iter_next(dtlv_list_val_iter *iter, MDB_val *val) {
-  val = iter->val;
 }
 
 void dtlv_list_val_iter_destroy(dtlv_list_val_iter *iter) {
