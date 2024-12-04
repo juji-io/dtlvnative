@@ -525,9 +525,6 @@ int dtlv_list_val_full_iter_create(dtlv_list_val_full_iter **iter,
   i->key = key;
   i->val = val;
 
-  i->n = 0;
-  i->c = 0;
-
   *iter = i;
   return MDB_SUCCESS;
 }
@@ -537,14 +534,18 @@ int dtlv_list_val_full_iter_seek(dtlv_list_val_full_iter *iter, MDB_val *k) {
 
   int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET);
   if (rc == MDB_SUCCESS) {
+
     rc = mdb_cursor_count(iter->cur, &iter->n);
     if (rc != MDB_SUCCESS) return rc;
+
+    iter->c = 0;
 
     rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_FIRST_DUP);
     if (rc == MDB_SUCCESS) {
       iter->c++;
       return DTLV_TRUE;
     } else return rc;
+
   } else if (rc == MDB_NOTFOUND) return DTLV_FALSE;
   else return rc;
 }
