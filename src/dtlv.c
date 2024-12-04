@@ -505,3 +505,59 @@ int dtlv_list_val_iter_has_next(dtlv_list_val_iter *iter) {
 void dtlv_list_val_iter_destroy(dtlv_list_val_iter *iter) {
   if (iter) free(iter);
 }
+
+struct dtlv_list_val_full_iter {
+  MDB_cursor *cur;
+  MDB_val *key;
+  MDB_val *val;
+  size_t n;
+  size_t c;
+};
+
+int dtlv_list_val_full_iter_create(dtlv_list_val_full_iter **iter,
+                                   MDB_cursor *cur,
+                                   MDB_val *key, MDB_val *val) {
+  dtlv_list_val_full_iter *i;
+  i = calloc(1, sizeof(struct dtlv_list_val_full_iter));
+  if (!i) return ENOMEM;
+
+  i->cur = cur;
+  i->key = key;
+  i->val = val;
+
+  i->n = 0;
+  i->c = 0;
+
+  *iter = i;
+  return MDB_SUCCESS;
+}
+
+int dtlv_list_val_full_iter_seek(dtlv_list_val_full_iter *iter, MDB_val *k) {
+  val_in(iter->key, k);
+
+  int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET);
+  if (rc == MDB_SUCCESS) {
+    rc = mdb_cursor_count(iter->cur, &iter->n);
+    if (rc != MDB_SUCCESS) return rc;
+
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_FIRST_DUP);
+    if (rc == MDB_SUCCESS) {
+      iter->c++;
+      return DTLV_TRUE;
+    } else return rc;
+  } else if (rc == MDB_NOTFOUND) return DTLV_FALSE;
+  else return rc;
+}
+
+int dtlv_list_val_full_iter_has_next(dtlv_list_val_full_iter *iter) {
+  if (iter->c < iter->n) {
+    iter->c++;
+    int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_NEXT_DUP);
+    if (rc == MDB_SUCCESS) return DTLV_TRUE;
+    else return rc;
+  } else return DTLV_FALSE;
+}
+
+void dtlv_list_val_full_iter_destroy(dtlv_list_val_full_iter *iter) {
+  if (iter) free(iter);
+}

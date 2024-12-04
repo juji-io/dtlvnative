@@ -2037,6 +2037,59 @@ public static final int DTLV_FALSE =	256;
   */
   public static native void dtlv_list_val_iter_destroy(dtlv_list_val_iter iter);
 
+ /**
+  * Opaque structure for a list value iterator that iterates all values
+  * of the key, without value comparisons, for a dupsort DBI.
+  */
+  @Opaque public static class dtlv_list_val_full_iter extends Pointer {
+      /** Empty constructor. Calls {@code super((Pointer)null)}. */
+      public dtlv_list_val_full_iter() { super((Pointer)null); }
+      /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+      public dtlv_list_val_full_iter(Pointer p) { super(p); }
+  }
+
+ /**
+  * A function to create a list values full iterator.
+  *
+  * @param iter The address where the iterator will be stored.
+  * @param cur The cursor.
+  * @param key Holder for the key.
+  * @param val Holder for the value.
+  * @return A non-zero error value on failure and 0 on success.
+  */
+  public static native int dtlv_list_val_full_iter_create(@Cast("dtlv_list_val_full_iter**") PointerPointer iter,
+                                       MDB_cursor cur,
+                                       MDB_val key, MDB_val val);
+  public static native int dtlv_list_val_full_iter_create(@ByPtrPtr dtlv_list_val_full_iter iter,
+                                       MDB_cursor cur,
+                                       MDB_val key, MDB_val val);
+
+ /**
+  * A function to seek to a key.
+  *
+  * @param iter The iterator handle.
+  * @param k The key to seek.
+  * @return DTLV_TRUE on found and DTLV_FALSE when not found.
+  */
+  public static native int dtlv_list_val_full_iter_seek(dtlv_list_val_full_iter iter, MDB_val k);
+
+ /**
+  * A function to indicate if the iterator has the next item. If it does,
+  * the value will be in val argument passed to dtlv_list_val_full_iter_create.
+  *
+  * @param iter The iterator handle.
+  * @return DTLV_TRUE on true and DTLV_FALSE on false.
+  */
+  public static native int dtlv_list_val_full_iter_has_next(dtlv_list_val_full_iter iter);
+
+ /**
+  * A function to destroy the list val full iterator.
+  *
+  * @param iter The iterator handle.
+  */
+  public static native void dtlv_list_val_full_iter_destroy(dtlv_list_val_full_iter iter);
+
+
 // #ifdef __cplusplus
 // #endif
 
