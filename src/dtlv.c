@@ -703,7 +703,7 @@ size_t dtlv_key_range_list_count(MDB_cursor *cur,
       else break;
     }
     dtlv_key_iter_destroy(iter);
-    if (rc == DTLV_TRUE || rc == DTLV_FALSE) {
+    if (rc == DTLV_FALSE || rc == DTLV_TRUE) {
       if (rc1 == MDB_SUCCESS) return n;
       return rc1;
     }
@@ -732,11 +732,8 @@ size_t dtlv_key_range_list_count_cap(MDB_cursor *cur, size_t cap,
       } else break;
     }
     dtlv_key_iter_destroy(iter);
-    if (rc == DTLV_TRUE || rc == DTLV_FALSE) {
-      if (rc1 == MDB_SUCCESS) {
-        if (n >= cap) return cap;
-        return n;
-      }
+    if (rc == DTLV_FALSE || rc == DTLV_TRUE) {
+      if (rc1 == MDB_SUCCESS) return n;
       return rc1;
     }
     return rc;
