@@ -2089,6 +2089,201 @@ public static final int DTLV_FALSE =	256;
   */
   public static native void dtlv_list_val_full_iter_destroy(dtlv_list_val_full_iter iter);
 
+ /**
+  * A function to return the count of values for a key.
+  *
+  * @param iter The cursor.
+  * @param key Holder for the key.
+  * @param val Holder for the value.
+  * @return The value count.
+  */
+  public static native @Cast("size_t") long dtlv_list_val_count(MDB_cursor cur, MDB_val key, MDB_val val);
+
+  /**
+  * A function to return the number of key-values in the specified value range of
+  * the specified key range, for a dupsort DBI.
+  *
+  * @param cur The cursor.
+  * @param key Holder for the key.
+  * @param val Holder for the value.
+  * @param kstart if to include (DTLV_TRUE) or not the start_key.
+  * @param kend if to include (DTLV_TRUE) or not the end_key.
+  * @param start_key The start key.
+  * @param end_key The end key..
+  * @param vstart if to include (DTLV_TRUE) or not the start_val.
+  * @param vend if to include (DTLV_TRUE) or not the end_val.
+  * @param start_val The start value.
+  * @param end_val The end value.
+  * @return The count
+  */
+  public static native @Cast("size_t") long dtlv_list_range_count(MDB_cursor cur,
+                                 MDB_val key, MDB_val val,
+                                 int kstart, int kend,
+                                 MDB_val start_key, MDB_val end_key,
+                                 int vstart, int vend,
+                                 MDB_val start_val, MDB_val end_val);
+
+ /**
+  * A function to return the number of key-values in the specified value range of
+  * the specified key range, for a dupsort DBI. Capped. When cap is reached, stop
+  * counting and return cap;
+  *
+  * @param cur The cursor.
+  * @param cap The cap.
+  * @param key Holder for the key.
+  * @param val Holder for the value.
+  * @param kstart if to include (DTLV_TRUE) or not the start_key.
+  * @param kend if to include (DTLV_TRUE) or not the end_key.
+  * @param start_key The start key.
+  * @param end_key The end key..
+  * @param vstart if to include (DTLV_TRUE) or not the start_val.
+  * @param vend if to include (DTLV_TRUE) or not the end_val.
+  * @param start_val The start value.
+  * @param end_val The end value.
+  * @return The count
+  */
+  public static native @Cast("size_t") long dtlv_list_range_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
+                                     MDB_val key, MDB_val val,
+                                     int kstart, int kend,
+                                     MDB_val start_key, MDB_val end_key,
+                                     int vstart, int vend,
+                                     MDB_val start_val, MDB_val end_val);
+
+  /**
+   * A function to return the number of keys in a key range.
+   *
+   * @param cur The cursor.
+   * @param key Holder for the key.
+   * @param val Holder for the value.
+   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+   * @param start_key The start key, could be null
+   * @param end_key The end key, could be null.
+   * @return The count
+   */
+  public static native @Cast("size_t") long dtlv_key_range_count(MDB_cursor cur,
+                                MDB_val key, MDB_val val,
+                                int start, int end,
+                                MDB_val start_key, MDB_val end_key);
+
+  /**
+   * A function to return the number of keys in a key range. Capped. When cap is
+   * reached, stop counting and return cap;
+   *
+   * @param cur The cursor.
+   * @param cap The cap.
+   * @param key Holder for the key.
+   * @param val Holder for the value.
+   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+   * @param start_key The start key, could be null
+   * @param end_key The end key, could be null.
+   * @return The count
+   */
+  public static native @Cast("size_t") long dtlv_key_range_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
+                                    MDB_val key, MDB_val val,
+                                    int start, int end,
+                                    MDB_val start_key, MDB_val end_key);
+
+ /**
+  * A function to return the total number of values in a key range, for a
+  * dupsort DBI.
+  *
+  * @param cur The cursor.
+  * @param key Holder for the key.
+  * @param val Holder for the value.
+  * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+  * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+  * @param start_key The start key, could be null
+  * @param end_key The end key, could be null.
+  * @return The count
+  */
+  public static native @Cast("size_t") long dtlv_key_range_list_count(MDB_cursor cur,
+                                     MDB_val key, MDB_val val,
+                                     int start, int end,
+                                     MDB_val start_key, MDB_val end_key);
+
+  /**
+   * A function to return the total number of values in a key range, for a
+   * dupsort DBI. Capped. When cap is reached, stop counting and return
+   * cap;
+   *
+   * @param cur The cursor.
+   * @param cap The cap.
+   * @param key Holder for the key.
+   * @param val Holder for the value.
+   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+   * @param start_key The start key, could be null
+   * @param end_key The end key, could be null.
+   * @return The count
+   */
+  public static native @Cast("size_t") long dtlv_key_range_list_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
+                                         MDB_val key, MDB_val val,
+                                         int start, int end,
+                                         MDB_val start_key, MDB_val end_key);
+
+  /**
+   * Opaque structure for a list sample iterator that return samples
+   * for a dupsort DBI.
+   */
+  @Opaque public static class dtlv_list_sample_iter extends Pointer {
+      /** Empty constructor. Calls {@code super((Pointer)null)}. */
+      public dtlv_list_sample_iter() { super((Pointer)null); }
+      /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+      public dtlv_list_sample_iter(Pointer p) { super(p); }
+  }
+
+ /**
+  * A function to create a list sample iterator.
+  *
+  * @param iter The address where the iterator will be stored.
+  * @param indices The array of sample indices..
+  * @param samples The number of samples.
+  * @param cur The cursor.
+  * @param key Holder for the key.
+  * @param val Holder for the value.
+  * @param kstart if to include (DTLV_TRUE) or not the start_key.
+  * @param kend if to include (DTLV_TRUE) or not the end_key.
+  * @param start_key The start key.
+  * @param end_key The end key..
+  * @param vstart if to include (DTLV_TRUE) or not the start_val.
+  * @param vend if to include (DTLV_TRUE) or not the end_val.
+  * @param start_val The start value.
+  * @param end_val The end value.
+  * @return A non-zero error value on failure and 0 on success.
+  */
+  public static native int dtlv_list_sample_iter_create(@Cast("dtlv_list_sample_iter**") PointerPointer iter,
+                                     @Cast("size_t*") SizeTPointer indices, int samples,
+                                     MDB_cursor cur, MDB_val key, MDB_val val,
+                                     int kstart, int kend,
+                                     MDB_val start_key, MDB_val end_key,
+                                     int vstart, int vend,
+                                     MDB_val start_val, MDB_val end_val);
+  public static native int dtlv_list_sample_iter_create(@ByPtrPtr dtlv_list_sample_iter iter,
+                                     @Cast("size_t*") SizeTPointer indices, int samples,
+                                     MDB_cursor cur, MDB_val key, MDB_val val,
+                                     int kstart, int kend,
+                                     MDB_val start_key, MDB_val end_key,
+                                     int vstart, int vend,
+                                     MDB_val start_val, MDB_val end_val);
+
+ /**
+  * A function to indicate if the list sample iterator has next sample. If
+  * it does, the sample will be in the key/val argument passed to
+  * dtlv_list_sample_iter_create.
+  *
+  * @param iter The iterator handle.
+  * @return DTLV_TRUE on true and DTLV_FALSE on false.
+  */
+  public static native int dtlv_list_sample_iter_has_next(dtlv_list_sample_iter iter);
+
+ /**
+  * A function to destroy the list sample iterator.
+  *
+  * @param iter The iterator handle.
+  */
+  public static native void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter iter);
 
 // #ifdef __cplusplus
 // #endif
