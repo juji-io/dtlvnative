@@ -236,10 +236,12 @@ extern "C" {
   * @param cur The cursor.
   * @param key Holder for the key.
   * @param val Holder for the value.
+  * @param kforward iterate keys forward (DTLV_TRUE) or not.
   * @param kstart if to include (DTLV_TRUE) or not the start_key.
   * @param kend if to include (DTLV_TRUE) or not the end_key.
   * @param start_key The start key.
   * @param end_key The end key..
+  * @param vforward iterate vals forward (DTLV_TRUE) or not.
   * @param vstart if to include (DTLV_TRUE) or not the start_val.
   * @param vend if to include (DTLV_TRUE) or not the end_val.
   * @param start_val The start value.
@@ -248,9 +250,9 @@ extern "C" {
   */
   size_t dtlv_list_range_count(MDB_cursor *cur,
                                MDB_val *key, MDB_val *val,
-                               int kstart, int kend,
+                               int kforward, int kstart, int kend,
                                MDB_val *start_key, MDB_val *end_key,
-                               int vstart, int vend,
+                               int vforward, int vstart, int vend,
                                MDB_val *start_val, MDB_val *end_val);
 
  /**
@@ -262,10 +264,12 @@ extern "C" {
   * @param cap The cap.
   * @param key Holder for the key.
   * @param val Holder for the value.
+  * @param kforward iterate keys forward (DTLV_TRUE) or not.
   * @param kstart if to include (DTLV_TRUE) or not the start_key.
   * @param kend if to include (DTLV_TRUE) or not the end_key.
   * @param start_key The start key.
   * @param end_key The end key..
+  * @param vforward iterate vals forward (DTLV_TRUE) or not.
   * @param vstart if to include (DTLV_TRUE) or not the start_val.
   * @param vend if to include (DTLV_TRUE) or not the end_val.
   * @param start_val The start value.
@@ -274,9 +278,9 @@ extern "C" {
   */
   size_t dtlv_list_range_count_cap(MDB_cursor *cur, size_t cap,
                                    MDB_val *key, MDB_val *val,
-                                   int kstart, int kend,
+                                   int kforward, int kstart, int kend,
                                    MDB_val *start_key, MDB_val *end_key,
-                                   int vstart, int vend,
+                                   int vforward, int vstart, int vend,
                                    MDB_val *start_val, MDB_val *end_val);
 
   /**
@@ -285,6 +289,7 @@ extern "C" {
    * @param cur The cursor.
    * @param key Holder for the key.
    * @param val Holder for the value.
+   * @param forward iterate keys forward (DTLV_TRUE) or not.
    * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
    * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
    * @param start_key The start key, could be null
@@ -293,7 +298,7 @@ extern "C" {
    */
   size_t dtlv_key_range_count(MDB_cursor *cur,
                               MDB_val *key, MDB_val *val,
-                              int start, int end,
+                              int forward, int start, int end,
                               MDB_val *start_key, MDB_val *end_key);
 
   /**
@@ -304,6 +309,7 @@ extern "C" {
    * @param cap The cap.
    * @param key Holder for the key.
    * @param val Holder for the value.
+   * @param forward iterate keys forward (DTLV_TRUE) or not.
    * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
    * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
    * @param start_key The start key, could be null
@@ -312,25 +318,26 @@ extern "C" {
    */
   size_t dtlv_key_range_count_cap(MDB_cursor *cur, size_t cap,
                                   MDB_val *key, MDB_val *val,
-                                  int start, int end,
+                                  int forward, int start, int end,
                                   MDB_val *start_key, MDB_val *end_key);
 
- /**
-  * A function to return the total number of values in a key range, for a
-  * dupsort DBI.
-  *
-  * @param cur The cursor.
-  * @param key Holder for the key.
-  * @param val Holder for the value.
-  * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
-  * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
-  * @param start_key The start key, could be null
-  * @param end_key The end key, could be null.
-  * @return The count
-  */
+  /**
+   * A function to return the total number of values in a key range, for a
+   * dupsort DBI.
+   *
+   * @param cur The cursor.
+   * @param key Holder for the key.
+   * @param val Holder for the value.
+   * @param forward iterate keys forward (DTLV_TRUE) or not.
+   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+   * @param start_key The start key, could be null
+   * @param end_key The end key, could be null.
+   * @return The count
+   */
   size_t dtlv_key_range_list_count(MDB_cursor *cur,
                                    MDB_val *key, MDB_val *val,
-                                   int start, int end,
+                                   int forward, int start, int end,
                                    MDB_val *start_key, MDB_val *end_key);
 
   /**
@@ -342,6 +349,7 @@ extern "C" {
    * @param cap The cap.
    * @param key Holder for the key.
    * @param val Holder for the value.
+   * @param forward iterate keys forward (DTLV_TRUE) or not.
    * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
    * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
    * @param start_key The start key, could be null
@@ -350,7 +358,7 @@ extern "C" {
    */
   size_t dtlv_key_range_list_count_cap(MDB_cursor *cur, size_t cap,
                                        MDB_val *key, MDB_val *val,
-                                       int start, int end,
+                                       int forward, int start, int end,
                                        MDB_val *start_key, MDB_val *end_key);
 
   /**
@@ -368,10 +376,12 @@ extern "C" {
   * @param cur The cursor.
   * @param key Holder for the key.
   * @param val Holder for the value.
+  * @param kforward iterate keys forward (DTLV_TRUE) or not.
   * @param kstart if to include (DTLV_TRUE) or not the start_key.
   * @param kend if to include (DTLV_TRUE) or not the end_key.
   * @param start_key The start key.
   * @param end_key The end key..
+  * @param vforward iterate vals forward (DTLV_TRUE) or not.
   * @param vstart if to include (DTLV_TRUE) or not the start_val.
   * @param vend if to include (DTLV_TRUE) or not the end_val.
   * @param start_val The start value.
@@ -381,9 +391,9 @@ extern "C" {
   int dtlv_list_sample_iter_create(dtlv_list_sample_iter **iter,
                                    size_t *indices, int samples,
                                    MDB_cursor *cur, MDB_val *key, MDB_val *val,
-                                   int kstart, int kend,
+                                   int kforward, int kstart, int kend,
                                    MDB_val *start_key, MDB_val *end_key,
-                                   int vstart, int vend,
+                                   int vforward, int vstart, int vend,
                                    MDB_val *start_val, MDB_val *end_val);
 
  /**

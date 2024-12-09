@@ -2106,10 +2106,12 @@ public static final int DTLV_FALSE =	256;
   * @param cur The cursor.
   * @param key Holder for the key.
   * @param val Holder for the value.
+  * @param kforward iterate keys forward (DTLV_TRUE) or not.
   * @param kstart if to include (DTLV_TRUE) or not the start_key.
   * @param kend if to include (DTLV_TRUE) or not the end_key.
   * @param start_key The start key.
   * @param end_key The end key..
+  * @param vforward iterate vals forward (DTLV_TRUE) or not.
   * @param vstart if to include (DTLV_TRUE) or not the start_val.
   * @param vend if to include (DTLV_TRUE) or not the end_val.
   * @param start_val The start value.
@@ -2118,9 +2120,9 @@ public static final int DTLV_FALSE =	256;
   */
   public static native @Cast("size_t") long dtlv_list_range_count(MDB_cursor cur,
                                  MDB_val key, MDB_val val,
-                                 int kstart, int kend,
+                                 int kforward, int kstart, int kend,
                                  MDB_val start_key, MDB_val end_key,
-                                 int vstart, int vend,
+                                 int vforward, int vstart, int vend,
                                  MDB_val start_val, MDB_val end_val);
 
  /**
@@ -2132,10 +2134,12 @@ public static final int DTLV_FALSE =	256;
   * @param cap The cap.
   * @param key Holder for the key.
   * @param val Holder for the value.
+  * @param kforward iterate keys forward (DTLV_TRUE) or not.
   * @param kstart if to include (DTLV_TRUE) or not the start_key.
   * @param kend if to include (DTLV_TRUE) or not the end_key.
   * @param start_key The start key.
   * @param end_key The end key..
+  * @param vforward iterate vals forward (DTLV_TRUE) or not.
   * @param vstart if to include (DTLV_TRUE) or not the start_val.
   * @param vend if to include (DTLV_TRUE) or not the end_val.
   * @param start_val The start value.
@@ -2144,9 +2148,9 @@ public static final int DTLV_FALSE =	256;
   */
   public static native @Cast("size_t") long dtlv_list_range_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
                                      MDB_val key, MDB_val val,
-                                     int kstart, int kend,
+                                     int kforward, int kstart, int kend,
                                      MDB_val start_key, MDB_val end_key,
-                                     int vstart, int vend,
+                                     int vforward, int vstart, int vend,
                                      MDB_val start_val, MDB_val end_val);
 
   /**
@@ -2155,6 +2159,7 @@ public static final int DTLV_FALSE =	256;
    * @param cur The cursor.
    * @param key Holder for the key.
    * @param val Holder for the value.
+   * @param forward iterate keys forward (DTLV_TRUE) or not.
    * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
    * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
    * @param start_key The start key, could be null
@@ -2163,7 +2168,7 @@ public static final int DTLV_FALSE =	256;
    */
   public static native @Cast("size_t") long dtlv_key_range_count(MDB_cursor cur,
                                 MDB_val key, MDB_val val,
-                                int start, int end,
+                                int forward, int start, int end,
                                 MDB_val start_key, MDB_val end_key);
 
   /**
@@ -2174,6 +2179,7 @@ public static final int DTLV_FALSE =	256;
    * @param cap The cap.
    * @param key Holder for the key.
    * @param val Holder for the value.
+   * @param forward iterate keys forward (DTLV_TRUE) or not.
    * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
    * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
    * @param start_key The start key, could be null
@@ -2182,7 +2188,7 @@ public static final int DTLV_FALSE =	256;
    */
   public static native @Cast("size_t") long dtlv_key_range_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
                                     MDB_val key, MDB_val val,
-                                    int start, int end,
+                                    int forward, int start, int end,
                                     MDB_val start_key, MDB_val end_key);
 
  /**
@@ -2192,6 +2198,7 @@ public static final int DTLV_FALSE =	256;
   * @param cur The cursor.
   * @param key Holder for the key.
   * @param val Holder for the value.
+  * @param forward iterate keys forward (DTLV_TRUE) or not.
   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
   * @param start_key The start key, could be null
@@ -2200,7 +2207,7 @@ public static final int DTLV_FALSE =	256;
   */
   public static native @Cast("size_t") long dtlv_key_range_list_count(MDB_cursor cur,
                                      MDB_val key, MDB_val val,
-                                     int start, int end,
+                                     int forward, int start, int end,
                                      MDB_val start_key, MDB_val end_key);
 
   /**
@@ -2212,6 +2219,7 @@ public static final int DTLV_FALSE =	256;
    * @param cap The cap.
    * @param key Holder for the key.
    * @param val Holder for the value.
+   * @param forward iterate keys forward (DTLV_TRUE) or not.
    * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
    * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
    * @param start_key The start key, could be null
@@ -2220,7 +2228,7 @@ public static final int DTLV_FALSE =	256;
    */
   public static native @Cast("size_t") long dtlv_key_range_list_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
                                          MDB_val key, MDB_val val,
-                                         int start, int end,
+                                         int forward, int start, int end,
                                          MDB_val start_key, MDB_val end_key);
 
   /**
@@ -2243,10 +2251,12 @@ public static final int DTLV_FALSE =	256;
   * @param cur The cursor.
   * @param key Holder for the key.
   * @param val Holder for the value.
+  * @param kforward iterate keys forward (DTLV_TRUE) or not.
   * @param kstart if to include (DTLV_TRUE) or not the start_key.
   * @param kend if to include (DTLV_TRUE) or not the end_key.
   * @param start_key The start key.
   * @param end_key The end key..
+  * @param vforward iterate vals forward (DTLV_TRUE) or not.
   * @param vstart if to include (DTLV_TRUE) or not the start_val.
   * @param vend if to include (DTLV_TRUE) or not the end_val.
   * @param start_val The start value.
@@ -2256,16 +2266,16 @@ public static final int DTLV_FALSE =	256;
   public static native int dtlv_list_sample_iter_create(@Cast("dtlv_list_sample_iter**") PointerPointer iter,
                                      @Cast("size_t*") SizeTPointer indices, int samples,
                                      MDB_cursor cur, MDB_val key, MDB_val val,
-                                     int kstart, int kend,
+                                     int kforward, int kstart, int kend,
                                      MDB_val start_key, MDB_val end_key,
-                                     int vstart, int vend,
+                                     int vforward, int vstart, int vend,
                                      MDB_val start_val, MDB_val end_val);
   public static native int dtlv_list_sample_iter_create(@ByPtrPtr dtlv_list_sample_iter iter,
                                      @Cast("size_t*") SizeTPointer indices, int samples,
                                      MDB_cursor cur, MDB_val key, MDB_val val,
-                                     int kstart, int kend,
+                                     int kforward, int kstart, int kend,
                                      MDB_val start_key, MDB_val end_key,
-                                     int vstart, int vend,
+                                     int vforward, int vstart, int vend,
                                      MDB_val start_val, MDB_val end_val);
 
  /**

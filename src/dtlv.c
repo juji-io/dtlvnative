@@ -603,16 +603,16 @@ size_t dtlv_list_val_count(MDB_cursor *cur, MDB_val *key, MDB_val *val) {
 
 size_t dtlv_list_range_count(MDB_cursor *cur,
                              MDB_val *key, MDB_val *val,
-                             int kstart, int kend,
+                             int kforward, int kstart, int kend,
                              MDB_val *start_key, MDB_val *end_key,
-                             int vstart, int vend,
+                             int vforward, int vstart, int vend,
                              MDB_val *start_val, MDB_val *end_val) {
   size_t n = 0;
   dtlv_list_iter *iter;
 
-  int rc = dtlv_list_iter_create(&iter, cur, key, val, DTLV_TRUE, kstart, kend,
-                                 start_key, end_key, DTLV_TRUE, vstart, vend,
-                                 start_val, end_val);
+  int rc = dtlv_list_iter_create(&iter, cur, key, val,
+                                 kforward, kstart, kend, start_key, end_key,
+                                 vforward, vstart, vend, start_val, end_val);
   if (rc == MDB_SUCCESS) {
     while ((rc = dtlv_list_iter_has_next(iter)) == DTLV_TRUE) n++;
     dtlv_list_iter_destroy(iter);
@@ -624,16 +624,16 @@ size_t dtlv_list_range_count(MDB_cursor *cur,
 
 size_t dtlv_list_range_count_cap(MDB_cursor *cur, size_t cap,
                                  MDB_val *key, MDB_val *val,
-                                 int kstart, int kend,
+                                 int kforward, int kstart, int kend,
                                  MDB_val *start_key, MDB_val *end_key,
-                                 int vstart, int vend,
+                                 int vforward, int vstart, int vend,
                                  MDB_val *start_val, MDB_val *end_val) {
   size_t n = 0;
   dtlv_list_iter *iter;
 
-  int rc = dtlv_list_iter_create(&iter, cur, key, val, DTLV_TRUE, kstart, kend,
-                                 start_key, end_key, DTLV_TRUE, vstart, vend,
-                                 start_val, end_val);
+  int rc = dtlv_list_iter_create(&iter, cur, key, val,
+                                 kforward, kstart, kend, start_key, end_key,
+                                 vforward, vstart, vend, start_val, end_val);
   if (rc == MDB_SUCCESS) {
     while ((rc = dtlv_list_iter_has_next(iter)) == DTLV_TRUE) {
       n++;
@@ -648,12 +648,12 @@ size_t dtlv_list_range_count_cap(MDB_cursor *cur, size_t cap,
 
 size_t dtlv_key_range_count(MDB_cursor *cur,
                             MDB_val *key, MDB_val *val,
-                            int start, int end,
+                            int forward, int start, int end,
                             MDB_val *start_key, MDB_val *end_key) {
   size_t n = 0;
   dtlv_key_iter *iter;
 
-  int rc = dtlv_key_iter_create(&iter, cur, key, val, DTLV_TRUE, start, end,
+  int rc = dtlv_key_iter_create(&iter, cur, key, val, forward, start, end,
                                 start_key, end_key);
   if (rc == MDB_SUCCESS) {
     while ((rc = dtlv_key_iter_has_next(iter)) == DTLV_TRUE) n++;
@@ -666,12 +666,12 @@ size_t dtlv_key_range_count(MDB_cursor *cur,
 
 size_t dtlv_key_range_count_cap(MDB_cursor *cur, size_t cap,
                                 MDB_val *key, MDB_val *val,
-                                int start, int end,
+                                int forward, int start, int end,
                                 MDB_val *start_key, MDB_val *end_key) {
   size_t n = 0;
   dtlv_key_iter *iter;
 
-  int rc = dtlv_key_iter_create(&iter, cur, key, val, DTLV_TRUE, start, end,
+  int rc = dtlv_key_iter_create(&iter, cur, key, val, forward, start, end,
                                 start_key, end_key);
   if (rc == MDB_SUCCESS) {
     while ((rc = dtlv_key_iter_has_next(iter)) == DTLV_TRUE) {
@@ -687,14 +687,14 @@ size_t dtlv_key_range_count_cap(MDB_cursor *cur, size_t cap,
 
 size_t dtlv_key_range_list_count(MDB_cursor *cur,
                                  MDB_val *key, MDB_val *val,
-                                 int start, int end,
+                                 int forward, int start, int end,
                                  MDB_val *start_key, MDB_val *end_key) {
   size_t n = 0;
   size_t m;
   dtlv_key_iter *iter;
 
   int rc1;
-  int rc = dtlv_key_iter_create(&iter, cur, key, val, DTLV_TRUE, start, end,
+  int rc = dtlv_key_iter_create(&iter, cur, key, val, forward, start, end,
                                 start_key, end_key);
   if (rc == MDB_SUCCESS) {
     while ((rc = dtlv_key_iter_has_next(iter)) == DTLV_TRUE) {
@@ -714,14 +714,14 @@ size_t dtlv_key_range_list_count(MDB_cursor *cur,
 
 size_t dtlv_key_range_list_count_cap(MDB_cursor *cur, size_t cap,
                                      MDB_val *key, MDB_val *val,
-                                     int start, int end,
+                                     int forward, int start, int end,
                                      MDB_val *start_key, MDB_val *end_key) {
   size_t n = 0;
   size_t m;
   dtlv_key_iter *iter;
 
   int rc1;
-  int rc = dtlv_key_iter_create(&iter, cur, key, val, DTLV_TRUE, start, end,
+  int rc = dtlv_key_iter_create(&iter, cur, key, val, forward, start, end,
                                 start_key, end_key);
   if (rc == MDB_SUCCESS) {
     while ((rc = dtlv_key_iter_has_next(iter)) == DTLV_TRUE) {
@@ -753,20 +753,20 @@ struct dtlv_list_sample_iter {
 };
 
 int dtlv_list_sample_iter_create(dtlv_list_sample_iter **iter,
-                                  size_t *indices, int samples,
-                                  MDB_cursor *cur, MDB_val *key, MDB_val *val,
-                                  int kstart, int kend,
-                                  MDB_val *start_key, MDB_val *end_key,
-                                  int vstart, int vend,
+                                 size_t *indices, int samples,
+                                 MDB_cursor *cur, MDB_val *key, MDB_val *val,
+                                 int kforward, int kstart, int kend,
+                                 MDB_val *start_key, MDB_val *end_key,
+                                 int vforward, int vstart, int vend,
                                  MDB_val *start_val, MDB_val *end_val) {
   dtlv_list_sample_iter *s;
   s = calloc(1, sizeof(struct dtlv_list_sample_iter));
   if (!s) return ENOMEM;
 
   dtlv_list_iter *base_iter;
-  int rc = dtlv_list_iter_create(&base_iter, cur, key, val, DTLV_TRUE,
-                                 kstart, kend, start_key, end_key, DTLV_TRUE,
-                                 vstart, vend, start_val, end_val);
+  int rc = dtlv_list_iter_create(&base_iter, cur, key, val,
+                                 kforward, kstart, kend, start_key, end_key,
+                                 vforward, vstart, vend, start_val, end_val);
   if (rc == MDB_SUCCESS) {
     s->base_iter = base_iter;
     s->indices = indices;
