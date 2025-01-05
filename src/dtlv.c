@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdint.h>
 #include <errno.h>
 #include <string.h>
 #include "dtlv.h"
@@ -7,23 +8,58 @@
 #include "win32/unistd.h"
 #endif
 
+#define LBLOCKSIZE (sizeof(uint64_t))
+#define TOO_SMALL(LEN) ((LEN) < LBLOCKSIZE)
+
 int dtlv_cmp_memn(const MDB_val *a, const MDB_val *b) {
 
   if (a == b) return 0;
 
-	int diff;
-	ssize_t len_diff;
-	unsigned int len;
+	int n = a->mv_size;
+	int len_diff = a->mv_size - b->mv_size;
+	if (len_diff > 0) n = b->mv_size;
 
-	len = a->mv_size;
-	len_diff = (ssize_t) a->mv_size - (ssize_t) b->mv_size;
-	if (len_diff > 0) {
-		len = b->mv_size;
-	}
+  unsigned char *s1 = (unsigned char *) a->mv_data;
+  unsigned char *s2 = (unsigned char *) b->mv_data;
 
-  diff = memcmp(a->mv_data, b->mv_data, len);
+  uint64_t *a1;
+  uint64_t *a2;
 
-	return diff ? diff : len_diff;
+  if (!TOO_SMALL(n)) {
+    a1 = (uint64_t *) s1;
+    a2 = (uint64_t *) s2;
+    while (n >= LBLOCKSIZE) {
+      if (*a1 != *a2) break;
+      a1++;
+      a2++;
+      n -= LBLOCKSIZE;
+    }
+    s1 = (unsigned char *) a1;
+    s2 = (unsigned char *) a2;
+  }
+
+  while (n--) {
+    if (*s1 != *s2) return *s1 - *s2;
+    s1++;
+    s2++;
+  }
+
+  return len_diff;
+
+  /* if (a == b) return 0; */
+
+	/* int diff; */
+	/* ssize_t len_diff; */
+
+	/* len = a->mv_size; */
+	/* len_diff = (ssize_t) a->mv_size - (ssize_t) b->mv_size; */
+	/* if (len_diff > 0) { */
+	/* 	len = b->mv_size; */
+	/* } */
+
+  /* diff = memcmp(a->mv_data, b->mv_data, len); */
+
+	/* return diff ? diff : len_diff; */
 }
 
 int dtlv_set_comparator(MDB_txn *txn, int dbi) {
