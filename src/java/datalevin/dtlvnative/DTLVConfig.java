@@ -1,4 +1,4 @@
-package dtlvnative;
+package datalevin.dtlvnative;
 
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
@@ -14,7 +14,7 @@ import org.bytedeco.javacpp.tools.*;
                               linkpath = {"../../src/"},
                               link = {"DTLV"}
                               ),
-            target = "dtlvnative.DTLV"
+            target = "datalevin.dtlvnative.DTLV"
             )
 
 public class DTLVConfig {
