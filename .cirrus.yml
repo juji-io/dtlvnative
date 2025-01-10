@@ -10,7 +10,7 @@ task:
   only_if: "changesInclude('linux-arm64/*', '.cirrus.yml')"
   script: |
     DEBIAN_FRONTEND=noninteractive apt-get update -y
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl git wget tar openjdk-21-jre-headless build-essential
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl git wget tar openjdk-21-jdk-headless build-essential
 
     git submodule init
     git submodule update
