@@ -10,9 +10,9 @@ import org.bytedeco.javacpp.tools.*;
                                              "../../src/"},
                               include = {"lmdb.h", "dtlv.h"},
                               // preloadpath = {"."},
-                              preload = {"lmdb", "dtlv"},
+                              preload = {"lmdb"},
                               linkpath = {"../../src/"},
-                              link = {"DTLV"}
+                              link = {"dtlv"}
                               ),
             target = "datalevin.dtlvnative.DTLV"
             )
