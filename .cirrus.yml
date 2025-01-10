@@ -6,39 +6,42 @@ env:
 task:
   arm_container:
     image: ubuntu:focal
-  only_if: $CIRRUS_TAG != ''
-  # only_if: "changesInclude('linux-latest-aarch64/*', '.cirrus.yml')"
+  # only_if: $CIRRUS_TAG != ''
+  only_if: "changesInclude('linux-arm64/*', '.cirrus.yml')"
   script: |
     DEBIAN_FRONTEND=noninteractive apt-get update -y
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl git wget tar openjdk-11-jre-headless build-essential liblmdb-dev
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl git wget tar openjdk-21-jre-headless build-essential
 
     git submodule init
     git submodule update
+
+    script/build-linux-shared
+    mkdir -p src/java/datalevin/dtlvnative/linux-arm64
+    cp src/*.so src/java/datalevin/dtlvnative/linux-arm64/
 
     curl -O https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
     chmod a+x lein
     mv lein /usr/local/bin/
 
-    script/build-linux-shared
-    mkdir -p ubuntu-latest-aarch64-shared/resources/dtlvnative/ubuntu-latest-aarch64-shared
-    cp src/lmdb/libraries/liblmdb/liblmdb.so ubuntu-latest-aarch64-shared/resources/dtlvnative/ubuntu-latest-aarch64-shared/
-    cd ubuntu-latest-aarch64-shared
-    lein deploy clojars
+    cd linux-arm64
+    lein deps
 
-    cd ..
-    script/build
-    cp src/*.a ubuntu-latest-aarch64/resources/dtlvnative/ubuntu-latest-aarch64/
-    cp src/dtlv.h ubuntu-latest-aarch64/resources/dtlvnative/ubuntu-latest-aarch64/
-    cp src/lmdb/libraries/liblmdb/lmdb.h ubuntu-latest-aarch64/resources/dtlvnative/ubuntu-latest-aarch64/lmdb/libraries/liblmdb/
-    cd ubuntu-latest-aarch64
+    cd ../src/java
+    java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.11/javacpp-1.5.11.jar datalevin/dtlvnative/DTLV.java
+
+    cd ../..
+    mkdir -p linux-arm64/resources/datalevin/dtlvnative/linux-arm64
+    cp src/java/datalevin/dtlvnative/linux-arm64/*.so linux-arm64/resources/datalevin/dtlvnative/linux-arm64/
+
+    cd linux-arm64
+    lein run
     lein deploy clojars
 
 task:
   macos_instance:
     image: ghcr.io/cirruslabs/macos-runner:sonoma
-  # only_if: $CIRRUS_TAG != ''
-  # only_if: "changesInclude('macos-latest-aarch64/*', 'macos-latest-aarch64-shared/*', '.cirrus.yml')"
-    only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
+  only_if: $CIRRUS_TAG != ''
+    # only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
   script: |
     git submodule init
     git submodule update
@@ -61,16 +64,3 @@ task:
     cd macosx-arm64
     lein run
     lein deploy clojars
-
-    #mkdir -p macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared
-    #cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-aarch64-shared/resources/dtlvnative/macos-latest-aarch64-shared/
-    #cd macos-latest-aarch64-shared
-    #lein deploy clojars
-
-    # cd ..
-    # script/build
-    # cp src/*.a macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
-    # cp src/dtlv.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/
-    # cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-aarch64/resources/dtlvnative/macos-latest-aarch64/lmdb/libraries/liblmdb/
-    # cd macos-latest-aarch64
-    # lein deploy clojars
