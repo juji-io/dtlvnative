@@ -15,8 +15,10 @@ task:
     git submodule init
     git submodule update
 
-    script/build
     mkdir -p src/java/datalevin/dtlvnative/linux-arm64
+    mkdir -p linux-arm64/resources/datalevin/dtlvnative/linux-arm64
+
+    script/build
     cp src/*.so src/java/datalevin/dtlvnative/linux-arm64/
 
     curl -O https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
@@ -30,7 +32,6 @@ task:
     java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.11/javacpp-1.5.11.jar datalevin/dtlvnative/DTLV.java
 
     cd ../..
-    mkdir -p linux-arm64/resources/datalevin/dtlvnative/linux-arm64
     cp src/java/datalevin/dtlvnative/linux-arm64/*.so linux-arm64/resources/datalevin/dtlvnative/linux-arm64/
 
     cd linux-arm64
