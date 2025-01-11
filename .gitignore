@@ -1,4 +1,5 @@
 .lein-env
+*/.lein-failures
 */target
 */classes
 */checkouts
