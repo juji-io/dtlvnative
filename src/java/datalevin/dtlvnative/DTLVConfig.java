@@ -9,8 +9,6 @@ import org.bytedeco.javacpp.tools.*;
                               includepath = {"../../src/lmdb/libraries/liblmdb/",
                                              "../../src/"},
                               include = {"lmdb.h", "dtlv.h"},
-                              // preloadpath = {"."},
-                              preload = {"lmdb"},
                               linkpath = {"../../src/"},
                               link = {"dtlv"}
                               ),
