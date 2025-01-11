@@ -17,5 +17,5 @@ $(lib_dtlv)$(SOEXT): $(lib_lmdb)
 	  $(CC) $(LDFLAGS) -pthread -shared -fPIC -o $@ dtlv.o -L. -llmdb
 
 clean:
-		$(RM) *.o *.a *.so *$(SOEXT)
+		$(RM) *.o *.a *.so *.dylib
 		$(MAKE) --directory=$(lib_lmdb) clean

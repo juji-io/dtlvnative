@@ -40,15 +40,17 @@ task:
 task:
   macos_instance:
     image: ghcr.io/cirruslabs/macos-runner:sonoma
-  only_if: $CIRRUS_TAG != ''
-  # only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
+  # only_if: $CIRRUS_TAG != ''
+  only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
   script: |
     git submodule init
     git submodule update
 
-    script/build-macos-shared
     mkdir -p src/java/datalevin/dtlvnative/macosx-arm64
-    cp src/*.dylib src/java/datalevin/dtlvnative/macosx-arm64/
+    mkdir -p macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64
+
+    script/build-macos-shared
+    cp src/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
 
     brew install leiningen
     cd macosx-arm64
@@ -58,7 +60,6 @@ task:
     java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.11/javacpp-1.5.11.jar datalevin/dtlvnative/DTLV.java
 
     cd ../..
-    mkdir -p macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64
     cp src/java/datalevin/dtlvnative/macosx-arm64/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
 
     cd macosx-arm64
