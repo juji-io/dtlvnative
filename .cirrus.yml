@@ -6,8 +6,8 @@ env:
 task:
   arm_container:
     image: ubuntu:focal
-  # only_if: $CIRRUS_TAG != ''
-  only_if: "changesInclude('linux-arm64/*', '.cirrus.yml')"
+  only_if: $CIRRUS_TAG != ''
+  # only_if: "changesInclude('linux-arm64/*', '.cirrus.yml')"
   script: |
     DEBIAN_FRONTEND=noninteractive apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y curl git wget tar openjdk-21-jdk-headless build-essential
@@ -15,7 +15,7 @@ task:
     git submodule init
     git submodule update
 
-    script/build-linux-shared
+    script/build
     mkdir -p src/java/datalevin/dtlvnative/linux-arm64
     cp src/*.so src/java/datalevin/dtlvnative/linux-arm64/
 
@@ -40,8 +40,8 @@ task:
 task:
   macos_instance:
     image: ghcr.io/cirruslabs/macos-runner:sonoma
-  # only_if: $CIRRUS_TAG != ''
-  only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
+  only_if: $CIRRUS_TAG != ''
+  # only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
   script: |
     git submodule init
     git submodule update

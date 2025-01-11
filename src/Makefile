@@ -9,12 +9,12 @@ libraries := $(lib_lmdb) $(lib_dtlv)$(SOEXT)
 all: $(libraries)
 
 $(lib_lmdb):
-		$(MAKE) --directory=$@ liblmdb$(SOEXT)
-		cp $(lib_lmdb)/liblmdb$(SOEXT) .
+		$(MAKE) --directory=$@ XCFLAGS="-fPIC" liblmdb.a
+		cp $(lib_lmdb)/liblmdb.a .
 
 $(lib_dtlv)$(SOEXT): $(lib_lmdb)
 		$(CC) -pthread -fPIC -O2 -Wall -g -c dtlv.c -o dtlv.o
-	  $(CC) $(LDFLAGS) -pthread -shared -o $@ dtlv.o liblmdb$(SOEXT)
+	  $(CC) $(LDFLAGS) -pthread -shared -fPIC -o $@ dtlv.o -L. -llmdb
 
 clean:
 		$(RM) *.o *.a *.so *$(SOEXT)
