@@ -1,11 +1,11 @@
 name: Build
 
-# on: push
+on: push
 
-on:
-  release:
-    types:
-      - created
+# on:
+#   release:
+#     types:
+#       - created
 
 jobs:
   build:
@@ -15,8 +15,8 @@ jobs:
       CLOJARS_PASSWORD: ${{secrets.CLOJARSPASSWORD}}
     strategy:
       matrix:
-        # os: [macos-13, ubuntu-20.04]
-        os: [ubuntu-20.04]
+        os: [macos-13, ubuntu-20.04]
+        # os: [ubuntu-20.04]
 
     steps:
       - name: Checkout repository and submodules
@@ -27,40 +27,32 @@ jobs:
       - name: Install Lein
         uses: knicknic/os-specific-run@v1.0.3
         with:
-          # macos: brew install leiningen
+          macos: brew install leiningen
           linux: echo "lein is already installed"
 
-      # - name: Install Zig
-      #   uses: goto-bus-stop/setup-zig@v2
-
-      # - name: Build and deploy static
-      #   uses: knicknic/os-specific-run@v1.0.3
-      #   with:
-      #     macos: |
-      #       script/build
-      #       cp src/*.a macos-latest-amd64/resources/dtlvnative/macos-latest-amd64/
-      #       cp src/dtlv.h macos-latest-amd64/resources/dtlvnative/macos-latest-amd64/
-      #       cp src/lmdb/libraries/liblmdb/lmdb.h macos-latest-amd64/resources/dtlvnative/macos-latest-amd64/lmdb/libraries/liblmdb/
-      #       cd macos-latest-amd64
-      #       lein deploy clojars
-      #     linux: |
-      #       sudo script/setup-musl
-      #       script/build-musl
-      #       cp src/*.a ubuntu-latest-amd64/resources/dtlvnative/ubuntu-latest-amd64/
-      #       cp src/dtlv.h ubuntu-latest-amd64/resources/dtlvnative/ubuntu-latest-amd64/
-      #       cp src/lmdb/libraries/liblmdb/lmdb.h ubuntu-latest-amd64/resources/dtlvnative/ubuntu-latest-amd64/lmdb/libraries/liblmdb/
-      #       cd ubuntu-latest-amd64
-      #       lein deploy clojars
-
-      - name: Build and deploy shared
+      - name: Build and deploy shared libraries
         uses: knicknic/os-specific-run@v1.0.3
         with:
-          # macos: |
-          #   script/build-macos-shared
-          #   mkdir -p macos-latest-amd64-shared/resources/dtlvnative/macos-latest-amd64-shared
-          #   cp src/lmdb/libraries/liblmdb/liblmdb.dylib macos-latest-amd64-shared/resources/dtlvnative/macos-latest-amd64-shared/
-          #   cd macos-latest-amd64-shared
-          #   lein deploy clojars
+          macos: |
+            mkdir -p src/java/datalevin/dtlvnative/macosx-x86_64
+            mkdir -p macosx-x86_64/resources/datalevin/dtlvnative/macosx-x86_64
+
+            script/build-macos
+            cp src/*.dylib macosx-x86_64/resources/datalevin/dtlvnative/macosx-x86_64/
+
+            cd macosx-x86_64
+            lein deps
+
+            cd ../src/java
+            java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.11/javacpp-1.5.11.jar datalevin/dtlvnative/DTLV.java
+
+            cd ../..
+            cp src/java/datalevin/dtlvnative/macosx-x86_64/*.dylib macosx-x86_64/resources/datalevin/dtlvnative/macosx-x86_64/
+
+            cd macosx-x86_64
+            lein run
+            lein deploy clojars
+
           linux: |
             mkdir -p linux-x86_64/resources/datalevin/dtlvnative/linux-x86_64
             mkdir -p src/java/datalevin/dtlvnative/linux-x86_64
@@ -80,9 +72,3 @@ jobs:
             cd linux-x86_64
             lein run
             lein deploy clojars
-
-      # - name: Build and deploy cross compiled shared
-      #   uses: knicknic/os-specific-run@v1.0.3
-      #   with:
-      #     linux: |
-      #       script/build-zig

@@ -1,5 +1,11 @@
 # Change Log
 
+## WIP
+### Changed
+- Use JavaCPP. Removed static compilation as we don't use GraalVM specific
+  binding any more. lmdb is compiled as static, and linked into dtlv shared
+  library. Platform naming follows JavaCPP as well.
+
 ## 0.9.7
 ### Changed
 - actually need apt update

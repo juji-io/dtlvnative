@@ -6,7 +6,7 @@ branches:
   only:
     - master
 
-skip_non_tags: true
+skip_non_tags: false
 
 image: Visual Studio 2019
 
@@ -51,6 +51,15 @@ build_script:
 
     call lein.bat self-install
 
-    cd windows-amd64
+    cd windows-x86_64
+    call ..\lein.bat deps
 
+    cd ..\src\java
+    java -jar ~\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar datalevin\dtlvnative\DTLV.java
+
+    cd ..\..
+    copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll macosx-arm64\resources\datalevin\dtlvnative\windows-x86_64/
+
+    cd windows-x86_64
+    call ..\lein.bat run
     call ..\lein.bat deploy clojars

@@ -17,6 +17,4 @@ nmake install
 
 cd %CPATH%
 
-copy *.lib ..\windows-amd64\resources\dtlvnative\windows-amd64\
-copy dtlv.h ..\windows-amd64\resources\dtlvnative\windows-amd64\
-copy lmdb\libraries\liblmdb\lmdb.h ..\windows-amd64\resources\dtlvnative\windows-amd64\lmdb\libraries\liblmdb\
+copy *.dll ..\windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\

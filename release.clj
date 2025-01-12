@@ -16,7 +16,7 @@
   (println "OK"))
 
 (defn current-version []
-  (second (re-find #"def version \"([0-9\.]+)\"" (slurp "windows-amd64/project.clj"))))
+  (second (re-find #"def version \"([0-9\.]+)\"" (slurp "windows-x86_64/project.clj"))))
 
 (def ^:dynamic *env* {})
 
@@ -39,36 +39,23 @@
         old->new #(str/replace % old-v new-v)]
     (update-file "CHANGELOG.md" #(str/replace % "# WIP" (str "# " new-v)))
 
-    (update-file "windows-amd64/project.clj" old->new)
-    (update-file "ubuntu-latest-amd64/project.clj" old->new)
-    (update-file "ubuntu-latest-aarch64/project.clj" old->new)
-    (update-file "macos-latest-amd64/project.clj" old->new)
-    (update-file "macos-latest-aarch64/project.clj" old->new)
-
-    (update-file "ubuntu-latest-amd64-shared/project.clj" old->new)
-    (update-file "ubuntu-latest-aarch64-shared/project.clj" old->new)
-    (update-file "macos-latest-amd64-shared/project.clj" old->new)
-    (update-file "macos-latest-aarch64-shared/project.clj" old->new)
-
-    (update-file "x86_64-windows-gnu/project.clj" old->new)
+    (update-file "windows-x86_64/project.clj" old->new)
+    (update-file "linux-arm64/project.clj" old->new)
+    (update-file "linux-x86_64/project.clj" old->new)
+    (update-file "macos-arm64/project.clj" old->new)
+    (update-file "macos-x86_64/project.clj" old->new)
     ))
 
 (defn make-commit []
   (println "\n\n[ Making a commit ]\n")
   (sh "git" "add"
       "CHANGELOG.md"
-      "windows-amd64/project.clj"
-      "ubuntu-latest-amd64/project.clj"
-      "ubuntu-latest-aarch64/project.clj"
-      "macos-latest-amd64/project.clj"
-      "macos-latest-aarch64/project.clj"
-
-      "x86_64-windows-gnu/project.clj"
-
-      "ubuntu-latest-amd64-shared/project.clj"
-      "ubuntu-latest-aarch64-shared/project.clj"
-      "macos-latest-amd64-shared/project.clj"
-      "macos-latest-aarch64-shared/project.clj")
+      "windows-x86_64/project.clj"
+      "linux-arm64/project.clj"
+      "linux-x86_64/project.clj"
+      "macos-arm64/project.clj"
+      "macos-x86_64/project.clj"
+      )
 
   (sh "git" "commit" "-m" (str "Version " new-v))
   (sh "git" "tag" new-v)

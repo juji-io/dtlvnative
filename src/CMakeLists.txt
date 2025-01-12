@@ -7,7 +7,7 @@ OPTION(CLOSE_WARNING "close warning,default off" OFF)
 OPTION(BUILD_TEST "build test program,default off" OFF)
 
 # for #include <unistd.h>
-INCLUDE_DIRECTORIES( ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/lmdb/libraries/liblmdb )
+INCLUDE_DIRECTORIES( ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/win32 ${PROJECT_SOURCE_DIR}/lmdb/libraries/liblmdb )
 
 # option
 IF( CLOSE_WARNING)
@@ -15,25 +15,24 @@ IF( CLOSE_WARNING)
     ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
 ENDIF(CLOSE_WARNING)
 
-# lmdb library (shared)
-ADD_LIBRARY(lmdbShared SHARED lmdb/libraries/liblmdb/mdb.c lmdb/libraries/liblmdb/midl.c)
-
-SET_TARGET_PROPERTIES( lmdbShared 
-  PROPERTIES
-  OUTPUT_NAME lmdb
-  ARCHIVE_OUTPUT_DIRECTORY lmdbShared
-  RUNTIME_OUTPUT_DIRECTORY lmdbShared
-)
-
-INSTALL(TARGETS lmdbShared 
-    RUNTIME DESTINATION .)
-
 # lmdb library (static)
 ADD_LIBRARY(lmdb STATIC lmdb/libraries/liblmdb/mdb.c lmdb/libraries/liblmdb/midl.c)
 
-# dtlv library (static)
-ADD_LIBRARY(dtlv STATIC dtlv.c)
+SET_TARGET_PROPERTIES( lmdb
+  PROPERTIES
+  OUTPUT_NAME lmdb
+  ARCHIVE_OUTPUT_DIRECTORY lmdb
+  RUNTIME_OUTPUT_DIRECTORY lmdb
+)
 
-INSTALL(TARGETS lmdb dtlv
+INSTALL(TARGETS lmdb
+    RUNTIME DESTINATION .)
+
+# dtlv library (shared)
+ADD_LIBRARY(dtlv SHARED dtlv.c)
+
+# Link the LMDB static library to DTLV
+TARGET_LINK_LIBRARIES(dtlv PRIVATE lmdb)
+
+INSTALL(TARGETS dtlv
     ARCHIVE DESTINATION .)
-

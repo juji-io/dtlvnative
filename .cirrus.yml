@@ -6,8 +6,8 @@ env:
 task:
   arm_container:
     image: ubuntu:focal
-  only_if: $CIRRUS_TAG != ''
-  # only_if: "changesInclude('linux-arm64/*', '.cirrus.yml')"
+  # only_if: $CIRRUS_TAG != ''
+  only_if: "changesInclude('linux-arm64/*', '.cirrus.yml')"
   script: |
     DEBIAN_FRONTEND=noninteractive apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y curl git wget tar openjdk-21-jdk-headless build-essential
@@ -50,7 +50,7 @@ task:
     mkdir -p src/java/datalevin/dtlvnative/macosx-arm64
     mkdir -p macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64
 
-    script/build-macos-shared
+    script/build-macos
     cp src/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
 
     brew install leiningen
