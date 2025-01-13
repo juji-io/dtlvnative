@@ -33,8 +33,8 @@ install(TARGETS lmdb
     ARCHIVE DESTINATION lib
 )
 
-# DTLV library (shared)
-add_library(dtlv SHARED
+# DTLV library (static)
+add_library(dtlv STATIC
     dtlv.c
 )
 
@@ -43,10 +43,10 @@ target_link_libraries(dtlv PRIVATE lmdb)
 
 set_target_properties(dtlv PROPERTIES
     OUTPUT_NAME dtlv
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
 )
 
-# Install the shared library
+# Install the static library
 install(TARGETS dtlv
-    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
