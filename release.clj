@@ -39,22 +39,22 @@
         old->new #(str/replace % old-v new-v)]
     (update-file "CHANGELOG.md" #(str/replace % "# WIP" (str "# " new-v)))
 
-    (update-file "windows-x86_64/project.clj" old->new)
     (update-file "linux-arm64/project.clj" old->new)
     (update-file "linux-x86_64/project.clj" old->new)
-    (update-file "macos-arm64/project.clj" old->new)
-    (update-file "macos-x86_64/project.clj" old->new)
+    (update-file "macosx-arm64/project.clj" old->new)
+    (update-file "macosx-x86_64/project.clj" old->new)
+    (update-file "windows-x86_64/project.clj" old->new)
     ))
 
 (defn make-commit []
   (println "\n\n[ Making a commit ]\n")
   (sh "git" "add"
       "CHANGELOG.md"
-      "windows-x86_64/project.clj"
       "linux-arm64/project.clj"
       "linux-x86_64/project.clj"
-      "macos-arm64/project.clj"
-      "macos-x86_64/project.clj"
+      "macosx-arm64/project.clj"
+      "macosx-x86_64/project.clj"
+      "windows-x86_64/project.clj"
       )
 
   (sh "git" "commit" "-m" (str "Version " new-v))
