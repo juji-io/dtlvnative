@@ -16,4 +16,4 @@ cmake .. ^
     -DBUILD_TEST=off
 nmake install
 
-dir $DPATH%
+dir %DPATH%
