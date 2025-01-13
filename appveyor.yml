@@ -61,7 +61,7 @@ build_script:
 
     cd ..\..
 
-    mkdir windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64 /p
+    mkdir windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
 
     copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
 
