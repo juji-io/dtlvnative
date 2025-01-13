@@ -1,38 +1,52 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
-PROJECT(dtlv VERSION  0.9.30 LANGUAGES  C)
+cmake_minimum_required(VERSION 3.0)
+project(dtlv VERSION 0.11.3 LANGUAGES C)
 
-# Compilation switch to turn off compilation warning
-OPTION(CLOSE_WARNING "close warning,default off" OFF)
-# Compile switch, used to specify whether to compile test code
-OPTION(BUILD_TEST "build test program,default off" OFF)
+# Options for compilation
+option(CLOSE_WARNING "Close warnings, default off" OFF)
+option(BUILD_TEST "Build test program, default off" OFF)
 
-# for #include <unistd.h>
-INCLUDE_DIRECTORIES( ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/win32 ${PROJECT_SOURCE_DIR}/lmdb/libraries/liblmdb )
-
-# option
-IF( CLOSE_WARNING)
-    #close warning
-    ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
-ENDIF(CLOSE_WARNING)
-
-# lmdb library (static)
-ADD_LIBRARY(lmdb STATIC lmdb/libraries/liblmdb/mdb.c lmdb/libraries/liblmdb/midl.c)
-
-SET_TARGET_PROPERTIES( lmdb
-  PROPERTIES
-  OUTPUT_NAME lmdb
-  ARCHIVE_OUTPUT_DIRECTORY lmdb
-  RUNTIME_OUTPUT_DIRECTORY lmdb
+# Include directories
+include_directories(
+    ${PROJECT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/win32
+    ${PROJECT_SOURCE_DIR}/lmdb/libraries/liblmdb
 )
 
-INSTALL(TARGETS lmdb
-    RUNTIME DESTINATION .)
+# Option to close warnings
+if(CLOSE_WARNING)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
 
-# dtlv library (shared)
-ADD_LIBRARY(dtlv SHARED dtlv.c)
+# LMDB library (static)
+add_library(lmdb STATIC
+    lmdb/libraries/liblmdb/mdb.c
+    lmdb/libraries/liblmdb/midl.c
+)
+
+set_target_properties(lmdb PROPERTIES
+    OUTPUT_NAME lmdb
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
+)
+
+# Install only the .lib file for the static library
+install(TARGETS lmdb
+    ARCHIVE DESTINATION lib
+)
+
+# DTLV library (shared)
+add_library(dtlv SHARED
+    dtlv.c
+)
 
 # Link the LMDB static library to DTLV
-TARGET_LINK_LIBRARIES(dtlv PRIVATE lmdb)
+target_link_libraries(dtlv PRIVATE lmdb)
 
-INSTALL(TARGETS dtlv
-    ARCHIVE DESTINATION .)
+set_target_properties(dtlv PROPERTIES
+    OUTPUT_NAME dtlv
+    RUNTIME_OUTPUT_DIRECTORY .
+)
+
+# Install the shared library
+install(TARGETS dtlv
+    RUNTIME DESTINATION .
+)
