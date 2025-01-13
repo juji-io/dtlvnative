@@ -3,6 +3,10 @@ set PWD=%cd%
 set CPATH=%PWD%\src
 set DPATH=%PWD%\windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
 
+mkdir %DPATH% /p
+
+mkdir %CPATH%\java\datalevin\dtlvnative\windows-x86_64 /p
+
 cd %CPATH%
 
 mkdir build
@@ -20,4 +24,4 @@ nmake install
 
 dir %DPATH%
 
-cd
+cd %PWD%
