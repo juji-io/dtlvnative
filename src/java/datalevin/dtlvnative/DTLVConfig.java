@@ -5,13 +5,23 @@ import org.bytedeco.javacpp.annotation.*;
 import org.bytedeco.javacpp.tools.*;
 
 @Properties(
-            value = @Platform(
-                              includepath = {"../../src/lmdb/libraries/liblmdb/",
-                                             "../../src/"},
-                              include = {"lmdb.h", "dtlv.h"},
-                              linkpath = {"../../src/"},
-                              link = {"lmdb", "dtlv"}
-                              ),
+            value = {
+                @Platform( // Common
+                           includepath = {
+                              "../../src/lmdb/libraries/liblmdb/",
+                              "../../src/" },
+                           include = { "lmdb.h", "dtlv.h" },
+                           linkpath = { "../../src/" }
+                           ),
+                @Platform( // Windows
+                           value = "windows",
+                           link = { "lmdb", "dtlv", "Advapi32" }
+                           ),
+                @Platform( // Unix-like
+                           value = { "linux", "macosx" },
+                           link = { "dtlv" }
+                           )
+            },
             target = "datalevin.dtlvnative.DTLV"
             )
 
