@@ -43,10 +43,10 @@ target_link_libraries(dtlv PRIVATE lmdb)
 
 set_target_properties(dtlv PROPERTIES
     OUTPUT_NAME dtlv
-    RUNTIME_OUTPUT_DIRECTORY .
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
 # Install the shared library
 install(TARGETS dtlv
-    RUNTIME DESTINATION .
+    RUNTIME DESTINATION bin
 )
