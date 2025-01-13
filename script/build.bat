@@ -18,3 +18,5 @@ cmake .. ^
 nmake install
 
 dir %CPATH%
+
+cd %PWD%
