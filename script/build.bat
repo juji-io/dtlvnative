@@ -1,6 +1,7 @@
 
 set PWD=%cd%
 set CPATH=%PWD%\src
+set DPATH=%PWD%\windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
 
 cd %CPATH%
 
@@ -10,11 +11,9 @@ cd build
 cmake .. ^
     -G "NMake Makefiles" ^
     -DCMAKE_BUILD_TYPE:STRING=RELEASE ^
-    -DCMAKE_INSTALL_PREFIX=%CPATH% ^
+    -DCMAKE_INSTALL_PREFIX=%DPATH% ^
     -DCLOSE_WARNING=on ^
     -DBUILD_TEST=off
 nmake install
 
-cd %CPATH%
-
-copy bin\*.dll ..\windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
+dir $DPATH%
