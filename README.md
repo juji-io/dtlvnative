@@ -19,6 +19,9 @@ The following platforms are currently supported:
 * linux-x86_64
 * windows-x86-64
 
+The corrdinate of the released JAR is `org.clojars.huahaiy/dtlvnative-PLATFORM`
+where `PLATFORM` is one of the above.
+
 ## License
 
 Copyright © 2021-2025 Juji, Inc.
