@@ -48,5 +48,5 @@ set_target_properties(dtlv PROPERTIES
 
 # Install the shared library
 install(TARGETS dtlv
-    RUNTIME DESTINATION bin
+    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
