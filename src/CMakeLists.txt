@@ -25,12 +25,12 @@ add_library(lmdb STATIC
 
 set_target_properties(lmdb PROPERTIES
     OUTPUT_NAME lmdb
-    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
 )
 
 # Install only the .lib file for the static library
 install(TARGETS lmdb
-    ARCHIVE DESTINATION lib
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
 
 # DTLV library (static)
@@ -43,7 +43,7 @@ target_link_libraries(dtlv PRIVATE lmdb)
 
 set_target_properties(dtlv PROPERTIES
     OUTPUT_NAME dtlv
-    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
 )
 
 # Install the static library
