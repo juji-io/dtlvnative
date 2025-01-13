@@ -52,14 +52,19 @@ build_script:
     call lein.bat self-install
 
     cd windows-x86_64
+
     call ..\lein.bat deps
 
     cd ..\src\java
-    java -jar ~\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar datalevin\dtlvnative\DTLV.java
+
+    java -jar %USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar datalevin\dtlvnative\DTLV.java
 
     cd ..\..
-    copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll macosx-arm64\resources\datalevin\dtlvnative\windows-x86_64/
+
+    copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll macosx-arm64\resources\datalevin\dtlvnative\windows-x86_64\
 
     cd windows-x86_64
+
     call ..\lein.bat run
+
     call ..\lein.bat deploy clojars
