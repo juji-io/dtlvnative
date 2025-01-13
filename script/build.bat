@@ -17,4 +17,4 @@ nmake install
 
 cd %CPATH%
 
-copy *.dll ..\windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
+copy bin\*.dll ..\windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
