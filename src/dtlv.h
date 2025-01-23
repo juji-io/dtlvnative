@@ -7,12 +7,13 @@
  *
  *	@author	Huahai Yang
  *
- *	@copyright Copyright 2020-2024. Huahai Yang. All rights reserved.
+ *	@copyright Copyright 2020-2025. Huahai Yang. All rights reserved.
  *
  *  This code is released under Eclipse Public License 2.0.
  */
 
 #include "lmdb/libraries/liblmdb/lmdb.h"
+#include "usearch/c/usearch.h"
 
 #ifdef __cplusplus
 extern "C" {
