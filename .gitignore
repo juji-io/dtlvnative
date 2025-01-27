@@ -17,3 +17,5 @@ pom.xml.asc
 *.o
 *.dylib
 *.so
+.project
+.settings/

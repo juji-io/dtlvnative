@@ -9,9 +9,9 @@ import org.bytedeco.javacpp.tools.*;
                 @Platform( // Common
                            includepath = {
                               "../../src/lmdb/libraries/liblmdb/",
-                              "../../src/usearch/include/",
+                              "../../src/usearch/c/",
                               "../../src/" },
-                           include = { "lmdb.h", "usearch.hpp", "dtlv.h" },
+                           include = { "lmdb.h", "usearch.h", "dtlv.h" },
                            linkpath = { "../../src/" }
                            ),
                 @Platform( // Windows

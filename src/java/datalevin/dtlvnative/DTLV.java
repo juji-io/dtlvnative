@@ -75,15 +75,14 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
  *
  *	  Fix: Check for stale readers periodically, using the
  *	  #mdb_reader_check function or the \ref mdb_stat_1 "mdb_stat" tool.
- *	  Stale writers will be cleared automatically on most systems:
+ *	  Stale writers will be cleared automatically on some systems:
  *	  - Windows - automatic
- *	  - BSD, systems using SysV semaphores - automatic
  *	  - Linux, systems using POSIX mutexes with Robust option - automatic
+ *	  - not on BSD, systems using POSIX semaphores.
  *	  Otherwise just make all programs using the database close it;
  *	  the lockfile is always reset on first open of the environment.
  *
- *	- On BSD systems or others configured with MDB_USE_SYSV_SEM or
- *	  MDB_USE_POSIX_SEM,
+ *	- On BSD systems or others configured with MDB_USE_POSIX_SEM,
  *	  startup can fail due to semaphores owned by another userid.
  *
  *	  Fix: Open and close the database as the user which owns the
@@ -189,8 +188,6 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
 // #define _LMDB_H_
 
 // #include <sys/types.h>
-// #include <inttypes.h>
-// #include <limits.h>
 
 // #ifdef __cplusplus
 // #endif
@@ -200,41 +197,17 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
 // #else
 // #endif
 
-// #ifdef _WIN32
-// public static final String MDB_FMT_Z =	"I";
-// #else
-// #endif
-
-// #ifndef MDB_VL32
-/** Unsigned type used for mapsize, entry counts and page/transaction IDs.
- *
- *	It is normally size_t, hence the name. Defining MDB_VL32 makes it
- *	uint64_t, but do not try this unless you know what you are doing.
- */
-/** max #mdb_size_t */
-// public static final int MDB_SIZE_MAX =	SIZE_MAX;
-/** #mdb_size_t printf formats, \b t = one of [diouxX] without quotes */
-// # define MDB_PRIy(t)	MDB_FMT_Z #t
-/** #mdb_size_t scanf formats, \b t = one of [dioux] without quotes */
-// # define MDB_SCNy(t)	MDB_FMT_Z #t
-// #else
-// # define MDB_PRIy(t)	PRI##t##64
-// # define MDB_SCNy(t)	SCN##t##64
-/** Prevent mixing with non-VL32 builds */
-// public static final int mdb_env_create =	mdb_env_create_vl32;
-// #endif
-
 /** An abstraction for a file handle.
  *	On POSIX systems file handles are small integers. On Windows
  *	they're opaque pointers.
  */
 // #ifdef _WIN32
-// @Namespace @Name("void") @Opaque public static class mdb_filehandle_t extends Pointer {
-//     /** Empty constructor. Calls {@code super((Pointer)null)}. */
-//     public mdb_filehandle_t() { super((Pointer)null); }
-//     /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-//     public mdb_filehandle_t(Pointer p) { super(p); }
-// }
+//@Namespace @Name("void") @Opaque public static class mdb_filehandle_t extends Pointer {
+    //[>* Empty constructor. Calls {@code super((Pointer)null)}. <]
+    //public mdb_filehandle_t() { super((Pointer)null); }
+    //[>* Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. <]
+    //public mdb_filehandle_t(Pointer p) { super(p); }
+//}
 // #else
 // #endif
 
@@ -250,17 +223,17 @@ public static final int MDB_VERSION_MAJOR =	0;
 /** Library minor version */
 public static final int MDB_VERSION_MINOR =	9;
 /** Library patch version */
-public static final int MDB_VERSION_PATCH =	70;
+public static final int MDB_VERSION_PATCH =	33;
 
 /** Combine args a,b,c into a single integer for easy version comparisons */
 // #define MDB_VERINT(a,b,c)	(((a) << 24) | ((b) << 16) | (c))
 
 /** The full library version as a single integer */
-// public static final int MDB_VERSION_FULL =
-// 	MDB_VERINT(MDB_VERSION_MAJOR,MDB_VERSION_MINOR,MDB_VERSION_PATCH);
+//public static final int MDB_VERSION_FULL =
+	//MDB_VERINT(MDB_VERSION_MAJOR,MDB_VERSION_MINOR,MDB_VERSION_PATCH);
 
 /** The release date of this library version */
-// public static final String MDB_VERSION_DATE =	"December 19, 2015";
+//public static final String MDB_VERSION_DATE =	"May 21, 2024";
 
 /** A stringifier for the version info */
 // #define MDB_VERSTR(a,b,c,d)	"LMDB " #a "." #b "." #c ": (" d ")"
@@ -269,8 +242,8 @@ public static final int MDB_VERSION_PATCH =	70;
 // #define MDB_VERFOO(a,b,c,d)	MDB_VERSTR(a,b,c,d)
 
 /** The full library version as a C string */
-// public static final int MDB_VERSION_STRING =
-// 	MDB_VERFOO(MDB_VERSION_MAJOR,MDB_VERSION_MINOR,MDB_VERSION_PATCH,MDB_VERSION_DATE);
+//public static final int MDB_VERSION_STRING =
+	//MDB_VERFOO(MDB_VERSION_MAJOR,MDB_VERSION_MINOR,MDB_VERSION_PATCH,MDB_VERSION_DATE);
 /**	\} */
 
 /** \brief Opaque structure for a database environment.
@@ -403,8 +376,6 @@ public static final int MDB_NOLOCK =		0x400000;
 public static final int MDB_NORDAHEAD =	0x800000;
 	/** don't initialize malloc'd memory before writing to datafile */
 public static final int MDB_NOMEMINIT =	0x1000000;
-	/** use the previous snapshot rather than the latest one */
-public static final int MDB_PREVSNAPSHOT =	0x2000000;
 /** \} */
 
 /**	\defgroup	mdb_dbi_open	Database Flags
@@ -414,8 +385,7 @@ public static final int MDB_PREVSNAPSHOT =	0x2000000;
 public static final int MDB_REVERSEKEY =	0x02;
 	/** use sorted duplicates */
 public static final int MDB_DUPSORT =		0x04;
-	/** numeric keys in native byte order, either unsigned int or #mdb_size_t.
-	 *	(lmdb expects 32-bit int <= size_t <= 32/64-bit mdb_size_t.)
+	/** numeric keys in native byte order: either unsigned int or size_t.
 	 *  The keys must all be of the same size. */
 public static final int MDB_INTEGERKEY =	0x08;
 	/** with #MDB_DUPSORT, sorted dup items have fixed size */
@@ -570,10 +540,8 @@ public static final int MDB_BAD_TXN =			(-30782);
 public static final int MDB_BAD_VALSIZE =		(-30781);
 	/** The specified DBI was changed unexpectedly */
 public static final int MDB_BAD_DBI =		(-30780);
-	/** Unexpected problem - txn should abort */
-public static final int MDB_PROBLEM =		(-30779);
 	/** The last defined error code */
-public static final int MDB_LAST_ERRCODE =	MDB_PROBLEM;
+public static final int MDB_LAST_ERRCODE =	MDB_BAD_DBI;
 /** \} */
 
 /** \brief Statistics for a database in the environment */
@@ -604,13 +572,13 @@ public static class MDB_stat extends Pointer {
 	/** Depth (height) of the B-tree */
 	public native @Cast("unsigned int") int ms_depth(); public native MDB_stat ms_depth(int setter);
 	/** Number of internal (non-leaf) pages */
-	public native @Cast("mdb_size_t") long ms_branch_pages(); public native MDB_stat ms_branch_pages(long setter);
+	public native @Cast("size_t") long ms_branch_pages(); public native MDB_stat ms_branch_pages(long setter);
 	/** Number of leaf pages */
-	public native @Cast("mdb_size_t") long ms_leaf_pages(); public native MDB_stat ms_leaf_pages(long setter);
+	public native @Cast("size_t") long ms_leaf_pages(); public native MDB_stat ms_leaf_pages(long setter);
 	/** Number of overflow pages */
-	public native @Cast("mdb_size_t") long ms_overflow_pages(); public native MDB_stat ms_overflow_pages(long setter);
+	public native @Cast("size_t") long ms_overflow_pages(); public native MDB_stat ms_overflow_pages(long setter);
 	/** Number of data items */
-	public native @Cast("mdb_size_t") long ms_entries(); public native MDB_stat ms_entries(long setter);
+	public native @Cast("size_t") long ms_entries(); public native MDB_stat ms_entries(long setter);
 }
 
 /** \brief Information about the environment */
@@ -638,11 +606,11 @@ public static class MDB_envinfo extends Pointer {
 	/** Address of map, if fixed */
 	public native Pointer me_mapaddr(); public native MDB_envinfo me_mapaddr(Pointer setter);
 	/** Size of the data memory map */
-	public native @Cast("mdb_size_t") long me_mapsize(); public native MDB_envinfo me_mapsize(long setter);
+	public native @Cast("size_t") long me_mapsize(); public native MDB_envinfo me_mapsize(long setter);
 	/** ID of the last used page */
-	public native @Cast("mdb_size_t") long me_last_pgno(); public native MDB_envinfo me_last_pgno(long setter);
+	public native @Cast("size_t") long me_last_pgno(); public native MDB_envinfo me_last_pgno(long setter);
 	/** ID of the last committed transaction */
-	public native @Cast("mdb_size_t") long me_last_txnid(); public native MDB_envinfo me_last_txnid(long setter);
+	public native @Cast("size_t") long me_last_txnid(); public native MDB_envinfo me_last_txnid(long setter);
 	/** max reader slots in the environment */
 	public native @Cast("unsigned int") int me_maxreaders(); public native MDB_envinfo me_maxreaders(int setter);
 	/** max reader slots used in the environment */
@@ -793,12 +761,6 @@ public static native int mdb_env_create(@ByPtrPtr MDB_env env);
 	 *		caller is expected to overwrite all of the memory that was
 	 *		reserved in that case.
 	 *		This flag may be changed at any time using #mdb_env_set_flags().
-	 *	<li>#MDB_PREVSNAPSHOT
-	 *		Open the environment with the previous snapshot rather than the latest
-	 *		one. This loses the latest transaction, but may help work around some
-	 *		types of corruption. If opened with write access, this must be the
-	 *		only process using the environment. This flag is automatically reset
-	 *		after a write transaction is successfully committed.
 	 * </ul>
 	 * @param mode [in] The UNIX permissions to set on created files and semaphores.
 	 * This parameter is ignored on Windows.
@@ -846,7 +808,7 @@ public static native int mdb_env_copy(MDB_env env, String path);
 	 * have already been opened for Write access.
 	 * @return A non-zero error value on failure and 0 on success.
 	 */
-// public static native int mdb_env_copyfd(MDB_env env, mdb_filehandle_t fd);
+//public static native int mdb_env_copyfd(MDB_env env, mdb_filehandle_t fd);
 
 	/** \brief Copy an LMDB environment to the specified path, with options.
 	 *
@@ -891,7 +853,7 @@ public static native int mdb_env_copy2(MDB_env env, String path, @Cast("unsigned
 	 * See #mdb_env_copy2() for options.
 	 * @return A non-zero error value on failure and 0 on success.
 	 */
-// public static native int mdb_env_copyfd2(MDB_env env, mdb_filehandle_t fd, @Cast("unsigned int") int flags);
+//public static native int mdb_env_copyfd2(MDB_env env, mdb_filehandle_t fd, @Cast("unsigned int") int flags);
 
 	/** \brief Return statistics about the LMDB environment.
 	 *
@@ -1001,7 +963,7 @@ public static native int mdb_env_get_path(MDB_env env, @Cast("const char**") @By
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-// public static native int mdb_env_get_fd(MDB_env env, @ByPtrPtr mdb_filehandle_t fd);
+//public static native int mdb_env_get_fd(MDB_env env, @ByPtrPtr mdb_filehandle_t fd);
 
 	/** \brief Set the size of the memory map to use for this environment.
 	 *
@@ -1035,7 +997,7 @@ public static native int mdb_env_get_path(MDB_env env, @Cast("const char**") @By
 	 *   	an active write transaction.
 	 * </ul>
 	 */
-public static native int mdb_env_set_mapsize(MDB_env env, @Cast("mdb_size_t") long size);
+public static native int mdb_env_set_mapsize(MDB_env env, @Cast("size_t") long size);
 
 	/** \brief Set the maximum number of threads/reader slots for the environment.
 	 *
@@ -1157,10 +1119,6 @@ public static native int mdb_env_set_assert(MDB_env env, MDB_assert_func func);
 	 * <ul>
 	 *	<li>#MDB_RDONLY
 	 *		This transaction will not perform any write operations.
-	 *	<li>#MDB_NOSYNC
-	 *		Don't flush system buffers to disk when committing this transaction.
-	 *	<li>#MDB_NOMETASYNC
-	 *		Flush system buffers but omit metadata flush when committing this transaction.
 	 * </ul>
 	 * @param txn [out] Address where the new #MDB_txn handle will be stored
 	 * @return A non-zero error value on failure and 0 on success. Some possible
@@ -1194,7 +1152,7 @@ public static native MDB_env mdb_txn_env(MDB_txn txn);
 	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
 	 * @return A transaction ID, valid if input is an active transaction.
 	 */
-public static native @Cast("mdb_size_t") long mdb_txn_id(MDB_txn txn);
+public static native @Cast("size_t") long mdb_txn_id(MDB_txn txn);
 
 	/** \brief Commit all the operations of a transaction into the database.
 	 *
@@ -1304,8 +1262,7 @@ public static native int mdb_txn_renew(MDB_txn txn);
 	 *		keys must be unique and may have only a single data item.
 	 *	<li>#MDB_INTEGERKEY
 	 *		Keys are binary integers in native byte order, either unsigned int
-	 *		or #mdb_size_t, and will be sorted as such.
-	 *		(lmdb expects 32-bit int <= size_t <= 32/64-bit mdb_size_t.)
+	 *		or size_t, and will be sorted as such.
 	 *		The keys must all be of the same size.
 	 *	<li>#MDB_DUPFIXED
 	 *		This flag may only be used in combination with #MDB_DUPSORT. This option
@@ -1758,7 +1715,7 @@ public static native int mdb_cursor_del(MDB_cursor cursor, @Cast("unsigned int")
 	 *	<li>EINVAL - cursor is not initialized, or an invalid parameter was specified.
 	 * </ul>
 	 */
-public static native int mdb_cursor_count(MDB_cursor cursor, @Cast("mdb_size_t*") SizeTPointer countp);
+public static native int mdb_cursor_count(MDB_cursor cursor, @Cast("size_t*") SizeTPointer countp);
 
 	/** \brief Compare two data items according to a particular database.
 	 *
@@ -1815,6 +1772,8 @@ public static native int mdb_reader_list(MDB_env env, MDB_msg_func func, Pointer
 	 * @return 0 on success, non-zero on failure.
 	 */
 public static native int mdb_reader_check(MDB_env env, IntPointer dead);
+public static native int mdb_reader_check(MDB_env env, IntBuffer dead);
+public static native int mdb_reader_check(MDB_env env, int[] dead);
 /**	\} */
 
 // #ifdef __cplusplus
@@ -1830,6 +1789,675 @@ public static native int mdb_reader_check(MDB_env env, IntPointer dead);
 // #endif /* _LMDB_H_ */
 
 
+// Parsed from usearch.h
+// Fixed tons of type errors in parsing
+
+// #ifndef UNUM_USEARCH_H
+// #define UNUM_USEARCH_H
+
+// #ifdef __cplusplus
+// #endif
+
+// #ifndef USEARCH_EXPORT
+// #if defined(_WIN32) && !defined(__MINGW32__)
+//public static native @MemberGetter int USEARCH_EXPORT();
+//public static final int USEARCH_EXPORT = USEARCH_EXPORT();
+// #else
+// #define USEARCH_EXPORT
+// #endif
+// #endif
+
+// #include <stdbool.h> // `bool`
+// #include <stddef.h>  // `size_t`
+// #include <stdint.h>  // `uint64_t`
+
+// USEARCH_EXPORT typedef void* usearch_index_t;
+public static class usearch_index_t extends Pointer {
+    // Inherits Pointer's functionality
+    public usearch_index_t() {
+        super();
+    }
+
+    public usearch_index_t(Pointer p) {
+        super(p);
+    }
+}
+
+// USEARCH_EXPORT typedef uint64_t usearch_key_t;
+// Use long directly
+
+// USEARCH_EXPORT typedef float usearch_distance_t;
+// Use float directly
+
+/**
+ *  \brief  Pointer to a null-terminated error message.
+ *          Returned error messages \b don't need to be deallocated.
+ */
+// USEARCH_EXPORT typedef char const* usearch_error_t;
+// Map to bytes
+
+/**
+ *  \brief  Type-punned callback for "metrics" or "distance functions",
+ *          that accepts pointers to two vectors and measures their \b dis-similarity.
+ */
+// USEARCH_EXPORT typedef usearch_distance_t (*usearch_metric_t)(void const*, void const*);
+public static class usearch_metric_t extends FunctionPointer {
+    static { Loader.load(); }
+    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+    public    usearch_metric_t(Pointer p) { super(p); }
+    protected usearch_metric_t() { allocate(); }
+    private native void allocate();
+    public native float call(@Cast("void const*") Pointer vectorA, @Cast("void const*") Pointer vectorB);
+}
+
+
+/**
+ *  \brief  Enumerator for the most common kinds of {@code usearch_metric_t}.
+ *          Those are supported out of the box, with SIMD-optimizations for most common hardware.
+ */
+/** enum usearch_metric_kind_t */
+public static final int
+    usearch_metric_unknown_k = 0,
+    usearch_metric_cos_k = 1,
+    usearch_metric_ip_k = 2,
+    usearch_metric_l2sq_k = 3,
+    usearch_metric_haversine_k = 4,
+    usearch_metric_divergence_k = 5,
+    usearch_metric_pearson_k = 6,
+    usearch_metric_jaccard_k = 7,
+    usearch_metric_hamming_k = 8,
+    usearch_metric_tanimoto_k = 9,
+    usearch_metric_sorensen_k = 10;
+
+/** enum usearch_scalar_kind_t */
+public static final int
+    usearch_scalar_unknown_k = 0,
+    usearch_scalar_f32_k = 1,
+    usearch_scalar_f64_k = 2,
+    usearch_scalar_f16_k = 3,
+    usearch_scalar_i8_k = 4,
+    usearch_scalar_b1_k = 5;
+
+public static class usearch_init_options_t extends Pointer {
+    static { Loader.load(); }
+    /** Default native constructor. */
+    public usearch_init_options_t() { super((Pointer)null); allocate(); }
+    /** Native array allocator. Access with {@link Pointer#position(long)}. */
+    public usearch_init_options_t(long size) { super((Pointer)null); allocateArray(size); }
+    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+    public usearch_init_options_t(Pointer p) { super(p); }
+    private native void allocate();
+    private native void allocateArray(long size);
+    @Override public usearch_init_options_t position(long position) {
+        return (usearch_init_options_t)super.position(position);
+    }
+    @Override public usearch_init_options_t getPointer(long i) {
+        return new usearch_init_options_t((Pointer)this).offsetAddress(i);
+    }
+
+    /**
+     *  \brief The metric kind used for distance calculation between vectors.
+     */
+    public native @Cast("usearch_metric_kind_t") int metric_kind(); public native usearch_init_options_t metric_kind(int setter);
+    /**
+     *  \brief The \b optional custom distance metric function used for distance calculation between vectors.
+     *  If the {@code metric_kind} is set to {@code usearch_metric_unknown_k}, this function pointer mustn't be {@code NULL}.
+     */
+    public native usearch_metric_t metric(); public native usearch_init_options_t metric(usearch_metric_t setter);
+    /**
+     *  \brief The scalar kind used for quantization of vector data during indexing.
+     *  In most cases, on modern hardware, it's recommended to use half-precision floating-point numbers.
+     *  When quantization is enabled, the "get"-like functions won't be able to recover the original data,
+     *  so you may want to replicate the original vectors elsewhere.
+     *
+     *  Quantizing to integers is also possible, but it's important to note that it's only valid for cosine-like
+     *  metrics. As part of the quantization process, the vectors are normalized to unit length and later scaled
+     *  to \b [-127,127] range to occupy the full 8-bit range.
+     *
+     *  Quantizing to 1-bit booleans is also possible, but it's only valid for binary metrics like Jaccard, Hamming,
+     *  etc. As part of the quantization process, the scalar components greater than zero are set to {@code true}, and the
+     *  rest to {@code false}.
+     */
+    public native @Cast("usearch_scalar_kind_t") int quantization(); public native usearch_init_options_t quantization(int setter);
+    /**
+     *  \brief The number of dimensions in the vectors to be indexed.
+     *  Must be defined for most metrics, but can be avoided for {@code usearch_metric_haversine_k}.
+     */
+    public native @Cast("size_t") long dimensions(); public native usearch_init_options_t dimensions(long setter);
+    /**
+     *  \brief The \b optional connectivity parameter that limits connections-per-node in graph.
+     */
+    public native @Cast("size_t") long connectivity(); public native usearch_init_options_t connectivity(long setter);
+    /**
+     *  \brief The \b optional expansion factor used for index construction when adding vectors.
+     */
+    public native @Cast("size_t") long expansion_add(); public native usearch_init_options_t expansion_add(long setter);
+    /**
+     *  \brief The \b optional expansion factor used for index construction during search operations.
+     */
+    public native @Cast("size_t") long expansion_search(); public native usearch_init_options_t expansion_search(long setter);
+    /**
+     *  \brief When set allows multiple vectors to map to the same key.
+     */
+    public native @Cast("bool") boolean multi(); public native usearch_init_options_t multi(boolean setter);
+}
+
+/**
+ *  \brief Retrieves the version of the library.
+ *  @return The version of the library.
+ */
+public static native @Const BytePointer usearch_version();
+
+/**
+ *  \brief Initializes a new instance of the index.
+ *  @param options Pointer to the {@code usearch_init_options_t} structure containing initialization options.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return A handle to the initialized USearch index, or {@code NULL} on failure.
+ */
+public static native @Cast("usearch_index_t") Pointer usearch_init(usearch_init_options_t options, @Cast("usearch_error_t*") BytePointer error);
+public static native @Cast("usearch_index_t") Pointer usearch_init(usearch_init_options_t options, @Cast("usearch_error_t*") ByteBuffer error);
+public static native @Cast("usearch_index_t") Pointer usearch_init(usearch_init_options_t options, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Frees the resources associated with the index.
+ *  @param index [inout] The handle to the USearch index to be freed.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Reports the memory usage of the index.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return Number of bytes used by the index.
+ */
+public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Reports the SIMD capabilities used by the index on the current CPU.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return The codename of the SIMD instruction set used by the index.
+ */
+public static native @Const BytePointer usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+public static native @Const ByteBuffer usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
+public static native @Const byte[] usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Reports expected file size after serialization.
+ *  @param index [in] The handle to the USearch index to be serialized.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Saves the index to a file.
+ *  @param index [in] The handle to the USearch index to be serialized.
+ *  @param path [in] The file path where the index will be saved.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
+public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Loads the index from a file.
+ *  @param index [inout] The handle to the USearch index to be populated from path.
+ *  @param path [in] The file path from where the index will be loaded.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
+public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Creates a view of the index from a file without copying it into memory.
+ *  @param index [inout] The handle to the USearch index to be populated with a file view.
+ *  @param path [in] The file path from where the view will be created.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
+public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Loads index metadata from a file.
+ *  @param path [in] The file path from where the index will be loaded.
+ *  @param options [out] Pointer to the {@code usearch_init_options_t} structure to be populated.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_metadata(String path, usearch_init_options_t options, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options, @Cast("usearch_error_t*") byte[] error);
+public static native void usearch_metadata(String path, usearch_init_options_t options, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_metadata(String path, usearch_init_options_t options, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Saves the index to an in-memory buffer.
+ *  @param index [in] The handle to the USearch index to be serialized.
+ *  @param buffer [in] The in-memory continuous buffer where the index will be saved.
+ *  @param length [in] The length of the buffer in bytes.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer, @Cast("size_t") long length, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer, @Cast("size_t") long length, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer, @Cast("size_t") long length, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Loads the index from an in-memory buffer.
+ *  @param index [inout] The handle to the USearch index to be populated from buffer.
+ *  @param buffer [in] The in-memory continuous buffer from where the index will be loaded.
+ *  @param length [in] The length of the buffer in bytes.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
+                                        @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
+                                        @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
+                                        @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Creates a view of the index from an in-memory buffer without copying it into memory.
+ *  @param index [inout] The handle to the USearch index to be populated with a buffer view.
+ *  @param buffer [in] The in-memory continuous buffer from where the view will be created.
+ *  @param length [in] The length of the buffer in bytes.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
+                                        @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
+                                        @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
+                                        @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Loads index metadata from an in-memory buffer.
+ *  @param buffer [in] The in-memory continuous buffer from where the view will be created.
+ *  @param options [out] Pointer to the {@code usearch_init_options_t} structure to be populated.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_metadata_buffer(@Const Pointer buffer, @Cast("size_t") long length, usearch_init_options_t options,
+                                            @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_metadata_buffer(@Const Pointer buffer, @Cast("size_t") long length, usearch_init_options_t options,
+                                            @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_metadata_buffer(@Const Pointer buffer, @Cast("size_t") long length, usearch_init_options_t options,
+                                            @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Reports the current size (number of vectors) of the index.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Reports the current capacity (number of vectors) of the index.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Reports the current dimensions of the vectors in the index.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Reports the current connectivity of the index.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Reserves memory for a specified number of incoming vectors.
+ *  @param index [inout] The handle to the USearch index to be resized.
+ *  @param capacity [in] The desired total capacity including current size.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long _capacity, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long _capacity, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long _capacity, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Retrieves the expansion value used during index creation.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return The expansion value used during index creation.
+ */
+public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Retrieves the expansion value used during search.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return The expansion value used during search.
+ */
+public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Updates the expansion value used during index creation. Rarely used.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param expansion [in] The new expansion value.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Updates the expansion value used during search. Rarely used.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param expansion [in] The new expansion value.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Updates the number of threads that would be used to construct the index. Rarely used.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param threads [in] The new limit for the number of concurrent threads.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Updates the number of threads that will be performing concurrent traversals. Rarely used.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param threads [in] The new limit for the number of concurrent threads.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Updates the metric kind used for distance calculation between vectors.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param kind [in] The metric kind used for distance calculation between vectors.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_metric_kind_t") int kind,
+                                               @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_metric_kind_t") int kind,
+                                               @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_metric_kind_t") int kind,
+                                               @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Updates the custom metric function used for distance calculation between vectors.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param metric [in] The custom metric function used for distance calculation between vectors.
+ *  @param state [in] The \b optional state pointer to be passed to the custom metric function.
+ *  @param kind [in] The metric kind used for distance calculation between vectors. Needed for serialization.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index, usearch_metric_t metric, Pointer state,
+                                          @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index, usearch_metric_t metric, Pointer state,
+                                          @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index, usearch_metric_t metric, Pointer state,
+                                          @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Adds a vector with a key to the index.
+ *  @param index [inout] The handle to the USearch index to be populated.
+ *  @param key [in] The key associated with the vector.
+ *  @param vector [in] Pointer to the vector data.
+ *  @param vector_kind [in] The scalar type used in the vector data.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_add(
+    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
+    @Const Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_add(
+    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
+    @Const Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_add(
+    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
+    @Const Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Checks if the index contains a vector with a specific key.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param key [in] The key to be checked.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return {@code true} if the index contains the vector with the given key, {@code false} otherwise.
+ */
+public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
+public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
+public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Counts the number of entries in the index under a specific key.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param key [in] The key to be checked.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return Number of vectors found under that key.
+ */
+public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Performs k-Approximate Nearest Neighbors (kANN) Search for closest vectors to query.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param query_vector [in] Pointer to the query vector data.
+ *  @param query_kind [in] The scalar type used in the query vector data.
+ *  @param count [in] Upper bound on the number of neighbors to search, the "k" in "kANN".
+ *  @param keys [out] Output buffer for up to {@code count} nearest neighbors keys.
+ *  @param distances [out] Output buffer for up to {@code count} distances to nearest neighbors.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return Number of found matches.
+ */
+public static native long usearch_search(
+    @Cast("usearch_index_t") usearch_index_t index,
+    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+    @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_search(
+    @Cast("usearch_index_t") usearch_index_t index,
+    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+    @Cast("usearch_key_t*") LongBuffer keys, @Cast("usearch_distance_t*") FloatBuffer distances, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_search(
+    @Cast("usearch_index_t") usearch_index_t index,
+    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+    @Cast("usearch_key_t*") long[] keys, @Cast("usearch_distance_t*") float[] distances, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief  Performs k-Approximate Nearest Neighbors (kANN) Search for closest vectors to query,
+ *          predicated on a custom function that returns {@code true} for vectors to be included.
+ *
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param query_vector [in] Pointer to the query vector data.
+ *  @param query_kind [in] The scalar type used in the query vector data.
+ *  @param count [in] Upper bound on the number of neighbors to search, the "k" in "kANN".
+ *  @param filter [in] The custom filter function that returns {@code true} for vectors to be included.
+ *  @param filter_state [in] The \b optional state pointer to be passed to the custom filter function.
+ *  @param keys [out] Output buffer for up to {@code count} nearest neighbors keys.
+ *  @param distances [out] Output buffer for up to {@code count} distances to nearest neighbors.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return Number of found matches.
+ */
+public static class Filter extends FunctionPointer {
+    static { Loader.load(); }
+    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+    public    Filter(Pointer p) { super(p); }
+    protected Filter() { allocate(); }
+    private native void allocate();
+    public native int call(@Cast("usearch_key_t") long key, Pointer filter_state);
+}
+public static native long usearch_filtered_search(
+    @Cast("usearch_index_t") usearch_index_t index,
+    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+    Filter filter, Pointer filter_state,
+    @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_filtered_search(
+    @Cast("usearch_index_t") usearch_index_t index,
+    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+    Filter filter, Pointer filter_state,
+    @Cast("usearch_key_t*") LongBuffer keys, @Cast("usearch_distance_t*") FloatBuffer distances, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_filtered_search(
+    @Cast("usearch_index_t") usearch_index_t index,
+    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+    Filter filter, Pointer filter_state,
+    @Cast("usearch_key_t*") long[] keys, @Cast("usearch_distance_t*") float[] distances, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Retrieves the vector associated with the given key from the index.
+ *  @param index [in] The handle to the USearch index to be queried.
+ *  @param key [in] The key of the vector to retrieve.
+ *  @param vector [out] Pointer to the memory where the vector data will be copied.
+ *  @param count [in] Number of vectors that can be fitted into {@code vector} for multi-vector entries.
+ *  @param vector_kind [in] The scalar type used in the vector data.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return Number of vectors found under that name and exported to {@code vector}.
+ */
+public static native long usearch_get(
+    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
+    Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_get(
+    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
+    Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_get(
+    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
+    Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Removes the vector associated with the given key from the index.
+ *  @param index [inout] The handle to the USearch index to be modified.
+ *  @param key [in] The key of the vector to be removed.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return Number of vectors found under that name and dropped from the index.
+ */
+public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Renames the vector to map to a different key.
+ *  @param index [inout] The handle to the USearch index to be modified.
+ *  @param from [in] The key of the vector to be renamed.
+ *  @param to [in] New key for found entry.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return Number of vectors found under that name and renamed.
+ */
+public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
+                                     @Cast("usearch_error_t*") BytePointer error);
+public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
+                                     @Cast("usearch_error_t*") ByteBuffer error);
+public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
+                                     @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Computes the distance between two equi-dimensional vectors.
+ *  @param vector_first [in] The first vector for comparison.
+ *  @param vector_second [in] The second vector for comparison.
+ *  @param scalar_kind [in] The scalar type used in the vectors.
+ *  @param dimensions [in] The number of dimensions in each vector.
+ *  @param metric_kind [in] The metric kind used for distance calculation between vectors.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ *  @return Distance between given vectors.
+ */
+public static native float usearch_distance(
+    @Const Pointer vector_first, @Const Pointer vector_second,
+    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") BytePointer error);
+public static native float usearch_distance(
+    @Const Pointer vector_first, @Const Pointer vector_second,
+    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") ByteBuffer error);
+public static native float usearch_distance(
+    @Const Pointer vector_first, @Const Pointer vector_second,
+    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") byte[] error);
+
+/**
+ *  \brief Multi-threaded many-to-many exact nearest neighbors search for equi-dimensional vectors.
+ *  @param dataset [in] Pointer to the first scalar of the dataset matrix.
+ *  @param queries [in] Pointer to the first scalar of the queries matrix.
+ *  @param dataset_size [in] Number of vectors in the {@code dataset}.
+ *  @param queries_size [in] Number of vectors in the {@code queries} set.
+ *  @param dataset_stride [in] Number of bytes between starts of consecutive vectors in {@code dataset}.
+ *  @param queries_stride [in] Number of bytes between starts of consecutive vectors in {@code queries}.
+ *  @param scalar_kind [in] The scalar type used in the vectors.
+ *  @param dimensions [in] The number of dimensions in each vector.
+ *  @param metric_kind [in] The metric kind used for distance calculation between vectors.
+ *  @param count [in] Upper bound on the number of neighbors to search, the "k" in "kANN".
+ *  @param threads [in] Upper bound for the number of CPU threads to use.
+ *  @param keys [out] Output matrix for {@code queries_size * count} nearest neighbors keys. Each row of the
+ *              matrix must be contiguous in memory, but different rows can be separated by {@code keys_stride} bytes.
+ *  @param keys_stride [in] Number of bytes between starts of consecutive rows od scalars in {@code keys}.
+ *  @param distances [out] Output matrix for {@code queries_size * count} distances to nearest neighbors. Each row of the
+ *              matrix must be contiguous in memory, but different rows can be separated by {@code keys_stride} bytes.
+ *  @param distances_stride [in] Number of bytes between starts of consecutive rows od scalars in {@code distances}.
+ *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
+ */
+public static native void usearch_exact_search(
+    @Const Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
+    @Const Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
+    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
+    @Cast("usearch_key_t*") LongPointer keys, @Cast("size_t") long keys_stride,
+    @Cast("usearch_distance_t*") FloatPointer distances, @Cast("size_t") long distances_stride,
+    @Cast("usearch_error_t*") BytePointer error);
+public static native void usearch_exact_search(
+    @Const Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
+    @Const Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
+    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
+    @Cast("usearch_key_t*") LongBuffer keys, @Cast("size_t") long keys_stride,
+    @Cast("usearch_distance_t*") FloatBuffer distances, @Cast("size_t") long distances_stride,
+    @Cast("usearch_error_t*") ByteBuffer error);
+public static native void usearch_exact_search(
+    @Const Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
+    @Const Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
+    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
+    @Cast("usearch_key_t*") long[] keys, @Cast("size_t") long keys_stride,
+    @Cast("usearch_distance_t*") float[] distances, @Cast("size_t") long distances_stride,
+    @Cast("usearch_error_t*") byte[] error);
+
+// #ifdef __cplusplus
+// #endif
+
+// #endif // UNUM_USEARCH_H
+
+
 // Parsed from dtlv.h
 
 /** \file dtlv.h
@@ -1841,12 +2469,13 @@ public static native int mdb_reader_check(MDB_env env, IntPointer dead);
  *
  *	@author	Huahai Yang
  *
- *	\copyright Copyright 2020-2024. Huahai Yang. All rights reserved.
+ *	\copyright Copyright 2020-2025. Huahai Yang. All rights reserved.
  *
  *  This code is released under Eclipse Public License 2.0.
  */
 
 // #include "lmdb/libraries/liblmdb/lmdb.h"
+// #include "usearch/c/usearch.h"
 
 // #ifdef __cplusplus
 // #endif
@@ -2191,20 +2820,20 @@ public static final int DTLV_FALSE =	256;
                                     int forward, int start, int end,
                                     MDB_val start_key, MDB_val end_key);
 
- /**
-  * A function to return the total number of values in a key range, for a
-  * dupsort DBI.
-  *
-  * @param cur The cursor.
-  * @param key Holder for the key.
-  * @param val Holder for the value.
-  * @param forward iterate keys forward (DTLV_TRUE) or not.
-  * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
-  * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
-  * @param start_key The start key, could be null
-  * @param end_key The end key, could be null.
-  * @return The count
-  */
+  /**
+   * A function to return the total number of values in a key range, for a
+   * dupsort DBI.
+   *
+   * @param cur The cursor.
+   * @param key Holder for the key.
+   * @param val Holder for the value.
+   * @param forward iterate keys forward (DTLV_TRUE) or not.
+   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+   * @param start_key The start key, could be null
+   * @param end_key The end key, could be null.
+   * @return The count
+   */
   public static native @Cast("size_t") long dtlv_key_range_list_count(MDB_cursor cur,
                                      MDB_val key, MDB_val val,
                                      int forward, int start, int end,
