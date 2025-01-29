@@ -61,10 +61,9 @@ build_script:
 
     cd ..\src\java
 
-    java -jar %USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar datalevin\dtlvnative\DTLV.java
+    java -jar %USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar -Dcompiler=msvc -DcompilerOptions=/MDd -DlinkerOptions="/DEBUG /INCREMENTAL" -DdeleteJniFiles=false datalevin\dtlvnative\DTLV.java
 
     cd ..\..
-
 
     copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
 
