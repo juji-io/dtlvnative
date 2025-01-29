@@ -25,8 +25,6 @@ dir build_release
 
 copy build_release\libusearch_static_c.lib %CPATH%\usearch.lib
 
-copy build_release\libusearch_static_c.lib %PWD%\windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\usearch.lib
-
 cd %PWD%
 
 cd %CPATH%
@@ -43,6 +41,14 @@ cmake .. ^
     -DBUILD_TEST=off
 
 nmake install
+
+cd %PWD%
+
+cd %CPATH%
+
+dumpbin /directives usearch.lib
+
+dumpbin /directives dtlv.lib
 
 dir %CPATH%
 
