@@ -76,9 +76,13 @@ build_script:
 
 on_finish:
   - cmd: >
-      IF EXIST crashlogs rmdir /S /Q crashlogs
-      mkdir crashlogs
-
-      IF EXIST hs_err_pid*.log move hs_err_pid*.log crashlogs
-
-      IF EXIST crashlogs\\*.log appveyor PushArtifact crashlogs -FileName crash-logs
+      echo "Checking for crash logs..."
+      IF EXIST hs_err_pid*.log (
+        echo "Found crash logs:"
+        dir hs_err_pid*.log
+        for %%F in (hs_err_pid*.log) do (
+          echo "----------------------------------------"
+          echo "Dumping %%F:"
+          type "%%F"
+        )
+      )
