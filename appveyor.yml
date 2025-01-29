@@ -75,4 +75,10 @@ build_script:
     # call ..\lein.bat deploy clojars
 
 on_finish:
-  - IF EXIST hs_err_pid*.log appveyor PushArtifact hs_err_pid*.log -FileName crash-logs
+  - cmd: >
+      IF EXIST crashlogs rmdir /S /Q crashlogs
+      mkdir crashlogs
+
+      IF EXIST hs_err_pid*.log move hs_err_pid*.log crashlogs
+
+      IF EXIST crashlogs\\*.log appveyor PushArtifact crashlogs -FileName crash-logs
