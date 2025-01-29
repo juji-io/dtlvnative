@@ -71,3 +71,6 @@ build_script:
     call ..\lein.bat run
 
     call ..\lein.bat deploy clojars
+
+artifacts:
+  - path: '**\*.log'
