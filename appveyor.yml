@@ -74,7 +74,5 @@ build_script:
 
     # call ..\lein.bat deploy clojars
 
-artifacts:
-  - path: '**\hs_err_pid*.log'
-    name: crash-logs
-    upload_on_condition: always
+on_finish:
+  - IF EXIST hs_err_pid*.log appveyor PushArtifact hs_err_pid*.log -FileName crash-logs
