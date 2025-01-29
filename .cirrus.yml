@@ -45,7 +45,7 @@ task:
   only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
   script: |
     git submodule init
-    git submodule update --recursive
+    git submodule update --init --recursive
 
     mkdir -p src/java/datalevin/dtlvnative/macosx-arm64
     mkdir -p macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64
