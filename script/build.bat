@@ -60,7 +60,7 @@ java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.
     -DcompilerOptions=/MDd ^
     -DlinkerOptions="/DEBUG /INCREMENTAL" ^
     -DdeleteJniFiles=false ^
-    datalevin.dtlvnative.DTLV
+    datalevin/dtlvnative/DTLV.java
 
 cd ..\..
 
