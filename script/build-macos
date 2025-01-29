@@ -10,8 +10,8 @@ cd src/usearch
 
 # Use LLVM CLang (v19) instead of Apple one (v16) to compile
 export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-export LDFLAGS="${LDFLAGS:+$LDFLAGS }-L/opt/homebrew/opt/llvm/lib -L/opt/homebrew/opt/libomp/lib"
-export CPPFLAGS="${CPPFLAG:+$CPPFLAGS }-I/opt/homebrew/opt/llvm/include -I/opt/homebrew/opt/libomp/include"
+export LDFLAGS="${LDFLAGS:+$LDFLAGS }-L/opt/homebrew/opt/llvm/lib -L/opt/homebrew/opt/libomp/lib -L/usr/local/opt/llvm/lib -L/usr/local/opt/libomp/lib"
+export CPPFLAGS="${CPPFLAG:+$CPPFLAGS }-I/opt/homebrew/opt/llvm/include -I/opt/homebrew/opt/libomp/include -I/usr/local/opt/llvm/include -I/usr/local/opt/libomp/include"
 
 cmake \
     -D CMAKE_BUILD_TYPE=Release \
