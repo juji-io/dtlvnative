@@ -52,11 +52,14 @@ cd java
 
 java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" ^
     -Dcompiler=msvc ^
-    -DcompilerOptions=/MDd ^
+    -DcompilerOptions="/MDd /Od /EHsc /LD /W3" ^
     -DlinkerOptions="/DEBUG /INCREMENTAL" ^
     -DdeleteJniFiles=false ^
+    -Dorg.bytedeco.javacpp.buildtype=Debug ^
     -Dorg.bytedeco.javacpp.logger.debug=true ^
     datalevin/dtlvnative/DTLV.java
+
+dumpbin /directives datalevin\dtlvnative\windows-x86_64\jniDTLV.obj
 
 cd ..\..
 
