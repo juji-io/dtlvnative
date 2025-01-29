@@ -29,17 +29,12 @@ cd %PWD%
 
 cd %CPATH%
 
-mkdir build_dtlv
-
-cd build_dtlv
-
-cmake .. ^
-  -G "Visual Studio 17 2022" ^
-  -D CMAKE_BUILD_TYPE=Debug ^
-  -DCLOSE_WARNING=on ^
-  -DBUILD_TEST=off ^
-  -DCMAKE_INSTALL_PREFIX=%CPATH% ^
-  -B build_dtlv
+cmake -G "Visual Studio 17 2022" ^
+      -D CMAKE_BUILD_TYPE=Debug ^
+      -DCLOSE_WARNING=on ^
+      -DBUILD_TEST=off ^
+      -DCMAKE_INSTALL_PREFIX=%CPATH% ^
+      -B build_dtlv
 
 cmake --build build_dtlv --config Debug --target install
 
@@ -60,6 +55,7 @@ java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.
     -DcompilerOptions=/MDd ^
     -DlinkerOptions="/DEBUG /INCREMENTAL" ^
     -DdeleteJniFiles=false ^
+    -Dorg.bytedeco.javacpp.logger.debug=true ^
     datalevin/dtlvnative/DTLV.java
 
 cd ..\..
