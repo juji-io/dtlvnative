@@ -70,8 +70,6 @@ build_script:
 
     call ..\lein.bat run
 
-    # call ..\lein.bat deploy clojars
-
 artifacts:
   - path: '**\hs_err_pid*.log'
   - name: crash-logs
