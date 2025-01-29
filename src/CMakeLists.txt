@@ -33,12 +33,6 @@ install(TARGETS lmdb
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
 
-# usearch static
-add_library(usearch STATIC IMPORTED)
-set_target_properties(usearch PROPERTIES
-    IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}"
-)
-
 # DTLV static
 add_library(dtlv STATIC
     dtlv.c
@@ -46,10 +40,6 @@ add_library(dtlv STATIC
 
 # Link the LMDB static to DTLV
 target_link_libraries(dtlv PRIVATE lmdb)
-
-# Link the usearch static to DTLV
-target_link_options(dtlv PRIVATE "/WHOLEARCHIVE:usearch.lib")
-target_link_libraries(dtlv PRIVATE usearch)
 
 set_target_properties(dtlv PROPERTIES
     OUTPUT_NAME dtlv
