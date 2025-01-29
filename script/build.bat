@@ -21,7 +21,7 @@ build_release\test_cpp
 
 build_release\test_c
 
-copy build_release\usearch_static_c.lib %CPATH%\
+copy build_release\libusearch_static_c.lib %CPATH%\usearch.lib
 
 cd %CPATH%
 
@@ -33,7 +33,7 @@ cmake .. ^
     -G "NMake Makefiles" ^
     -DCMAKE_BUILD_TYPE:STRING=RELEASE ^
     -DCMAKE_INSTALL_PREFIX=%CPATH% ^
-    -DCLOSE_WARNING=on ^
+    -DCLOSE_WARNING=off ^
     -DBUILD_TEST=off
 
 nmake install
