@@ -13,7 +13,7 @@ task:
     DEBIAN_FRONTEND=noninteractive apt-get install -y curl git wget tar openjdk-21-jdk-headless build-essential
 
     git submodule init
-    git submodule update
+    git submodule update --init --recursive
 
     mkdir -p src/java/datalevin/dtlvnative/linux-arm64
     mkdir -p linux-arm64/resources/datalevin/dtlvnative/linux-arm64
@@ -41,8 +41,8 @@ task:
 task:
   macos_instance:
     image: ghcr.io/cirruslabs/macos-runner:sonoma
-  # only_if: $CIRRUS_TAG != ''
-  only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
+  only_if: $CIRRUS_TAG != ''
+  # only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml')"
   script: |
     git submodule init
     git submodule update --init --recursive
@@ -66,4 +66,4 @@ task:
 
     cd macosx-arm64
     lein run
-    # lein deploy clojars
+    lein deploy clojars
