@@ -28,18 +28,18 @@ cd %PWD%
 
 cd %CPATH%
 
-mkdir build
+mkdir build_dtlv
 
-cd build
+cd build_dtlv
 
 cmake .. ^
-    -G "NMake Makefiles" ^
-    -DCMAKE_BUILD_TYPE:STRING=RELEASE ^
-    -DCMAKE_INSTALL_PREFIX=%CPATH% ^
-    -DCLOSE_WARNING=on ^
-    -DBUILD_TEST=off
+  -G "Visual Studio 17 2022" ^
+  -DCLOSE_WARNING=on ^
+  -DBUILD_TEST=off ^
+  -DCMAKE_INSTALL_PREFIX=%CPATH% ^
+  -B build_dtlv
 
-nmake install
+cmake --build build_dtlv --config Debug --target install
 
 cd %PWD%
 
