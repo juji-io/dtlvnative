@@ -775,7 +775,6 @@ int dtlv_list_sample_iter_create(dtlv_list_sample_iter **iter,
   return rc;
 }
 
-
 int dtlv_list_sample_iter_has_next(dtlv_list_sample_iter *iter) {
   int rc;
   while((rc = dtlv_list_iter_has_next(iter->base_iter)) == DTLV_TRUE) {

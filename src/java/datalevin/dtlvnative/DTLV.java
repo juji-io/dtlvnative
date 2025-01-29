@@ -4,8 +4,8 @@
  * cd src/java
  * java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.11/javacpp-1.5.11.jar datalevin/dtlvnative/DTLVConfig.java
  *
- * Modified to comment out wrong parsing results and items that we do not use.
- * Also fixed compiler warnings.
+ * Modified to fix wrong parsing results and comment out items that we do not use.
+ * Also fixed compiler errors and warnings.
  *
  */
 
@@ -16,2916 +16,3804 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
 public class DTLV extends datalevin.dtlvnative.DTLVConfig {
-    static { Loader.load(); }
-
-// Parsed from lmdb.h
-
-/** \file lmdb.h
- *	\brief Lightning memory-mapped database library
- *
- *	\mainpage	Lightning Memory-Mapped Database Manager (LMDB)
- *
- *	\section intro_sec Introduction
- *	LMDB is a Btree-based database management library modeled loosely on the
- *	BerkeleyDB API, but much simplified. The entire database is exposed
- *	in a memory map, and all data fetches return data directly
- *	from the mapped memory, so no malloc's or memcpy's occur during
- *	data fetches. As such, the library is extremely simple because it
- *	requires no page caching layer of its own, and it is extremely high
- *	performance and memory-efficient. It is also fully transactional with
- *	full ACID semantics, and when the memory map is read-only, the
- *	database integrity cannot be corrupted by stray pointer writes from
- *	application code.
- *
- *	The library is fully thread-aware and supports concurrent read/write
- *	access from multiple processes and threads. Data pages use a copy-on-
- *	write strategy so no active data pages are ever overwritten, which
- *	also provides resistance to corruption and eliminates the need of any
- *	special recovery procedures after a system crash. Writes are fully
- *	serialized; only one write transaction may be active at a time, which
- *	guarantees that writers can never deadlock. The database structure is
- *	multi-versioned so readers run with no locks; writers cannot block
- *	readers, and readers don't block writers.
- *
- *	Unlike other well-known database mechanisms which use either write-ahead
- *	transaction logs or append-only data writes, LMDB requires no maintenance
- *	during operation. Both write-ahead loggers and append-only databases
- *	require periodic checkpointing and/or compaction of their log or database
- *	files otherwise they grow without bound. LMDB tracks free pages within
- *	the database and re-uses them for new write operations, so the database
- *	size does not grow without bound in normal use.
- *
- *	The memory map can be used as a read-only or read-write map. It is
- *	read-only by default as this provides total immunity to corruption.
- *	Using read-write mode offers much higher write performance, but adds
- *	the possibility for stray application writes thru pointers to silently
- *	corrupt the database. Of course if your application code is known to
- *	be bug-free (...) then this is not an issue.
- *
- *	If this is your first time using a transactional embedded key/value
- *	store, you may find the \ref starting page to be helpful.
- *
- *	\section caveats_sec Caveats
- *	Troubleshooting the lock file, plus semaphores on BSD systems:
- *
- *	- A broken lockfile can cause sync issues.
- *	  Stale reader transactions left behind by an aborted program
- *	  cause further writes to grow the database quickly, and
- *	  stale locks can block further operation.
- *
- *	  Fix: Check for stale readers periodically, using the
- *	  #mdb_reader_check function or the \ref mdb_stat_1 "mdb_stat" tool.
- *	  Stale writers will be cleared automatically on some systems:
- *	  - Windows - automatic
- *	  - Linux, systems using POSIX mutexes with Robust option - automatic
- *	  - not on BSD, systems using POSIX semaphores.
- *	  Otherwise just make all programs using the database close it;
- *	  the lockfile is always reset on first open of the environment.
- *
- *	- On BSD systems or others configured with MDB_USE_POSIX_SEM,
- *	  startup can fail due to semaphores owned by another userid.
- *
- *	  Fix: Open and close the database as the user which owns the
- *	  semaphores (likely last user) or as root, while no other
- *	  process is using the database.
- *
- *	Restrictions/caveats (in addition to those listed for some functions):
- *
- *	- Only the database owner should normally use the database on
- *	  BSD systems or when otherwise configured with MDB_USE_POSIX_SEM.
- *	  Multiple users can cause startup to fail later, as noted above.
- *
- *	- There is normally no pure read-only mode, since readers need write
- *	  access to locks and lock file. Exceptions: On read-only filesystems
- *	  or with the #MDB_NOLOCK flag described under #mdb_env_open().
- *
- *	- An LMDB configuration will often reserve considerable \b unused
- *	  memory address space and maybe file size for future growth.
- *	  This does not use actual memory or disk space, but users may need
- *	  to understand the difference so they won't be scared off.
- *
- *	- By default, in versions before 0.9.10, unused portions of the data
- *	  file might receive garbage data from memory freed by other code.
- *	  (This does not happen when using the #MDB_WRITEMAP flag.) As of
- *	  0.9.10 the default behavior is to initialize such memory before
- *	  writing to the data file. Since there may be a slight performance
- *	  cost due to this initialization, applications may disable it using
- *	  the #MDB_NOMEMINIT flag. Applications handling sensitive data
- *	  which must not be written should not use this flag. This flag is
- *	  irrelevant when using #MDB_WRITEMAP.
- *
- *	- A thread can only use one transaction at a time, plus any child
- *	  transactions.  Each transaction belongs to one thread.  See below.
- *	  The #MDB_NOTLS flag changes this for read-only transactions.
- *
- *	- Use an MDB_env* in the process which opened it, not after fork().
- *
- *	- Do not have open an LMDB database twice in the same process at
- *	  the same time.  Not even from a plain open() call - close()ing it
- *	  breaks fcntl() advisory locking.  (It is OK to reopen it after
- *	  fork() - exec*(), since the lockfile has FD_CLOEXEC set.)
- *
- *	- Avoid long-lived transactions.  Read transactions prevent
- *	  reuse of pages freed by newer write transactions, thus the
- *	  database can grow quickly.  Write transactions prevent
- *	  other write transactions, since writes are serialized.
- *
- *	- Avoid suspending a process with active transactions.  These
- *	  would then be "long-lived" as above.  Also read transactions
- *	  suspended when writers commit could sometimes see wrong data.
- *
- *	...when several processes can use a database concurrently:
- *
- *	- Avoid aborting a process with an active transaction.
- *	  The transaction becomes "long-lived" as above until a check
- *	  for stale readers is performed or the lockfile is reset,
- *	  since the process may not remove it from the lockfile.
- *
- *	  This does not apply to write transactions if the system clears
- *	  stale writers, see above.
- *
- *	- If you do that anyway, do a periodic check for stale readers. Or
- *	  close the environment once in a while, so the lockfile can get reset.
- *
- *	- Do not use LMDB databases on remote filesystems, even between
- *	  processes on the same host.  This breaks flock() on some OSes,
- *	  possibly memory map sync, and certainly sync between programs
- *	  on different hosts.
- *
- *	- Opening a database can fail if another process is opening or
- *	  closing it at exactly the same time.
- *
- *	@author	Howard Chu, Symas Corporation.
- *
- *	\copyright Copyright 2011-2021 Howard Chu, Symas Corp. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted only as authorized by the OpenLDAP
- * Public License.
- *
- * A copy of this license is available in the file LICENSE in the
- * top-level directory of the distribution or, alternatively, at
- * <http://www.OpenLDAP.org/license.html>.
- *
- *	\par Derived From:
- * This code is derived from btree.c written by Martin Hedenfalk.
- *
- * Copyright (c) 2009, 2010 Martin Hedenfalk <martin\bzero.se>
- *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- */
-// #ifndef _LMDB_H_
-// #define _LMDB_H_
-
-// #include <sys/types.h>
-
-// #ifdef __cplusplus
-// #endif
-
-/** Unix permissions for creating files, or dummy definition for Windows */
-// #ifdef _MSC_VER
-// #else
-// #endif
-
-/** An abstraction for a file handle.
- *	On POSIX systems file handles are small integers. On Windows
- *	they're opaque pointers.
- */
-// #ifdef _WIN32
-//@Namespace @Name("void") @Opaque public static class mdb_filehandle_t extends Pointer {
-    //[>* Empty constructor. Calls {@code super((Pointer)null)}. <]
-    //public mdb_filehandle_t() { super((Pointer)null); }
-    //[>* Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. <]
-    //public mdb_filehandle_t(Pointer p) { super(p); }
-//}
-// #else
-// #endif
-
-/** \defgroup mdb LMDB API
- *	\{
- *	\brief OpenLDAP Lightning Memory-Mapped Database Manager
- */
-/** \defgroup Version Version Macros
- *	\{
- */
-/** Library major version */
-public static final int MDB_VERSION_MAJOR =	0;
-/** Library minor version */
-public static final int MDB_VERSION_MINOR =	9;
-/** Library patch version */
-public static final int MDB_VERSION_PATCH =	33;
-
-/** Combine args a,b,c into a single integer for easy version comparisons */
-// #define MDB_VERINT(a,b,c)	(((a) << 24) | ((b) << 16) | (c))
-
-/** The full library version as a single integer */
-//public static final int MDB_VERSION_FULL =
-	//MDB_VERINT(MDB_VERSION_MAJOR,MDB_VERSION_MINOR,MDB_VERSION_PATCH);
-
-/** The release date of this library version */
-//public static final String MDB_VERSION_DATE =	"May 21, 2024";
-
-/** A stringifier for the version info */
-// #define MDB_VERSTR(a,b,c,d)	"LMDB " #a "." #b "." #c ": (" d ")"
-
-/** A helper for the stringifier macro */
-// #define MDB_VERFOO(a,b,c,d)	MDB_VERSTR(a,b,c,d)
-
-/** The full library version as a C string */
-//public static final int MDB_VERSION_STRING =
-	//MDB_VERFOO(MDB_VERSION_MAJOR,MDB_VERSION_MINOR,MDB_VERSION_PATCH,MDB_VERSION_DATE);
-/**	\} */
-
-/** \brief Opaque structure for a database environment.
- *
- * A DB environment supports multiple databases, all residing in the same
- * shared-memory map.
- */
-@Opaque public static class MDB_env extends Pointer {
-    /** Empty constructor. Calls {@code super((Pointer)null)}. */
-    public MDB_env() { super((Pointer)null); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public MDB_env(Pointer p) { super(p); }
-}
-
-/** \brief Opaque structure for a transaction handle.
- *
- * All database operations require a transaction handle. Transactions may be
- * read-only or read-write.
- */
-@Opaque public static class MDB_txn extends Pointer {
-    /** Empty constructor. Calls {@code super((Pointer)null)}. */
-    public MDB_txn() { super((Pointer)null); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public MDB_txn(Pointer p) { super(p); }
-}
-
-/** \brief A handle for an individual database in the DB environment. */
-
-/** \brief Opaque structure for navigating through a database */
-@Opaque public static class MDB_cursor extends Pointer {
-    /** Empty constructor. Calls {@code super((Pointer)null)}. */
-    public MDB_cursor() { super((Pointer)null); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public MDB_cursor(Pointer p) { super(p); }
-}
-
-/** \brief Generic structure used for passing keys and data in and out
- * of the database.
- *
- * Values returned from the database are valid only until a subsequent
- * update operation, or the end of the transaction. Do not modify or
- * free them, they commonly point into the database itself.
- *
- * Key sizes must be between 1 and #mdb_env_get_maxkeysize() inclusive.
- * The same applies to data sizes in databases with the #MDB_DUPSORT flag.
- * Other data items can in theory be from 0 to 0xffffffff bytes long.
- */
-public static class MDB_val extends Pointer {
-    static { Loader.load(); }
-    /** Default native constructor. */
-    public MDB_val() { super((Pointer)null); allocate(); }
-    /** Native array allocator. Access with {@link Pointer#position(long)}. */
-    public MDB_val(long size) { super((Pointer)null); allocateArray(size); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public MDB_val(Pointer p) { super(p); }
-    private native void allocate();
-    private native void allocateArray(long size);
-    @Override
-    @SuppressWarnings("unchecked")
-    public MDB_val position(long position) {
-        return (MDB_val)super.position(position);
-    }
-    @Override
-    @SuppressWarnings("unchecked")
-    public MDB_val getPointer(long i) {
-        return new MDB_val((Pointer)this).offsetAddress(i);
+    static {
+        Loader.load();
     }
 
-	/** size of the data item */
-	public native @Cast("size_t") long mv_size(); public native MDB_val mv_size(long setter);
-	/** address of the data item */
-	public native Pointer mv_data(); public native MDB_val mv_data(Pointer setter);
-}
-
-/** \brief A callback function used to compare two keys in a database */
-public static class MDB_cmp_func extends FunctionPointer {
-    static { Loader.load(); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public    MDB_cmp_func(Pointer p) { super(p); }
-    protected MDB_cmp_func() { allocate(); }
-    private native void allocate();
-    public native int call(@Const MDB_val a, @Const MDB_val b);
-}
-
-/** \brief A callback function used to relocate a position-dependent data item
- * in a fixed-address database.
- *
- * The \b newptr gives the item's desired address in
- * the memory map, and \b oldptr gives its previous address. The item's actual
- * data resides at the address in \b item.  This callback is expected to walk
- * through the fields of the record in \b item and modify any
- * values based at the \b oldptr address to be relative to the \b newptr address.
- * @param item [in,out] The item that is to be relocated.
- * @param oldptr [in] The previous address.
- * @param newptr [in] The new address to relocate to.
- * @param relctx [in] An application-provided context, set by #mdb_set_relctx().
- * \todo This feature is currently unimplemented.
- */
-public static class MDB_rel_func extends FunctionPointer {
-    static { Loader.load(); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public    MDB_rel_func(Pointer p) { super(p); }
-    protected MDB_rel_func() { allocate(); }
-    private native void allocate();
-    public native void call(MDB_val item, Pointer oldptr, Pointer newptr, Pointer relctx);
-}
-
-/** \defgroup	mdb_env	Environment Flags
- *	\{
- */
-	/** mmap at a fixed address (experimental) */
-public static final int MDB_FIXEDMAP =	0x01;
-	/** no environment directory */
-public static final int MDB_NOSUBDIR =	0x4000;
-	/** don't fsync after commit */
-public static final int MDB_NOSYNC =		0x10000;
-	/** read only */
-public static final int MDB_RDONLY =		0x20000;
-	/** don't fsync metapage after commit */
-public static final int MDB_NOMETASYNC =		0x40000;
-	/** use writable mmap */
-public static final int MDB_WRITEMAP =		0x80000;
-	/** use asynchronous msync when #MDB_WRITEMAP is used */
-public static final int MDB_MAPASYNC =		0x100000;
-	/** tie reader locktable slots to #MDB_txn objects instead of to threads */
-public static final int MDB_NOTLS =		0x200000;
-	/** don't do any locking, caller must manage their own locks */
-public static final int MDB_NOLOCK =		0x400000;
-	/** don't do readahead (no effect on Windows) */
-public static final int MDB_NORDAHEAD =	0x800000;
-	/** don't initialize malloc'd memory before writing to datafile */
-public static final int MDB_NOMEMINIT =	0x1000000;
-/** \} */
-
-/**	\defgroup	mdb_dbi_open	Database Flags
- *	\{
- */
-	/** use reverse string keys */
-public static final int MDB_REVERSEKEY =	0x02;
-	/** use sorted duplicates */
-public static final int MDB_DUPSORT =		0x04;
-	/** numeric keys in native byte order: either unsigned int or size_t.
-	 *  The keys must all be of the same size. */
-public static final int MDB_INTEGERKEY =	0x08;
-	/** with #MDB_DUPSORT, sorted dup items have fixed size */
-public static final int MDB_DUPFIXED =	0x10;
-	/** with #MDB_DUPSORT, dups are #MDB_INTEGERKEY-style integers */
-public static final int MDB_INTEGERDUP =	0x20;
-	/** with #MDB_DUPSORT, use reverse string dups */
-public static final int MDB_REVERSEDUP =	0x40;
-	/** create DB if not already existing */
-public static final int MDB_CREATE =		0x40000;
-/** \} */
-
-/**	\defgroup mdb_put	Write Flags
- *	\{
- */
-/** For put: Don't write if the key already exists. */
-public static final int MDB_NOOVERWRITE =	0x10;
-/** Only for #MDB_DUPSORT<br>
- * For put: don't write if the key and data pair already exist.<br>
- * For mdb_cursor_del: remove all duplicate data items.
- */
-public static final int MDB_NODUPDATA =	0x20;
-/** For mdb_cursor_put: overwrite the current key/data pair */
-public static final int MDB_CURRENT =	0x40;
-/** For put: Just reserve space for data, don't copy it. Return a
- * pointer to the reserved space.
- */
-public static final int MDB_RESERVE =	0x10000;
-/** Data is being appended, don't split full pages. */
-public static final int MDB_APPEND =	0x20000;
-/** Duplicate data is being appended, don't split full pages. */
-public static final int MDB_APPENDDUP =	0x40000;
-/** Store multiple data items in one call. Only for #MDB_DUPFIXED. */
-public static final int MDB_MULTIPLE =	0x80000;
-/*	@} */
-
-/**	\defgroup mdb_copy	Copy Flags
- *	\{
- */
-/** Compacting copy: Omit free space from copy, and renumber all
- * pages sequentially.
- */
-public static final int MDB_CP_COMPACT =	0x01;
-/*	@} */
-
-/** \brief Cursor Get operations.
- *
- *	This is the set of all operations for retrieving data
- *	using a cursor.
- */
-/** enum MDB_cursor_op */
-public static final int
-	/** Position at first key/data item */
-	MDB_FIRST = 0,
-	/** Position at first data item of current key.
-								Only for #MDB_DUPSORT */
-	MDB_FIRST_DUP = 1,
-	/** Position at key/data pair. Only for #MDB_DUPSORT */
-	MDB_GET_BOTH = 2,
-	/** position at key, nearest data. Only for #MDB_DUPSORT */
-	MDB_GET_BOTH_RANGE = 3,
-	/** Return key/data at current cursor position */
-	MDB_GET_CURRENT = 4,
-	/** Return up to a page of duplicate data items
-								from current cursor position. Move cursor to prepare
-								for #MDB_NEXT_MULTIPLE. Only for #MDB_DUPFIXED */
-	MDB_GET_MULTIPLE = 5,
-	/** Position at last key/data item */
-	MDB_LAST = 6,
-	/** Position at last data item of current key.
-								Only for #MDB_DUPSORT */
-	MDB_LAST_DUP = 7,
-	/** Position at next data item */
-	MDB_NEXT = 8,
-	/** Position at next data item of current key.
-								Only for #MDB_DUPSORT */
-	MDB_NEXT_DUP = 9,
-	/** Return up to a page of duplicate data items
-								from next cursor position. Move cursor to prepare
-								for #MDB_NEXT_MULTIPLE. Only for #MDB_DUPFIXED */
-	MDB_NEXT_MULTIPLE = 10,
-	/** Position at first data item of next key */
-	MDB_NEXT_NODUP = 11,
-	/** Position at previous data item */
-	MDB_PREV = 12,
-	/** Position at previous data item of current key.
-								Only for #MDB_DUPSORT */
-	MDB_PREV_DUP = 13,
-	/** Position at last data item of previous key */
-	MDB_PREV_NODUP = 14,
-	/** Position at specified key */
-	MDB_SET = 15,
-	/** Position at specified key, return key + data */
-	MDB_SET_KEY = 16,
-	/** Position at first key greater than or equal to specified key. */
-	MDB_SET_RANGE = 17,
-	/** Position at previous page and return up to
-								a page of duplicate data items. Only for #MDB_DUPFIXED */
-	MDB_PREV_MULTIPLE = 18;
-
-/** \defgroup  errors	Return Codes
- *
- *	BerkeleyDB uses -30800 to -30999, we'll go under them
- *	\{
- */
-	/**	Successful result */
-public static final int MDB_SUCCESS =	 0;
-	/** key/data pair already exists */
-public static final int MDB_KEYEXIST =	(-30799);
-	/** key/data pair not found (EOF) */
-public static final int MDB_NOTFOUND =	(-30798);
-	/** Requested page not found - this usually indicates corruption */
-public static final int MDB_PAGE_NOTFOUND =	(-30797);
-	/** Located page was wrong type */
-public static final int MDB_CORRUPTED =	(-30796);
-	/** Update of meta page failed or environment had fatal error */
-public static final int MDB_PANIC =		(-30795);
-	/** Environment version mismatch */
-public static final int MDB_VERSION_MISMATCH =	(-30794);
-	/** File is not a valid LMDB file */
-public static final int MDB_INVALID =	(-30793);
-	/** Environment mapsize reached */
-public static final int MDB_MAP_FULL =	(-30792);
-	/** Environment maxdbs reached */
-public static final int MDB_DBS_FULL =	(-30791);
-	/** Environment maxreaders reached */
-public static final int MDB_READERS_FULL =	(-30790);
-	/** Too many TLS keys in use - Windows only */
-public static final int MDB_TLS_FULL =	(-30789);
-	/** Txn has too many dirty pages */
-public static final int MDB_TXN_FULL =	(-30788);
-	/** Cursor stack too deep - internal error */
-public static final int MDB_CURSOR_FULL =	(-30787);
-	/** Page has not enough space - internal error */
-public static final int MDB_PAGE_FULL =	(-30786);
-	/** Database contents grew beyond environment mapsize */
-public static final int MDB_MAP_RESIZED =	(-30785);
-	/** Operation and DB incompatible, or DB type changed. This can mean:
-	 *	<ul>
-	 *	<li>The operation expects an #MDB_DUPSORT / #MDB_DUPFIXED database.
-	 *	<li>Opening a named DB when the unnamed DB has #MDB_DUPSORT / #MDB_INTEGERKEY.
-	 *	<li>Accessing a data record as a database, or vice versa.
-	 *	<li>The database was dropped and recreated with different flags.
-	 *	</ul>
-	 */
-public static final int MDB_INCOMPATIBLE =	(-30784);
-	/** Invalid reuse of reader locktable slot */
-public static final int MDB_BAD_RSLOT =		(-30783);
-	/** Transaction must abort, has a child, or is invalid */
-public static final int MDB_BAD_TXN =			(-30782);
-	/** Unsupported size of key/DB name/data, or wrong DUPFIXED size */
-public static final int MDB_BAD_VALSIZE =		(-30781);
-	/** The specified DBI was changed unexpectedly */
-public static final int MDB_BAD_DBI =		(-30780);
-	/** The last defined error code */
-public static final int MDB_LAST_ERRCODE =	MDB_BAD_DBI;
-/** \} */
-
-/** \brief Statistics for a database in the environment */
-public static class MDB_stat extends Pointer {
-    static { Loader.load(); }
-    /** Default native constructor. */
-    public MDB_stat() { super((Pointer)null); allocate(); }
-    /** Native array allocator. Access with {@link Pointer#position(long)}. */
-    public MDB_stat(long size) { super((Pointer)null); allocateArray(size); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public MDB_stat(Pointer p) { super(p); }
-    private native void allocate();
-    private native void allocateArray(long size);
-    @Override
-    @SuppressWarnings("unchecked")
-    public MDB_stat position(long position) {
-        return (MDB_stat)super.position(position);
-    }
-    @Override
-    @SuppressWarnings("unchecked")
-    public MDB_stat getPointer(long i) {
-        return new MDB_stat((Pointer)this).offsetAddress(i);
-    }
-
-	/** Size of a database page.
-												This is currently the same for all databases. */
-	public native @Cast("unsigned int") int ms_psize(); public native MDB_stat ms_psize(int setter);
-	/** Depth (height) of the B-tree */
-	public native @Cast("unsigned int") int ms_depth(); public native MDB_stat ms_depth(int setter);
-	/** Number of internal (non-leaf) pages */
-	public native @Cast("size_t") long ms_branch_pages(); public native MDB_stat ms_branch_pages(long setter);
-	/** Number of leaf pages */
-	public native @Cast("size_t") long ms_leaf_pages(); public native MDB_stat ms_leaf_pages(long setter);
-	/** Number of overflow pages */
-	public native @Cast("size_t") long ms_overflow_pages(); public native MDB_stat ms_overflow_pages(long setter);
-	/** Number of data items */
-	public native @Cast("size_t") long ms_entries(); public native MDB_stat ms_entries(long setter);
-}
-
-/** \brief Information about the environment */
-public static class MDB_envinfo extends Pointer {
-    static { Loader.load(); }
-    /** Default native constructor. */
-    public MDB_envinfo() { super((Pointer)null); allocate(); }
-    /** Native array allocator. Access with {@link Pointer#position(long)}. */
-    public MDB_envinfo(long size) { super((Pointer)null); allocateArray(size); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public MDB_envinfo(Pointer p) { super(p); }
-    private native void allocate();
-    private native void allocateArray(long size);
-    @Override
-    @SuppressWarnings("unchecked")
-    public MDB_envinfo position(long position) {
-        return (MDB_envinfo)super.position(position);
-    }
-    @Override
-    @SuppressWarnings("unchecked")
-    public MDB_envinfo getPointer(long i) {
-        return new MDB_envinfo((Pointer)this).offsetAddress(i);
-    }
-
-	/** Address of map, if fixed */
-	public native Pointer me_mapaddr(); public native MDB_envinfo me_mapaddr(Pointer setter);
-	/** Size of the data memory map */
-	public native @Cast("size_t") long me_mapsize(); public native MDB_envinfo me_mapsize(long setter);
-	/** ID of the last used page */
-	public native @Cast("size_t") long me_last_pgno(); public native MDB_envinfo me_last_pgno(long setter);
-	/** ID of the last committed transaction */
-	public native @Cast("size_t") long me_last_txnid(); public native MDB_envinfo me_last_txnid(long setter);
-	/** max reader slots in the environment */
-	public native @Cast("unsigned int") int me_maxreaders(); public native MDB_envinfo me_maxreaders(int setter);
-	/** max reader slots used in the environment */
-	public native @Cast("unsigned int") int me_numreaders(); public native MDB_envinfo me_numreaders(int setter);
-}
-
-	/** \brief Return the LMDB library version information.
-	 *
-	 * @param major [out] if non-NULL, the library major version number is copied here
-	 * @param minor [out] if non-NULL, the library minor version number is copied here
-	 * @param patch [out] if non-NULL, the library patch version number is copied here
-	 * \retval "version string" The library version as a string
-	 */
-public static native @Cast("char*") BytePointer mdb_version(IntPointer major, IntPointer minor, IntPointer patch);
-public static native @Cast("char*") ByteBuffer mdb_version(IntBuffer major, IntBuffer minor, IntBuffer patch);
-public static native @Cast("char*") byte[] mdb_version(int[] major, int[] minor, int[] patch);
-
-	/** \brief Return a string describing a given error code.
-	 *
-	 * This function is a superset of the ANSI C X3.159-1989 (ANSI C) strerror(3)
-	 * function. If the error code is greater than or equal to 0, then the string
-	 * returned by the system function strerror(3) is returned. If the error code
-	 * is less than 0, an error string corresponding to the LMDB library error is
-	 * returned. See \ref errors for a list of LMDB-specific error codes.
-	 * @param err [in] The error code
-	 * \retval "error message" The description of the error
-	 */
-public static native @Cast("char*") BytePointer mdb_strerror(int err);
-
-	/** \brief Create an LMDB environment handle.
-	 *
-	 * This function allocates memory for a #MDB_env structure. To release
-	 * the allocated memory and discard the handle, call #mdb_env_close().
-	 * Before the handle may be used, it must be opened using #mdb_env_open().
-	 * Various other options may also need to be set before opening the handle,
-	 * e.g. #mdb_env_set_mapsize(), #mdb_env_set_maxreaders(), #mdb_env_set_maxdbs(),
-	 * depending on usage requirements.
-	 * @param env [out] The address where the new handle will be stored
-	 * @return A non-zero error value on failure and 0 on success.
-	 */
-public static native int mdb_env_create(@Cast("MDB_env**") PointerPointer env);
-public static native int mdb_env_create(@ByPtrPtr MDB_env env);
-
-	/** \brief Open an environment handle.
-	 *
-	 * If this function fails, #mdb_env_close() must be called to discard the #MDB_env handle.
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param path [in] The directory in which the database files reside. This
-	 * directory must already exist and be writable.
-	 * @param flags [in] Special options for this environment. This parameter
-	 * must be set to 0 or by bitwise OR'ing together one or more of the
-	 * values described here.
-	 * Flags set by mdb_env_set_flags() are also used.
-	 * <ul>
-	 *	<li>#MDB_FIXEDMAP
-	 *      use a fixed address for the mmap region. This flag must be specified
-	 *      when creating the environment, and is stored persistently in the environment.
-	 *		If successful, the memory map will always reside at the same virtual address
-	 *		and pointers used to reference data items in the database will be constant
-	 *		across multiple invocations. This option may not always work, depending on
-	 *		how the operating system has allocated memory to shared libraries and other uses.
-	 *		The feature is highly experimental.
-	 *	<li>#MDB_NOSUBDIR
-	 *		By default, LMDB creates its environment in a directory whose
-	 *		pathname is given in \b path, and creates its data and lock files
-	 *		under that directory. With this option, \b path is used as-is for
-	 *		the database main data file. The database lock file is the \b path
-	 *		with "-lock" appended.
-	 *	<li>#MDB_RDONLY
-	 *		Open the environment in read-only mode. No write operations will be
-	 *		allowed. LMDB will still modify the lock file - except on read-only
-	 *		filesystems, where LMDB does not use locks.
-	 *	<li>#MDB_WRITEMAP
-	 *		Use a writeable memory map unless MDB_RDONLY is set. This uses
-	 *		fewer mallocs but loses protection from application bugs
-	 *		like wild pointer writes and other bad updates into the database.
-	 *		This may be slightly faster for DBs that fit entirely in RAM, but
-	 *		is slower for DBs larger than RAM.
-	 *		Incompatible with nested transactions.
-	 *		Do not mix processes with and without MDB_WRITEMAP on the same
-	 *		environment.  This can defeat durability (#mdb_env_sync etc).
-	 *	<li>#MDB_NOMETASYNC
-	 *		Flush system buffers to disk only once per transaction, omit the
-	 *		metadata flush. Defer that until the system flushes files to disk,
-	 *		or next non-MDB_RDONLY commit or #mdb_env_sync(). This optimization
-	 *		maintains database integrity, but a system crash may undo the last
-	 *		committed transaction. I.e. it preserves the ACI (atomicity,
-	 *		consistency, isolation) but not D (durability) database property.
-	 *		This flag may be changed at any time using #mdb_env_set_flags().
-	 *	<li>#MDB_NOSYNC
-	 *		Don't flush system buffers to disk when committing a transaction.
-	 *		This optimization means a system crash can corrupt the database or
-	 *		lose the last transactions if buffers are not yet flushed to disk.
-	 *		The risk is governed by how often the system flushes dirty buffers
-	 *		to disk and how often #mdb_env_sync() is called.  However, if the
-	 *		filesystem preserves write order and the #MDB_WRITEMAP flag is not
-	 *		used, transactions exhibit ACI (atomicity, consistency, isolation)
-	 *		properties and only lose D (durability).  I.e. database integrity
-	 *		is maintained, but a system crash may undo the final transactions.
-	 *		Note that (#MDB_NOSYNC | #MDB_WRITEMAP) leaves the system with no
-	 *		hint for when to write transactions to disk, unless #mdb_env_sync()
-	 *		is called. (#MDB_MAPASYNC | #MDB_WRITEMAP) may be preferable.
-	 *		This flag may be changed at any time using #mdb_env_set_flags().
-	 *	<li>#MDB_MAPASYNC
-	 *		When using #MDB_WRITEMAP, use asynchronous flushes to disk.
-	 *		As with #MDB_NOSYNC, a system crash can then corrupt the
-	 *		database or lose the last transactions. Calling #mdb_env_sync()
-	 *		ensures on-disk database integrity until next commit.
-	 *		This flag may be changed at any time using #mdb_env_set_flags().
-	 *	<li>#MDB_NOTLS
-	 *		Don't use Thread-Local Storage. Tie reader locktable slots to
-	 *		#MDB_txn objects instead of to threads. I.e. #mdb_txn_reset() keeps
-	 *		the slot reserved for the #MDB_txn object. A thread may use parallel
-	 *		read-only transactions. A read-only transaction may span threads if
-	 *		the user synchronizes its use. Applications that multiplex many
-	 *		user threads over individual OS threads need this option. Such an
-	 *		application must also serialize the write transactions in an OS
-	 *		thread, since LMDB's write locking is unaware of the user threads.
-	 *	<li>#MDB_NOLOCK
-	 *		Don't do any locking. If concurrent access is anticipated, the
-	 *		caller must manage all concurrency itself. For proper operation
-	 *		the caller must enforce single-writer semantics, and must ensure
-	 *		that no readers are using old transactions while a writer is
-	 *		active. The simplest approach is to use an exclusive lock so that
-	 *		no readers may be active at all when a writer begins.
-	 *	<li>#MDB_NORDAHEAD
-	 *		Turn off readahead. Most operating systems perform readahead on
-	 *		read requests by default. This option turns it off if the OS
-	 *		supports it. Turning it off may help random read performance
-	 *		when the DB is larger than RAM and system RAM is full.
-	 *		The option is not implemented on Windows.
-	 *	<li>#MDB_NOMEMINIT
-	 *		Don't initialize malloc'd memory before writing to unused spaces
-	 *		in the data file. By default, memory for pages written to the data
-	 *		file is obtained using malloc. While these pages may be reused in
-	 *		subsequent transactions, freshly malloc'd pages will be initialized
-	 *		to zeroes before use. This avoids persisting leftover data from other
-	 *		code (that used the heap and subsequently freed the memory) into the
-	 *		data file. Note that many other system libraries may allocate
-	 *		and free memory from the heap for arbitrary uses. E.g., stdio may
-	 *		use the heap for file I/O buffers. This initialization step has a
-	 *		modest performance cost so some applications may want to disable
-	 *		it using this flag. This option can be a problem for applications
-	 *		which handle sensitive data like passwords, and it makes memory
-	 *		checkers like Valgrind noisy. This flag is not needed with #MDB_WRITEMAP,
-	 *		which writes directly to the mmap instead of using malloc for pages. The
-	 *		initialization is also skipped if #MDB_RESERVE is used; the
-	 *		caller is expected to overwrite all of the memory that was
-	 *		reserved in that case.
-	 *		This flag may be changed at any time using #mdb_env_set_flags().
-	 * </ul>
-	 * @param mode [in] The UNIX permissions to set on created files and semaphores.
-	 * This parameter is ignored on Windows.
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>#MDB_VERSION_MISMATCH - the version of the LMDB library doesn't match the
-	 *	version that created the database environment.
-	 *	<li>#MDB_INVALID - the environment file headers are corrupted.
-	 *	<li>ENOENT - the directory specified by the path parameter doesn't exist.
-	 *	<li>EACCES - the user didn't have permission to access the environment files.
-	 *	<li>EAGAIN - the environment was locked by another process.
-	 * </ul>
-	 */
-public static native int mdb_env_open(MDB_env env, @Cast("const char*") BytePointer path, @Cast("unsigned int") int flags, @Cast("mdb_mode_t") int mode);
-public static native int mdb_env_open(MDB_env env, String path, @Cast("unsigned int") int flags, @Cast("mdb_mode_t") int mode);
-
-	/** \brief Copy an LMDB environment to the specified path.
-	 *
-	 * This function may be used to make a backup of an existing environment.
-	 * No lockfile is created, since it gets recreated at need.
-	 * \note This call can trigger significant file size growth if run in
-	 * parallel with write transactions, because it employs a read-only
-	 * transaction. See long-lived transactions under \ref caveats_sec.
-	 * @param env [in] An environment handle returned by #mdb_env_create(). It
-	 * must have already been opened successfully.
-	 * @param path [in] The directory in which the copy will reside. This
-	 * directory must already exist and be writable but must otherwise be
-	 * empty.
-	 * @return A non-zero error value on failure and 0 on success.
-	 */
-public static native int mdb_env_copy(MDB_env env, @Cast("const char*") BytePointer path);
-public static native int mdb_env_copy(MDB_env env, String path);
-
-	/** \brief Copy an LMDB environment to the specified file descriptor.
-	 *
-	 * This function may be used to make a backup of an existing environment.
-	 * No lockfile is created, since it gets recreated at need.
-	 * \note This call can trigger significant file size growth if run in
-	 * parallel with write transactions, because it employs a read-only
-	 * transaction. See long-lived transactions under \ref caveats_sec.
-	 * @param env [in] An environment handle returned by #mdb_env_create(). It
-	 * must have already been opened successfully.
-	 * @param fd [in] The filedescriptor to write the copy to. It must
-	 * have already been opened for Write access.
-	 * @return A non-zero error value on failure and 0 on success.
-	 */
-//public static native int mdb_env_copyfd(MDB_env env, mdb_filehandle_t fd);
-
-	/** \brief Copy an LMDB environment to the specified path, with options.
-	 *
-	 * This function may be used to make a backup of an existing environment.
-	 * No lockfile is created, since it gets recreated at need.
-	 * \note This call can trigger significant file size growth if run in
-	 * parallel with write transactions, because it employs a read-only
-	 * transaction. See long-lived transactions under \ref caveats_sec.
-	 * @param env [in] An environment handle returned by #mdb_env_create(). It
-	 * must have already been opened successfully.
-	 * @param path [in] The directory in which the copy will reside. This
-	 * directory must already exist and be writable but must otherwise be
-	 * empty.
-	 * @param flags [in] Special options for this operation. This parameter
-	 * must be set to 0 or by bitwise OR'ing together one or more of the
-	 * values described here.
-	 * <ul>
-	 *	<li>#MDB_CP_COMPACT - Perform compaction while copying: omit free
-	 *		pages and sequentially renumber all pages in output. This option
-	 *		consumes more CPU and runs more slowly than the default.
-	 *		Currently it fails if the environment has suffered a page leak.
-	 * </ul>
-	 * @return A non-zero error value on failure and 0 on success.
-	 */
-public static native int mdb_env_copy2(MDB_env env, @Cast("const char*") BytePointer path, @Cast("unsigned int") int flags);
-public static native int mdb_env_copy2(MDB_env env, String path, @Cast("unsigned int") int flags);
-
-	/** \brief Copy an LMDB environment to the specified file descriptor,
-	 *	with options.
-	 *
-	 * This function may be used to make a backup of an existing environment.
-	 * No lockfile is created, since it gets recreated at need. See
-	 * #mdb_env_copy2() for further details.
-	 * \note This call can trigger significant file size growth if run in
-	 * parallel with write transactions, because it employs a read-only
-	 * transaction. See long-lived transactions under \ref caveats_sec.
-	 * @param env [in] An environment handle returned by #mdb_env_create(). It
-	 * must have already been opened successfully.
-	 * @param fd [in] The filedescriptor to write the copy to. It must
-	 * have already been opened for Write access.
-	 * @param flags [in] Special options for this operation.
-	 * See #mdb_env_copy2() for options.
-	 * @return A non-zero error value on failure and 0 on success.
-	 */
-//public static native int mdb_env_copyfd2(MDB_env env, mdb_filehandle_t fd, @Cast("unsigned int") int flags);
-
-	/** \brief Return statistics about the LMDB environment.
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param stat [out] The address of an #MDB_stat structure
-	 * 	where the statistics will be copied
-	 */
-public static native int mdb_env_stat(MDB_env env, MDB_stat stat);
-
-	/** \brief Return information about the LMDB environment.
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param stat [out] The address of an #MDB_envinfo structure
-	 * 	where the information will be copied
-	 */
-public static native int mdb_env_info(MDB_env env, MDB_envinfo stat);
-
-	/** \brief Flush the data buffers to disk.
-	 *
-	 * Data is always written to disk when #mdb_txn_commit() is called,
-	 * but the operating system may keep it buffered. LMDB always flushes
-	 * the OS buffers upon commit as well, unless the environment was
-	 * opened with #MDB_NOSYNC or in part #MDB_NOMETASYNC. This call is
-	 * not valid if the environment was opened with #MDB_RDONLY.
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param force [in] If non-zero, force a synchronous flush.  Otherwise
-	 *  if the environment has the #MDB_NOSYNC flag set the flushes
-	 *	will be omitted, and with #MDB_MAPASYNC they will be asynchronous.
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EACCES - the environment is read-only.
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 *	<li>EIO - an error occurred during synchronization.
-	 * </ul>
-	 */
-public static native int mdb_env_sync(MDB_env env, int force);
-
-	/** \brief Close the environment and release the memory map.
-	 *
-	 * Only a single thread may call this function. All transactions, databases,
-	 * and cursors must already be closed before calling this function. Attempts to
-	 * use any such handles after calling this function will cause a SIGSEGV.
-	 * The environment handle will be freed and must not be used again after this call.
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 */
-public static native void mdb_env_close(MDB_env env);
-
-	/** \brief Set environment flags.
-	 *
-	 * This may be used to set some flags in addition to those from
-	 * #mdb_env_open(), or to unset these flags.  If several threads
-	 * change the flags at the same time, the result is undefined.
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param flags [in] The flags to change, bitwise OR'ed together
-	 * @param onoff [in] A non-zero value sets the flags, zero clears them.
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_env_set_flags(MDB_env env, @Cast("unsigned int") int flags, int onoff);
-
-	/** \brief Get environment flags.
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param flags [out] The address of an integer to store the flags
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_env_get_flags(MDB_env env, @Cast("unsigned int*") IntPointer flags);
-public static native int mdb_env_get_flags(MDB_env env, @Cast("unsigned int*") IntBuffer flags);
-public static native int mdb_env_get_flags(MDB_env env, @Cast("unsigned int*") int[] flags);
-
-	/** \brief Return the path that was used in #mdb_env_open().
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param path [out] Address of a string pointer to contain the path. This
-	 * is the actual string in the environment, not a copy. It should not be
-	 * altered in any way.
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_env_get_path(MDB_env env, @Cast("const char**") PointerPointer path);
-public static native int mdb_env_get_path(MDB_env env, @Cast("const char**") @ByPtrPtr BytePointer path);
-public static native int mdb_env_get_path(MDB_env env, @Cast("const char**") @ByPtrPtr ByteBuffer path);
-public static native int mdb_env_get_path(MDB_env env, @Cast("const char**") @ByPtrPtr byte[] path);
-
-	/** \brief Return the filedescriptor for the given environment.
-	 *
-	 * This function may be called after fork(), so the descriptor can be
-	 * closed before exec*().  Other LMDB file descriptors have FD_CLOEXEC.
-	 * (Until LMDB 0.9.18, only the lockfile had that.)
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param fd [out] Address of a mdb_filehandle_t to contain the descriptor.
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-//public static native int mdb_env_get_fd(MDB_env env, @ByPtrPtr mdb_filehandle_t fd);
-
-	/** \brief Set the size of the memory map to use for this environment.
-	 *
-	 * The size should be a multiple of the OS page size. The default is
-	 * 10485760 bytes. The size of the memory map is also the maximum size
-	 * of the database. The value should be chosen as large as possible,
-	 * to accommodate future growth of the database.
-	 * This function should be called after #mdb_env_create() and before #mdb_env_open().
-	 * It may be called at later times if no transactions are active in
-	 * this process. Note that the library does not check for this condition,
-	 * the caller must ensure it explicitly.
-	 *
-	 * The new size takes effect immediately for the current process but
-	 * will not be persisted to any others until a write transaction has been
-	 * committed by the current process. Also, only mapsize increases are
-	 * persisted into the environment.
-	 *
-	 * If the mapsize is increased by another process, and data has grown
-	 * beyond the range of the current mapsize, #mdb_txn_begin() will
-	 * return #MDB_MAP_RESIZED. This function may be called with a size
-	 * of zero to adopt the new size.
-	 *
-	 * Any attempt to set a size smaller than the space already consumed
-	 * by the environment will be silently changed to the current size of the used space.
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param size [in] The size in bytes
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified, or the environment has
-	 *   	an active write transaction.
-	 * </ul>
-	 */
-public static native int mdb_env_set_mapsize(MDB_env env, @Cast("size_t") long size);
-
-	/** \brief Set the maximum number of threads/reader slots for the environment.
-	 *
-	 * This defines the number of slots in the lock table that is used to track readers in the
-	 * the environment. The default is 126.
-	 * Starting a read-only transaction normally ties a lock table slot to the
-	 * current thread until the environment closes or the thread exits. If
-	 * MDB_NOTLS is in use, #mdb_txn_begin() instead ties the slot to the
-	 * MDB_txn object until it or the #MDB_env object is destroyed.
-	 * This function may only be called after #mdb_env_create() and before #mdb_env_open().
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param readers [in] The maximum number of reader lock table slots
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified, or the environment is already open.
-	 * </ul>
-	 */
-public static native int mdb_env_set_maxreaders(MDB_env env, @Cast("unsigned int") int readers);
-
-	/** \brief Get the maximum number of threads/reader slots for the environment.
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param readers [out] Address of an integer to store the number of readers
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_env_get_maxreaders(MDB_env env, @Cast("unsigned int*") IntPointer readers);
-public static native int mdb_env_get_maxreaders(MDB_env env, @Cast("unsigned int*") IntBuffer readers);
-public static native int mdb_env_get_maxreaders(MDB_env env, @Cast("unsigned int*") int[] readers);
-
-	/** \brief Set the maximum number of named databases for the environment.
-	 *
-	 * This function is only needed if multiple databases will be used in the
-	 * environment. Simpler applications that use the environment as a single
-	 * unnamed database can ignore this option.
-	 * This function may only be called after #mdb_env_create() and before #mdb_env_open().
-	 *
-	 * Currently a moderate number of slots are cheap but a huge number gets
-	 * expensive: 7-120 words per transaction, and every #mdb_dbi_open()
-	 * does a linear search of the opened slots.
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param dbs [in] The maximum number of databases
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified, or the environment is already open.
-	 * </ul>
-	 */
-public static native int mdb_env_set_maxdbs(MDB_env env, int dbs);
-
-	/** \brief Get the maximum size of keys and #MDB_DUPSORT data we can write.
-	 *
-	 * Depends on the compile-time constant #MDB_MAXKEYSIZE. Default 511.
-	 * See \ref MDB_val.
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @return The maximum size of a key we can write
-	 */
-public static native int mdb_env_get_maxkeysize(MDB_env env);
-
-	/** \brief Set application information associated with the #MDB_env.
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param ctx [in] An arbitrary pointer for whatever the application needs.
-	 * @return A non-zero error value on failure and 0 on success.
-	 */
-public static native int mdb_env_set_userctx(MDB_env env, Pointer ctx);
-
-	/** \brief Get the application information associated with the #MDB_env.
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @return The pointer set by #mdb_env_set_userctx().
-	 */
-public static native Pointer mdb_env_get_userctx(MDB_env env);
-
-	/** \brief A callback function for most LMDB assert() failures,
-	 * called before printing the message and aborting.
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create().
-	 * @param msg [in] The assertion message, not including newline.
-	 */
-public static class MDB_assert_func extends FunctionPointer {
-    static { Loader.load(); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public    MDB_assert_func(Pointer p) { super(p); }
-    protected MDB_assert_func() { allocate(); }
-    private native void allocate();
-    public native void call(MDB_env env, @Cast("const char*") BytePointer msg);
-}
-
-	/** Set or reset the assert() callback of the environment.
-	 * Disabled if liblmdb is built with NDEBUG.
-	 * \note This hack should become obsolete as lmdb's error handling matures.
-	 * @param env [in] An environment handle returned by #mdb_env_create().
-	 * @param func [in] An #MDB_assert_func function, or 0.
-	 * @return A non-zero error value on failure and 0 on success.
-	 */
-public static native int mdb_env_set_assert(MDB_env env, MDB_assert_func func);
-
-	/** \brief Create a transaction for use with the environment.
-	 *
-	 * The transaction handle may be discarded using #mdb_txn_abort() or #mdb_txn_commit().
-	 * \note A transaction and its cursors must only be used by a single
-	 * thread, and a thread may only have a single transaction at a time.
-	 * If #MDB_NOTLS is in use, this does not apply to read-only transactions.
-	 * \note Cursors may not span transactions.
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param parent [in] If this parameter is non-NULL, the new transaction
-	 * will be a nested transaction, with the transaction indicated by \b parent
-	 * as its parent. Transactions may be nested to any level. A parent
-	 * transaction and its cursors may not issue any other operations than
-	 * mdb_txn_commit and mdb_txn_abort while it has active child transactions.
-	 * @param flags [in] Special options for this transaction. This parameter
-	 * must be set to 0 or by bitwise OR'ing together one or more of the
-	 * values described here.
-	 * <ul>
-	 *	<li>#MDB_RDONLY
-	 *		This transaction will not perform any write operations.
-	 * </ul>
-	 * @param txn [out] Address where the new #MDB_txn handle will be stored
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>#MDB_PANIC - a fatal error occurred earlier and the environment
-	 *		must be shut down.
-	 *	<li>#MDB_MAP_RESIZED - another process wrote data beyond this MDB_env's
-	 *		mapsize and this environment's map must be resized as well.
-	 *		See #mdb_env_set_mapsize().
-	 *	<li>#MDB_READERS_FULL - a read-only transaction was requested and
-	 *		the reader lock table is full. See #mdb_env_set_maxreaders().
-	 *	<li>ENOMEM - out of memory.
-	 * </ul>
-	 */
-public static native int mdb_txn_begin(MDB_env env, MDB_txn parent, @Cast("unsigned int") int flags, @Cast("MDB_txn**") PointerPointer txn);
-public static native int mdb_txn_begin(MDB_env env, MDB_txn parent, @Cast("unsigned int") int flags, @ByPtrPtr MDB_txn txn);
-
-	/** \brief Returns the transaction's #MDB_env
-	 *
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 */
-public static native MDB_env mdb_txn_env(MDB_txn txn);
-
-	/** \brief Return the transaction's ID.
-	 *
-	 * This returns the identifier associated with this transaction. For a
-	 * read-only transaction, this corresponds to the snapshot being read;
-	 * concurrent readers will frequently have the same transaction ID.
-	 *
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @return A transaction ID, valid if input is an active transaction.
-	 */
-public static native @Cast("size_t") long mdb_txn_id(MDB_txn txn);
-
-	/** \brief Commit all the operations of a transaction into the database.
-	 *
-	 * The transaction handle is freed. It and its cursors must not be used
-	 * again after this call, except with #mdb_cursor_renew().
-	 * \note Earlier documentation incorrectly said all cursors would be freed.
-	 * Only write-transactions free cursors.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 *	<li>ENOSPC - no more disk space.
-	 *	<li>EIO - a low-level I/O error occurred while writing.
-	 *	<li>ENOMEM - out of memory.
-	 * </ul>
-	 */
-public static native int mdb_txn_commit(MDB_txn txn);
-
-	/** \brief Abandon all the operations of the transaction instead of saving them.
-	 *
-	 * The transaction handle is freed. It and its cursors must not be used
-	 * again after this call, except with #mdb_cursor_renew().
-	 * \note Earlier documentation incorrectly said all cursors would be freed.
-	 * Only write-transactions free cursors.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 */
-public static native void mdb_txn_abort(MDB_txn txn);
-
-	/** \brief Reset a read-only transaction.
-	 *
-	 * Abort the transaction like #mdb_txn_abort(), but keep the transaction
-	 * handle. #mdb_txn_renew() may reuse the handle. This saves allocation
-	 * overhead if the process will start a new read-only transaction soon,
-	 * and also locking overhead if #MDB_NOTLS is in use. The reader table
-	 * lock is released, but the table slot stays tied to its thread or
-	 * #MDB_txn. Use mdb_txn_abort() to discard a reset handle, and to free
-	 * its lock table slot if MDB_NOTLS is in use.
-	 * Cursors opened within the transaction must not be used
-	 * again after this call, except with #mdb_cursor_renew().
-	 * Reader locks generally don't interfere with writers, but they keep old
-	 * versions of database pages allocated. Thus they prevent the old pages
-	 * from being reused when writers commit new data, and so under heavy load
-	 * the database size may grow much more rapidly than otherwise.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 */
-public static native void mdb_txn_reset(MDB_txn txn);
-
-	/** \brief Renew a read-only transaction.
-	 *
-	 * This acquires a new reader lock for a transaction handle that had been
-	 * released by #mdb_txn_reset(). It must be called before a reset transaction
-	 * may be used again.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>#MDB_PANIC - a fatal error occurred earlier and the environment
-	 *		must be shut down.
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_txn_renew(MDB_txn txn);
-
-/** Compat with version <= 0.9.4, avoid clash with libmdb from MDB Tools project */
-// #define mdb_open(txn,name,flags,dbi)	mdb_dbi_open(txn,name,flags,dbi)
-/** Compat with version <= 0.9.4, avoid clash with libmdb from MDB Tools project */
-// #define mdb_close(env,dbi)				mdb_dbi_close(env,dbi)
-
-	/** \brief Open a database in the environment.
-	 *
-	 * A database handle denotes the name and parameters of a database,
-	 * independently of whether such a database exists.
-	 * The database handle may be discarded by calling #mdb_dbi_close().
-	 * The old database handle is returned if the database was already open.
-	 * The handle may only be closed once.
-	 *
-	 * The database handle will be private to the current transaction until
-	 * the transaction is successfully committed. If the transaction is
-	 * aborted the handle will be closed automatically.
-	 * After a successful commit the handle will reside in the shared
-	 * environment, and may be used by other transactions.
-	 *
-	 * This function must not be called from multiple concurrent
-	 * transactions in the same process. A transaction that uses
-	 * this function must finish (either commit or abort) before
-	 * any other transaction in the process may use this function.
-	 *
-	 * To use named databases (with name != NULL), #mdb_env_set_maxdbs()
-	 * must be called before opening the environment.  Database names are
-	 * keys in the unnamed database, and may be read but not written.
-	 *
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param name [in] The name of the database to open. If only a single
-	 * 	database is needed in the environment, this value may be NULL.
-	 * @param flags [in] Special options for this database. This parameter
-	 * must be set to 0 or by bitwise OR'ing together one or more of the
-	 * values described here.
-	 * <ul>
-	 *	<li>#MDB_REVERSEKEY
-	 *		Keys are strings to be compared in reverse order, from the end
-	 *		of the strings to the beginning. By default, Keys are treated as strings and
-	 *		compared from beginning to end.
-	 *	<li>#MDB_DUPSORT
-	 *		Duplicate keys may be used in the database. (Or, from another perspective,
-	 *		keys may have multiple data items, stored in sorted order.) By default
-	 *		keys must be unique and may have only a single data item.
-	 *	<li>#MDB_INTEGERKEY
-	 *		Keys are binary integers in native byte order, either unsigned int
-	 *		or size_t, and will be sorted as such.
-	 *		The keys must all be of the same size.
-	 *	<li>#MDB_DUPFIXED
-	 *		This flag may only be used in combination with #MDB_DUPSORT. This option
-	 *		tells the library that the data items for this database are all the same
-	 *		size, which allows further optimizations in storage and retrieval. When
-	 *		all data items are the same size, the #MDB_GET_MULTIPLE, #MDB_NEXT_MULTIPLE
-	 *		and #MDB_PREV_MULTIPLE cursor operations may be used to retrieve multiple
-	 *		items at once.
-	 *	<li>#MDB_INTEGERDUP
-	 *		This option specifies that duplicate data items are binary integers,
-	 *		similar to #MDB_INTEGERKEY keys.
-	 *	<li>#MDB_REVERSEDUP
-	 *		This option specifies that duplicate data items should be compared as
-	 *		strings in reverse order.
-	 *	<li>#MDB_CREATE
-	 *		Create the named database if it doesn't exist. This option is not
-	 *		allowed in a read-only transaction or a read-only environment.
-	 * </ul>
-	 * @param dbi [out] Address where the new #MDB_dbi handle will be stored
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>#MDB_NOTFOUND - the specified database doesn't exist in the environment
-	 *		and #MDB_CREATE was not specified.
-	 *	<li>#MDB_DBS_FULL - too many databases have been opened. See #mdb_env_set_maxdbs().
-	 * </ul>
-	 */
-public static native int mdb_dbi_open(MDB_txn txn, @Cast("const char*") BytePointer name, @Cast("unsigned int") int flags, @Cast("MDB_dbi*") IntPointer dbi);
-public static native int mdb_dbi_open(MDB_txn txn, String name, @Cast("unsigned int") int flags, @Cast("MDB_dbi*") IntBuffer dbi);
-public static native int mdb_dbi_open(MDB_txn txn, @Cast("const char*") BytePointer name, @Cast("unsigned int") int flags, @Cast("MDB_dbi*") int[] dbi);
-public static native int mdb_dbi_open(MDB_txn txn, String name, @Cast("unsigned int") int flags, @Cast("MDB_dbi*") IntPointer dbi);
-public static native int mdb_dbi_open(MDB_txn txn, @Cast("const char*") BytePointer name, @Cast("unsigned int") int flags, @Cast("MDB_dbi*") IntBuffer dbi);
-public static native int mdb_dbi_open(MDB_txn txn, String name, @Cast("unsigned int") int flags, @Cast("MDB_dbi*") int[] dbi);
-
-	/** \brief Retrieve statistics for a database.
-	 *
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param stat [out] The address of an #MDB_stat structure
-	 * 	where the statistics will be copied
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_stat(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_stat stat);
-
-	/** \brief Retrieve the DB flags for a database handle.
-	 *
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param flags [out] Address where the flags will be returned.
-	 * @return A non-zero error value on failure and 0 on success.
-	 */
-public static native int mdb_dbi_flags(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("unsigned int*") IntPointer flags);
-public static native int mdb_dbi_flags(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("unsigned int*") IntBuffer flags);
-public static native int mdb_dbi_flags(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("unsigned int*") int[] flags);
-
-	/** \brief Close a database handle. Normally unnecessary. Use with care:
-	 *
-	 * This call is not mutex protected. Handles should only be closed by
-	 * a single thread, and only if no other threads are going to reference
-	 * the database handle or one of its cursors any further. Do not close
-	 * a handle if an existing transaction has modified its database.
-	 * Doing so can cause misbehavior from database corruption to errors
-	 * like MDB_BAD_VALSIZE (since the DB name is gone).
-	 *
-	 * Closing a database handle is not necessary, but lets #mdb_dbi_open()
-	 * reuse the handle value.  Usually it's better to set a bigger
-	 * #mdb_env_set_maxdbs(), unless that value would be large.
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 */
-public static native void mdb_dbi_close(MDB_env env, @Cast("MDB_dbi") int dbi);
-
-	/** \brief Empty or delete+close a database.
-	 *
-	 * See #mdb_dbi_close() for restrictions about closing the DB handle.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param del [in] 0 to empty the DB, 1 to delete it from the
-	 * environment and close the DB handle.
-	 * @return A non-zero error value on failure and 0 on success.
-	 */
-public static native int mdb_drop(MDB_txn txn, @Cast("MDB_dbi") int dbi, int del);
-
-	/** \brief Set a custom key comparison function for a database.
-	 *
-	 * The comparison function is called whenever it is necessary to compare a
-	 * key specified by the application with a key currently stored in the database.
-	 * If no comparison function is specified, and no special key flags were specified
-	 * with #mdb_dbi_open(), the keys are compared lexically, with shorter keys collating
-	 * before longer keys.
-	 * \warning This function must be called before any data access functions are used,
-	 * otherwise data corruption may occur. The same comparison function must be used by every
-	 * program accessing the database, every time the database is used.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param cmp [in] A #MDB_cmp_func function
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_set_compare(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_cmp_func cmp);
-
-	/** \brief Set a custom data comparison function for a #MDB_DUPSORT database.
-	 *
-	 * This comparison function is called whenever it is necessary to compare a data
-	 * item specified by the application with a data item currently stored in the database.
-	 * This function only takes effect if the database was opened with the #MDB_DUPSORT
-	 * flag.
-	 * If no comparison function is specified, and no special key flags were specified
-	 * with #mdb_dbi_open(), the data items are compared lexically, with shorter items collating
-	 * before longer items.
-	 * \warning This function must be called before any data access functions are used,
-	 * otherwise data corruption may occur. The same comparison function must be used by every
-	 * program accessing the database, every time the database is used.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param cmp [in] A #MDB_cmp_func function
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_set_dupsort(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_cmp_func cmp);
-
-	/** \brief Set a relocation function for a #MDB_FIXEDMAP database.
-	 *
-	 * \todo The relocation function is called whenever it is necessary to move the data
-	 * of an item to a different position in the database (e.g. through tree
-	 * balancing operations, shifts as a result of adds or deletes, etc.). It is
-	 * intended to allow address/position-dependent data items to be stored in
-	 * a database in an environment opened with the #MDB_FIXEDMAP option.
-	 * Currently the relocation feature is unimplemented and setting
-	 * this function has no effect.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param rel [in] A #MDB_rel_func function
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_set_relfunc(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_rel_func rel);
-
-	/** \brief Set a context pointer for a #MDB_FIXEDMAP database's relocation function.
-	 *
-	 * See #mdb_set_relfunc and #MDB_rel_func for more details.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param ctx [in] An arbitrary pointer for whatever the application needs.
-	 * It will be passed to the callback function set by #mdb_set_relfunc
-	 * as its \b relctx parameter whenever the callback is invoked.
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_set_relctx(MDB_txn txn, @Cast("MDB_dbi") int dbi, Pointer ctx);
-
-	/** \brief Get items from a database.
-	 *
-	 * This function retrieves key/data pairs from the database. The address
-	 * and length of the data associated with the specified \b key are returned
-	 * in the structure to which \b data refers.
-	 * If the database supports duplicate keys (#MDB_DUPSORT) then the
-	 * first data item for the key will be returned. Retrieval of other
-	 * items requires the use of #mdb_cursor_get().
-	 *
-	 * \note The memory pointed to by the returned values is owned by the
-	 * database. The caller need not dispose of the memory, and may not
-	 * modify it in any way. For values returned in a read-only transaction
-	 * any modification attempts will cause a SIGSEGV.
-	 * \note Values returned from the database are valid only until a
-	 * subsequent update operation, or the end of the transaction.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param key [in] The key to search for in the database
-	 * @param data [out] The data corresponding to the key
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>#MDB_NOTFOUND - the key was not in the database.
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_get(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_val key, MDB_val data);
-
-	/** \brief Store items into a database.
-	 *
-	 * This function stores key/data pairs in the database. The default behavior
-	 * is to enter the new key/data pair, replacing any previously existing key
-	 * if duplicates are disallowed, or adding a duplicate data item if
-	 * duplicates are allowed (#MDB_DUPSORT).
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param key [in] The key to store in the database
-	 * @param data [in,out] The data to store
-	 * @param flags [in] Special options for this operation. This parameter
-	 * must be set to 0 or by bitwise OR'ing together one or more of the
-	 * values described here.
-	 * <ul>
-	 *	<li>#MDB_NODUPDATA - enter the new key/data pair only if it does not
-	 *		already appear in the database. This flag may only be specified
-	 *		if the database was opened with #MDB_DUPSORT. The function will
-	 *		return #MDB_KEYEXIST if the key/data pair already appears in the
-	 *		database.
-	 *	<li>#MDB_NOOVERWRITE - enter the new key/data pair only if the key
-	 *		does not already appear in the database. The function will return
-	 *		#MDB_KEYEXIST if the key already appears in the database, even if
-	 *		the database supports duplicates (#MDB_DUPSORT). The \b data
-	 *		parameter will be set to point to the existing item.
-	 *	<li>#MDB_RESERVE - reserve space for data of the given size, but
-	 *		don't copy the given data. Instead, return a pointer to the
-	 *		reserved space, which the caller can fill in later - before
-	 *		the next update operation or the transaction ends. This saves
-	 *		an extra memcpy if the data is being generated later.
-	 *		LMDB does nothing else with this memory, the caller is expected
-	 *		to modify all of the space requested. This flag must not be
-	 *		specified if the database was opened with #MDB_DUPSORT.
-	 *	<li>#MDB_APPEND - append the given key/data pair to the end of the
-	 *		database. This option allows fast bulk loading when keys are
-	 *		already known to be in the correct order. Loading unsorted keys
-	 *		with this flag will cause a #MDB_KEYEXIST error.
-	 *	<li>#MDB_APPENDDUP - as above, but for sorted dup data.
-	 * </ul>
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>#MDB_MAP_FULL - the database is full, see #mdb_env_set_mapsize().
-	 *	<li>#MDB_TXN_FULL - the transaction has too many dirty pages.
-	 *	<li>EACCES - an attempt was made to write in a read-only transaction.
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_put(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_val key, MDB_val data,
-			    @Cast("unsigned int") int flags);
-
-	/** \brief Delete items from a database.
-	 *
-	 * This function removes key/data pairs from the database.
-	 * If the database does not support sorted duplicate data items
-	 * (#MDB_DUPSORT) the data parameter is ignored.
-	 * If the database supports sorted duplicates and the data parameter
-	 * is NULL, all of the duplicate data items for the key will be
-	 * deleted. Otherwise, if the data parameter is non-NULL
-	 * only the matching data item will be deleted.
-	 * This function will return #MDB_NOTFOUND if the specified key/data
-	 * pair is not in the database.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param key [in] The key to delete from the database
-	 * @param data [in] The data to delete
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EACCES - an attempt was made to write in a read-only transaction.
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_del(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_val key, MDB_val data);
-
-	/** \brief Create a cursor handle.
-	 *
-	 * A cursor is associated with a specific transaction and database.
-	 * A cursor cannot be used when its database handle is closed.  Nor
-	 * when its transaction has ended, except with #mdb_cursor_renew().
-	 * It can be discarded with #mdb_cursor_close().
-	 * A cursor in a write-transaction can be closed before its transaction
-	 * ends, and will otherwise be closed when its transaction ends.
-	 * A cursor in a read-only transaction must be closed explicitly, before
-	 * or after its transaction ends. It can be reused with
-	 * #mdb_cursor_renew() before finally closing it.
-	 * \note Earlier documentation said that cursors in every transaction
-	 * were closed when the transaction committed or aborted.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param cursor [out] Address where the new #MDB_cursor handle will be stored
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_cursor_open(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("MDB_cursor**") PointerPointer cursor);
-public static native int mdb_cursor_open(MDB_txn txn, @Cast("MDB_dbi") int dbi, @ByPtrPtr MDB_cursor cursor);
-
-	/** \brief Close a cursor handle.
-	 *
-	 * The cursor handle will be freed and must not be used again after this call.
-	 * Its transaction must still be live if it is a write-transaction.
-	 * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
-	 */
-public static native void mdb_cursor_close(MDB_cursor cursor);
-
-	/** \brief Renew a cursor handle.
-	 *
-	 * A cursor is associated with a specific transaction and database.
-	 * Cursors that are only used in read-only
-	 * transactions may be re-used, to avoid unnecessary malloc/free overhead.
-	 * The cursor may be associated with a new read-only transaction, and
-	 * referencing the same database handle as it was created with.
-	 * This may be done whether the previous transaction is live or dead.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_cursor_renew(MDB_txn txn, MDB_cursor cursor);
-
-	/** \brief Return the cursor's transaction handle.
-	 *
-	 * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
-	 */
-public static native MDB_txn mdb_cursor_txn(MDB_cursor cursor);
-
-	/** \brief Return the cursor's database handle.
-	 *
-	 * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
-	 */
-public static native @Cast("MDB_dbi") int mdb_cursor_dbi(MDB_cursor cursor);
-
-	/** \brief Retrieve by cursor.
-	 *
-	 * This function retrieves key/data pairs from the database. The address and length
-	 * of the key are returned in the object to which \b key refers (except for the
-	 * case of the #MDB_SET option, in which the \b key object is unchanged), and
-	 * the address and length of the data are returned in the object to which \b data
-	 * refers.
-	 * See #mdb_get() for restrictions on using the output values.
-	 * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
-	 * @param key [in,out] The key for a retrieved item
-	 * @param data [in,out] The data of a retrieved item
-	 * @param op [in] A cursor operation #MDB_cursor_op
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>#MDB_NOTFOUND - no matching key found.
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_cursor_get(MDB_cursor cursor, MDB_val key, MDB_val data,
-			    @Cast("MDB_cursor_op") int op);
-
-	/** \brief Store by cursor.
-	 *
-	 * This function stores key/data pairs into the database.
-	 * The cursor is positioned at the new item, or on failure usually near it.
-	 * \note Earlier documentation incorrectly said errors would leave the
-	 * state of the cursor unchanged.
-	 * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
-	 * @param key [in] The key operated on.
-	 * @param data [in] The data operated on.
-	 * @param flags [in] Options for this operation. This parameter
-	 * must be set to 0 or one of the values described here.
-	 * <ul>
-	 *	<li>#MDB_CURRENT - replace the item at the current cursor position.
-	 *		The \b key parameter must still be provided, and must match it.
-	 *		If using sorted duplicates (#MDB_DUPSORT) the data item must still
-	 *		sort into the same place. This is intended to be used when the
-	 *		new data is the same size as the old. Otherwise it will simply
-	 *		perform a delete of the old record followed by an insert.
-	 *	<li>#MDB_NODUPDATA - enter the new key/data pair only if it does not
-	 *		already appear in the database. This flag may only be specified
-	 *		if the database was opened with #MDB_DUPSORT. The function will
-	 *		return #MDB_KEYEXIST if the key/data pair already appears in the
-	 *		database.
-	 *	<li>#MDB_NOOVERWRITE - enter the new key/data pair only if the key
-	 *		does not already appear in the database. The function will return
-	 *		#MDB_KEYEXIST if the key already appears in the database, even if
-	 *		the database supports duplicates (#MDB_DUPSORT).
-	 *	<li>#MDB_RESERVE - reserve space for data of the given size, but
-	 *		don't copy the given data. Instead, return a pointer to the
-	 *		reserved space, which the caller can fill in later - before
-	 *		the next update operation or the transaction ends. This saves
-	 *		an extra memcpy if the data is being generated later. This flag
-	 *		must not be specified if the database was opened with #MDB_DUPSORT.
-	 *	<li>#MDB_APPEND - append the given key/data pair to the end of the
-	 *		database. No key comparisons are performed. This option allows
-	 *		fast bulk loading when keys are already known to be in the
-	 *		correct order. Loading unsorted keys with this flag will cause
-	 *		a #MDB_KEYEXIST error.
-	 *	<li>#MDB_APPENDDUP - as above, but for sorted dup data.
-	 *	<li>#MDB_MULTIPLE - store multiple contiguous data elements in a
-	 *		single request. This flag may only be specified if the database
-	 *		was opened with #MDB_DUPFIXED. The \b data argument must be an
-	 *		array of two MDB_vals. The mv_size of the first MDB_val must be
-	 *		the size of a single data element. The mv_data of the first MDB_val
-	 *		must point to the beginning of the array of contiguous data elements.
-	 *		The mv_size of the second MDB_val must be the count of the number
-	 *		of data elements to store. On return this field will be set to
-	 *		the count of the number of elements actually written. The mv_data
-	 *		of the second MDB_val is unused.
-	 * </ul>
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>#MDB_MAP_FULL - the database is full, see #mdb_env_set_mapsize().
-	 *	<li>#MDB_TXN_FULL - the transaction has too many dirty pages.
-	 *	<li>EACCES - an attempt was made to write in a read-only transaction.
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_cursor_put(MDB_cursor cursor, MDB_val key, MDB_val data,
-				@Cast("unsigned int") int flags);
-
-	/** \brief Delete current key/data pair
-	 *
-	 * This function deletes the key/data pair to which the cursor refers.
-	 * This does not invalidate the cursor, so operations such as MDB_NEXT
-	 * can still be used on it.
-	 * Both MDB_NEXT and MDB_GET_CURRENT will return the same record after
-	 * this operation.
-	 * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
-	 * @param flags [in] Options for this operation. This parameter
-	 * must be set to 0 or one of the values described here.
-	 * <ul>
-	 *	<li>#MDB_NODUPDATA - delete all of the data items for the current key.
-	 *		This flag may only be specified if the database was opened with #MDB_DUPSORT.
-	 * </ul>
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EACCES - an attempt was made to write in a read-only transaction.
-	 *	<li>EINVAL - an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_cursor_del(MDB_cursor cursor, @Cast("unsigned int") int flags);
-
-	/** \brief Return count of duplicates for current key.
-	 *
-	 * This call is only valid on databases that support sorted duplicate
-	 * data items #MDB_DUPSORT.
-	 * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
-	 * @param countp [out] Address where the count will be stored
-	 * @return A non-zero error value on failure and 0 on success. Some possible
-	 * errors are:
-	 * <ul>
-	 *	<li>EINVAL - cursor is not initialized, or an invalid parameter was specified.
-	 * </ul>
-	 */
-public static native int mdb_cursor_count(MDB_cursor cursor, @Cast("size_t*") SizeTPointer countp);
-
-	/** \brief Compare two data items according to a particular database.
-	 *
-	 * This returns a comparison as if the two data items were keys in the
-	 * specified database.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param a [in] The first item to compare
-	 * @param b [in] The second item to compare
-	 * @return < 0 if a < b, 0 if a == b, > 0 if a > b
-	 */
-public static native int mdb_cmp(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val a, @Const MDB_val b);
-
-	/** \brief Compare two data items according to a particular database.
-	 *
-	 * This returns a comparison as if the two items were data items of
-	 * the specified database. The database must have the #MDB_DUPSORT flag.
-	 * @param txn [in] A transaction handle returned by #mdb_txn_begin()
-	 * @param dbi [in] A database handle returned by #mdb_dbi_open()
-	 * @param a [in] The first item to compare
-	 * @param b [in] The second item to compare
-	 * @return < 0 if a < b, 0 if a == b, > 0 if a > b
-	 */
-public static native int mdb_dcmp(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val a, @Const MDB_val b);
-
-	/** \brief A callback function used to print a message from the library.
-	 *
-	 * @param msg [in] The string to be printed.
-	 * @param ctx [in] An arbitrary context pointer for the callback.
-	 * @return < 0 on failure, >= 0 on success.
-	 */
-public static class MDB_msg_func extends FunctionPointer {
-    static { Loader.load(); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public    MDB_msg_func(Pointer p) { super(p); }
-    protected MDB_msg_func() { allocate(); }
-    private native void allocate();
-    public native int call(@Cast("const char*") BytePointer msg, Pointer ctx);
-}
-
-	/** \brief Dump the entries in the reader lock table.
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param func [in] A #MDB_msg_func function
-	 * @param ctx [in] Anything the message function needs
-	 * @return < 0 on failure, >= 0 on success.
-	 */
-public static native int mdb_reader_list(MDB_env env, MDB_msg_func func, Pointer ctx);
-
-	/** \brief Check for stale entries in the reader lock table.
-	 *
-	 * @param env [in] An environment handle returned by #mdb_env_create()
-	 * @param dead [out] Number of stale slots that were cleared
-	 * @return 0 on success, non-zero on failure.
-	 */
-public static native int mdb_reader_check(MDB_env env, IntPointer dead);
-public static native int mdb_reader_check(MDB_env env, IntBuffer dead);
-public static native int mdb_reader_check(MDB_env env, int[] dead);
-/**	\} */
-
-// #ifdef __cplusplus
-// #endif
-/** \page tools LMDB Command Line Tools
-	The following describes the command line tools that are available for LMDB.
-	\li \ref mdb_copy_1
-	\li \ref mdb_dump_1
-	\li \ref mdb_load_1
-	\li \ref mdb_stat_1
-*/
-
-// #endif /* _LMDB_H_ */
-
-
-// Parsed from usearch.h
-// Fixed tons of type errors in parsing
-
-// #ifndef UNUM_USEARCH_H
-// #define UNUM_USEARCH_H
-
-// #ifdef __cplusplus
-// #endif
-
-// #ifndef USEARCH_EXPORT
-// #if defined(_WIN32) && !defined(__MINGW32__)
-//public static native @MemberGetter int USEARCH_EXPORT();
-//public static final int USEARCH_EXPORT = USEARCH_EXPORT();
-// #else
-// #define USEARCH_EXPORT
-// #endif
-// #endif
-
-// #include <stdbool.h> // `bool`
-// #include <stddef.h>  // `size_t`
-// #include <stdint.h>  // `uint64_t`
-
-// USEARCH_EXPORT typedef void* usearch_index_t;
-public static class usearch_index_t extends Pointer {
-    // Inherits Pointer's functionality
-    public usearch_index_t() {
-        super();
-    }
-
-    public usearch_index_t(Pointer p) {
-        super(p);
-    }
-}
-
-// USEARCH_EXPORT typedef uint64_t usearch_key_t;
-// Use long directly
-
-// USEARCH_EXPORT typedef float usearch_distance_t;
-// Use float directly
-
-/**
- *  \brief  Pointer to a null-terminated error message.
- *          Returned error messages \b don't need to be deallocated.
- */
-// USEARCH_EXPORT typedef char const* usearch_error_t;
-// Map to bytes
-
-/**
- *  \brief  Type-punned callback for "metrics" or "distance functions",
- *          that accepts pointers to two vectors and measures their \b dis-similarity.
- */
-// USEARCH_EXPORT typedef usearch_distance_t (*usearch_metric_t)(void const*, void const*);
-public static class usearch_metric_t extends FunctionPointer {
-    static { Loader.load(); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public    usearch_metric_t(Pointer p) { super(p); }
-    protected usearch_metric_t() { allocate(); }
-    private native void allocate();
-    public native float call(@Cast("void const*") Pointer vectorA, @Cast("void const*") Pointer vectorB);
-}
-
-
-/**
- *  \brief  Enumerator for the most common kinds of {@code usearch_metric_t}.
- *          Those are supported out of the box, with SIMD-optimizations for most common hardware.
- */
-/** enum usearch_metric_kind_t */
-public static final int
-    usearch_metric_unknown_k = 0,
-    usearch_metric_cos_k = 1,
-    usearch_metric_ip_k = 2,
-    usearch_metric_l2sq_k = 3,
-    usearch_metric_haversine_k = 4,
-    usearch_metric_divergence_k = 5,
-    usearch_metric_pearson_k = 6,
-    usearch_metric_jaccard_k = 7,
-    usearch_metric_hamming_k = 8,
-    usearch_metric_tanimoto_k = 9,
-    usearch_metric_sorensen_k = 10;
-
-/** enum usearch_scalar_kind_t */
-public static final int
-    usearch_scalar_unknown_k = 0,
-    usearch_scalar_f32_k = 1,
-    usearch_scalar_f64_k = 2,
-    usearch_scalar_f16_k = 3,
-    usearch_scalar_i8_k = 4,
-    usearch_scalar_b1_k = 5;
-
-public static class usearch_init_options_t extends Pointer {
-    static { Loader.load(); }
-    /** Default native constructor. */
-    public usearch_init_options_t() { super((Pointer)null); allocate(); }
-    /** Native array allocator. Access with {@link Pointer#position(long)}. */
-    public usearch_init_options_t(long size) { super((Pointer)null); allocateArray(size); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public usearch_init_options_t(Pointer p) { super(p); }
-    private native void allocate();
-    private native void allocateArray(long size);
-    @Override public usearch_init_options_t position(long position) {
-        return (usearch_init_options_t)super.position(position);
-    }
-    @Override public usearch_init_options_t getPointer(long i) {
-        return new usearch_init_options_t((Pointer)this).offsetAddress(i);
-    }
+    // Parsed from lmdb.h
 
     /**
-     *  \brief The metric kind used for distance calculation between vectors.
-     */
-    public native @Cast("usearch_metric_kind_t") int metric_kind(); public native usearch_init_options_t metric_kind(int setter);
-    /**
-     *  \brief The \b optional custom distance metric function used for distance calculation between vectors.
-     *  If the {@code metric_kind} is set to {@code usearch_metric_unknown_k}, this function pointer mustn't be {@code NULL}.
-     */
-    public native usearch_metric_t metric(); public native usearch_init_options_t metric(usearch_metric_t setter);
-    /**
-     *  \brief The scalar kind used for quantization of vector data during indexing.
-     *  In most cases, on modern hardware, it's recommended to use half-precision floating-point numbers.
-     *  When quantization is enabled, the "get"-like functions won't be able to recover the original data,
-     *  so you may want to replicate the original vectors elsewhere.
+     * \file lmdb.h
+     * \brief Lightning memory-mapped database library
      *
-     *  Quantizing to integers is also possible, but it's important to note that it's only valid for cosine-like
-     *  metrics. As part of the quantization process, the vectors are normalized to unit length and later scaled
-     *  to \b [-127,127] range to occupy the full 8-bit range.
+     * \mainpage Lightning Memory-Mapped Database Manager (LMDB)
      *
-     *  Quantizing to 1-bit booleans is also possible, but it's only valid for binary metrics like Jaccard, Hamming,
-     *  etc. As part of the quantization process, the scalar components greater than zero are set to {@code true}, and the
-     *  rest to {@code false}.
+     * \section intro_sec Introduction
+     * LMDB is a Btree-based database management library modeled loosely on the
+     * BerkeleyDB API, but much simplified. The entire database is exposed
+     * in a memory map, and all data fetches return data directly
+     * from the mapped memory, so no malloc's or memcpy's occur during
+     * data fetches. As such, the library is extremely simple because it
+     * requires no page caching layer of its own, and it is extremely high
+     * performance and memory-efficient. It is also fully transactional with
+     * full ACID semantics, and when the memory map is read-only, the
+     * database integrity cannot be corrupted by stray pointer writes from
+     * application code.
+     *
+     * The library is fully thread-aware and supports concurrent read/write
+     * access from multiple processes and threads. Data pages use a copy-on-
+     * write strategy so no active data pages are ever overwritten, which
+     * also provides resistance to corruption and eliminates the need of any
+     * special recovery procedures after a system crash. Writes are fully
+     * serialized; only one write transaction may be active at a time, which
+     * guarantees that writers can never deadlock. The database structure is
+     * multi-versioned so readers run with no locks; writers cannot block
+     * readers, and readers don't block writers.
+     *
+     * Unlike other well-known database mechanisms which use either write-ahead
+     * transaction logs or append-only data writes, LMDB requires no maintenance
+     * during operation. Both write-ahead loggers and append-only databases
+     * require periodic checkpointing and/or compaction of their log or database
+     * files otherwise they grow without bound. LMDB tracks free pages within
+     * the database and re-uses them for new write operations, so the database
+     * size does not grow without bound in normal use.
+     *
+     * The memory map can be used as a read-only or read-write map. It is
+     * read-only by default as this provides total immunity to corruption.
+     * Using read-write mode offers much higher write performance, but adds
+     * the possibility for stray application writes thru pointers to silently
+     * corrupt the database. Of course if your application code is known to
+     * be bug-free (...) then this is not an issue.
+     *
+     * If this is your first time using a transactional embedded key/value
+     * store, you may find the \ref starting page to be helpful.
+     *
+     * \section caveats_sec Caveats
+     * Troubleshooting the lock file, plus semaphores on BSD systems:
+     *
+     * - A broken lockfile can cause sync issues.
+     * Stale reader transactions left behind by an aborted program
+     * cause further writes to grow the database quickly, and
+     * stale locks can block further operation.
+     *
+     * Fix: Check for stale readers periodically, using the
+     * #mdb_reader_check function or the \ref mdb_stat_1 "mdb_stat" tool.
+     * Stale writers will be cleared automatically on some systems:
+     * - Windows - automatic
+     * - Linux, systems using POSIX mutexes with Robust option - automatic
+     * - not on BSD, systems using POSIX semaphores.
+     * Otherwise just make all programs using the database close it;
+     * the lockfile is always reset on first open of the environment.
+     *
+     * - On BSD systems or others configured with MDB_USE_POSIX_SEM,
+     * startup can fail due to semaphores owned by another userid.
+     *
+     * Fix: Open and close the database as the user which owns the
+     * semaphores (likely last user) or as root, while no other
+     * process is using the database.
+     *
+     * Restrictions/caveats (in addition to those listed for some functions):
+     *
+     * - Only the database owner should normally use the database on
+     * BSD systems or when otherwise configured with MDB_USE_POSIX_SEM.
+     * Multiple users can cause startup to fail later, as noted above.
+     *
+     * - There is normally no pure read-only mode, since readers need write
+     * access to locks and lock file. Exceptions: On read-only filesystems
+     * or with the #MDB_NOLOCK flag described under #mdb_env_open().
+     *
+     * - An LMDB configuration will often reserve considerable \b unused
+     * memory address space and maybe file size for future growth.
+     * This does not use actual memory or disk space, but users may need
+     * to understand the difference so they won't be scared off.
+     *
+     * - By default, in versions before 0.9.10, unused portions of the data
+     * file might receive garbage data from memory freed by other code.
+     * (This does not happen when using the #MDB_WRITEMAP flag.) As of
+     * 0.9.10 the default behavior is to initialize such memory before
+     * writing to the data file. Since there may be a slight performance
+     * cost due to this initialization, applications may disable it using
+     * the #MDB_NOMEMINIT flag. Applications handling sensitive data
+     * which must not be written should not use this flag. This flag is
+     * irrelevant when using #MDB_WRITEMAP.
+     *
+     * - A thread can only use one transaction at a time, plus any child
+     * transactions. Each transaction belongs to one thread. See below.
+     * The #MDB_NOTLS flag changes this for read-only transactions.
+     *
+     * - Use an MDB_env* in the process which opened it, not after fork().
+     *
+     * - Do not have open an LMDB database twice in the same process at
+     * the same time. Not even from a plain open() call - close()ing it
+     * breaks fcntl() advisory locking. (It is OK to reopen it after
+     * fork() - exec*(), since the lockfile has FD_CLOEXEC set.)
+     *
+     * - Avoid long-lived transactions. Read transactions prevent
+     * reuse of pages freed by newer write transactions, thus the
+     * database can grow quickly. Write transactions prevent
+     * other write transactions, since writes are serialized.
+     *
+     * - Avoid suspending a process with active transactions. These
+     * would then be "long-lived" as above. Also read transactions
+     * suspended when writers commit could sometimes see wrong data.
+     *
+     * ...when several processes can use a database concurrently:
+     *
+     * - Avoid aborting a process with an active transaction.
+     * The transaction becomes "long-lived" as above until a check
+     * for stale readers is performed or the lockfile is reset,
+     * since the process may not remove it from the lockfile.
+     *
+     * This does not apply to write transactions if the system clears
+     * stale writers, see above.
+     *
+     * - If you do that anyway, do a periodic check for stale readers. Or
+     * close the environment once in a while, so the lockfile can get reset.
+     *
+     * - Do not use LMDB databases on remote filesystems, even between
+     * processes on the same host. This breaks flock() on some OSes,
+     * possibly memory map sync, and certainly sync between programs
+     * on different hosts.
+     *
+     * - Opening a database can fail if another process is opening or
+     * closing it at exactly the same time.
+     *
+     * @author Howard Chu, Symas Corporation.
+     *
+     *         \copyright Copyright 2011-2021 Howard Chu, Symas Corp. All rights
+     *         reserved.
+     *
+     *         Redistribution and use in source and binary forms, with or without
+     *         modification, are permitted only as authorized by the OpenLDAP
+     *         Public License.
+     *
+     *         A copy of this license is available in the file LICENSE in the
+     *         top-level directory of the distribution or, alternatively, at
+     *         <http://www.OpenLDAP.org/license.html>.
+     *
+     *         \par Derived From:
+     *         This code is derived from btree.c written by Martin Hedenfalk.
+     *
+     *         Copyright (c) 2009, 2010 Martin Hedenfalk <martin\bzero.se>
+     *
+     *         Permission to use, copy, modify, and distribute this software for any
+     *         purpose with or without fee is hereby granted, provided that the
+     *         above
+     *         copyright notice and this permission notice appear in all copies.
+     *
+     *         THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+     *         WARRANTIES
+     *         WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+     *         MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE
+     *         FOR
+     *         ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
+     *         DAMAGES
+     *         WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+     *         ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+     *         OF
+     *         OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
      */
-    public native @Cast("usearch_scalar_kind_t") int quantization(); public native usearch_init_options_t quantization(int setter);
+    // #ifndef _LMDB_H_
+    // #define _LMDB_H_
+
+    // #include <sys/types.h>
+
+    // #ifdef __cplusplus
+    // #endif
+
+    /** Unix permissions for creating files, or dummy definition for Windows */
+    // #ifdef _MSC_VER
+    // #else
+    // #endif
+
     /**
-     *  \brief The number of dimensions in the vectors to be indexed.
-     *  Must be defined for most metrics, but can be avoided for {@code usearch_metric_haversine_k}.
+     * An abstraction for a file handle.
+     * On POSIX systems file handles are small integers. On Windows
+     * they're opaque pointers.
      */
-    public native @Cast("size_t") long dimensions(); public native usearch_init_options_t dimensions(long setter);
+    // #ifdef _WIN32
+    // @Namespace @Name("void") @Opaque public static class mdb_filehandle_t extends
+    // Pointer {
+    // [>* Empty constructor. Calls {@code super((Pointer)null)}. <]
+    // public mdb_filehandle_t() { super((Pointer)null); }
+    // [>* Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. <]
+    // public mdb_filehandle_t(Pointer p) { super(p); }
+    // }
+    // #else
+    // #endif
+
     /**
-     *  \brief The \b optional connectivity parameter that limits connections-per-node in graph.
+     * \defgroup mdb LMDB API
+     * \{
+     * \brief OpenLDAP Lightning Memory-Mapped Database Manager
      */
-    public native @Cast("size_t") long connectivity(); public native usearch_init_options_t connectivity(long setter);
     /**
-     *  \brief The \b optional expansion factor used for index construction when adding vectors.
+     * \defgroup Version Version Macros
+     * \{
      */
-    public native @Cast("size_t") long expansion_add(); public native usearch_init_options_t expansion_add(long setter);
+    /** Library major version */
+    public static final int MDB_VERSION_MAJOR = 0;
+    /** Library minor version */
+    public static final int MDB_VERSION_MINOR = 9;
+    /** Library patch version */
+    public static final int MDB_VERSION_PATCH = 33;
+
+    /** Combine args a,b,c into a single integer for easy version comparisons */
+    // #define MDB_VERINT(a,b,c) (((a) << 24) | ((b) << 16) | (c))
+
+    /** The full library version as a single integer */
+    // public static final int MDB_VERSION_FULL =
+    // MDB_VERINT(MDB_VERSION_MAJOR,MDB_VERSION_MINOR,MDB_VERSION_PATCH);
+
+    /** The release date of this library version */
+    // public static final String MDB_VERSION_DATE = "May 21, 2024";
+
+    /** A stringifier for the version info */
+    // #define MDB_VERSTR(a,b,c,d) "LMDB " #a "." #b "." #c ": (" d ")"
+
+    /** A helper for the stringifier macro */
+    // #define MDB_VERFOO(a,b,c,d) MDB_VERSTR(a,b,c,d)
+
+    /** The full library version as a C string */
+    // public static final int MDB_VERSION_STRING =
+    // MDB_VERFOO(MDB_VERSION_MAJOR,MDB_VERSION_MINOR,MDB_VERSION_PATCH,MDB_VERSION_DATE);
+    /** \} */
+
     /**
-     *  \brief The \b optional expansion factor used for index construction during search operations.
+     * \brief Opaque structure for a database environment.
+     *
+     * A DB environment supports multiple databases, all residing in the same
+     * shared-memory map.
      */
-    public native @Cast("size_t") long expansion_search(); public native usearch_init_options_t expansion_search(long setter);
+    @Opaque
+    public static class MDB_env extends Pointer {
+        /** Empty constructor. Calls {@code super((Pointer)null)}. */
+        public MDB_env() {
+            super((Pointer) null);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public MDB_env(Pointer p) {
+            super(p);
+        }
+    }
+
     /**
-     *  \brief When set allows multiple vectors to map to the same key.
+     * \brief Opaque structure for a transaction handle.
+     *
+     * All database operations require a transaction handle. Transactions may be
+     * read-only or read-write.
      */
-    public native @Cast("bool") boolean multi(); public native usearch_init_options_t multi(boolean setter);
-}
-
-/**
- *  \brief Retrieves the version of the library.
- *  @return The version of the library.
- */
-public static native @Const BytePointer usearch_version();
-
-/**
- *  \brief Initializes a new instance of the index.
- *  @param options Pointer to the {@code usearch_init_options_t} structure containing initialization options.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return A handle to the initialized USearch index, or {@code NULL} on failure.
- */
-public static native @Cast("usearch_index_t") Pointer usearch_init(usearch_init_options_t options, @Cast("usearch_error_t*") BytePointer error);
-public static native @Cast("usearch_index_t") Pointer usearch_init(usearch_init_options_t options, @Cast("usearch_error_t*") ByteBuffer error);
-public static native @Cast("usearch_index_t") Pointer usearch_init(usearch_init_options_t options, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Frees the resources associated with the index.
- *  @param index [inout] The handle to the USearch index to be freed.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Reports the memory usage of the index.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return Number of bytes used by the index.
- */
-public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Reports the SIMD capabilities used by the index on the current CPU.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return The codename of the SIMD instruction set used by the index.
- */
-public static native @Const BytePointer usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-public static native @Const ByteBuffer usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
-public static native @Const byte[] usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Reports expected file size after serialization.
- *  @param index [in] The handle to the USearch index to be serialized.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Saves the index to a file.
- *  @param index [in] The handle to the USearch index to be serialized.
- *  @param path [in] The file path where the index will be saved.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
-public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Loads the index from a file.
- *  @param index [inout] The handle to the USearch index to be populated from path.
- *  @param path [in] The file path from where the index will be loaded.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
-public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Creates a view of the index from a file without copying it into memory.
- *  @param index [inout] The handle to the USearch index to be populated with a file view.
- *  @param path [in] The file path from where the view will be created.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
-public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Loads index metadata from a file.
- *  @param path [in] The file path from where the index will be loaded.
- *  @param options [out] Pointer to the {@code usearch_init_options_t} structure to be populated.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_metadata(String path, usearch_init_options_t options, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options, @Cast("usearch_error_t*") byte[] error);
-public static native void usearch_metadata(String path, usearch_init_options_t options, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_metadata(String path, usearch_init_options_t options, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Saves the index to an in-memory buffer.
- *  @param index [in] The handle to the USearch index to be serialized.
- *  @param buffer [in] The in-memory continuous buffer where the index will be saved.
- *  @param length [in] The length of the buffer in bytes.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer, @Cast("size_t") long length, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer, @Cast("size_t") long length, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer, @Cast("size_t") long length, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Loads the index from an in-memory buffer.
- *  @param index [inout] The handle to the USearch index to be populated from buffer.
- *  @param buffer [in] The in-memory continuous buffer from where the index will be loaded.
- *  @param length [in] The length of the buffer in bytes.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
-                                        @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
-                                        @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
-                                        @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Creates a view of the index from an in-memory buffer without copying it into memory.
- *  @param index [inout] The handle to the USearch index to be populated with a buffer view.
- *  @param buffer [in] The in-memory continuous buffer from where the view will be created.
- *  @param length [in] The length of the buffer in bytes.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
-                                        @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
-                                        @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Const Pointer buffer, @Cast("size_t") long length,
-                                        @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Loads index metadata from an in-memory buffer.
- *  @param buffer [in] The in-memory continuous buffer from where the view will be created.
- *  @param options [out] Pointer to the {@code usearch_init_options_t} structure to be populated.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_metadata_buffer(@Const Pointer buffer, @Cast("size_t") long length, usearch_init_options_t options,
-                                            @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_metadata_buffer(@Const Pointer buffer, @Cast("size_t") long length, usearch_init_options_t options,
-                                            @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_metadata_buffer(@Const Pointer buffer, @Cast("size_t") long length, usearch_init_options_t options,
-                                            @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Reports the current size (number of vectors) of the index.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Reports the current capacity (number of vectors) of the index.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Reports the current dimensions of the vectors in the index.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Reports the current connectivity of the index.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Reserves memory for a specified number of incoming vectors.
- *  @param index [inout] The handle to the USearch index to be resized.
- *  @param capacity [in] The desired total capacity including current size.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long _capacity, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long _capacity, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long _capacity, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Retrieves the expansion value used during index creation.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return The expansion value used during index creation.
- */
-public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Retrieves the expansion value used during search.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return The expansion value used during search.
- */
-public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Updates the expansion value used during index creation. Rarely used.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param expansion [in] The new expansion value.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Updates the expansion value used during search. Rarely used.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param expansion [in] The new expansion value.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long expansion, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Updates the number of threads that would be used to construct the index. Rarely used.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param threads [in] The new limit for the number of concurrent threads.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Updates the number of threads that will be performing concurrent traversals. Rarely used.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param threads [in] The new limit for the number of concurrent threads.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index, @Cast("size_t") long threads, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Updates the metric kind used for distance calculation between vectors.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param kind [in] The metric kind used for distance calculation between vectors.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_metric_kind_t") int kind,
-                                               @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_metric_kind_t") int kind,
-                                               @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_metric_kind_t") int kind,
-                                               @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Updates the custom metric function used for distance calculation between vectors.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param metric [in] The custom metric function used for distance calculation between vectors.
- *  @param state [in] The \b optional state pointer to be passed to the custom metric function.
- *  @param kind [in] The metric kind used for distance calculation between vectors. Needed for serialization.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index, usearch_metric_t metric, Pointer state,
-                                          @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index, usearch_metric_t metric, Pointer state,
-                                          @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index, usearch_metric_t metric, Pointer state,
-                                          @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Adds a vector with a key to the index.
- *  @param index [inout] The handle to the USearch index to be populated.
- *  @param key [in] The key associated with the vector.
- *  @param vector [in] Pointer to the vector data.
- *  @param vector_kind [in] The scalar type used in the vector data.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_add(
-    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
-    @Const Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_add(
-    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
-    @Const Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_add(
-    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
-    @Const Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Checks if the index contains a vector with a specific key.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param key [in] The key to be checked.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return {@code true} if the index contains the vector with the given key, {@code false} otherwise.
- */
-public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
-public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
-public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Counts the number of entries in the index under a specific key.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param key [in] The key to be checked.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return Number of vectors found under that key.
- */
-public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Performs k-Approximate Nearest Neighbors (kANN) Search for closest vectors to query.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param query_vector [in] Pointer to the query vector data.
- *  @param query_kind [in] The scalar type used in the query vector data.
- *  @param count [in] Upper bound on the number of neighbors to search, the "k" in "kANN".
- *  @param keys [out] Output buffer for up to {@code count} nearest neighbors keys.
- *  @param distances [out] Output buffer for up to {@code count} distances to nearest neighbors.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return Number of found matches.
- */
-public static native long usearch_search(
-    @Cast("usearch_index_t") usearch_index_t index,
-    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
-    @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_search(
-    @Cast("usearch_index_t") usearch_index_t index,
-    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
-    @Cast("usearch_key_t*") LongBuffer keys, @Cast("usearch_distance_t*") FloatBuffer distances, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_search(
-    @Cast("usearch_index_t") usearch_index_t index,
-    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
-    @Cast("usearch_key_t*") long[] keys, @Cast("usearch_distance_t*") float[] distances, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief  Performs k-Approximate Nearest Neighbors (kANN) Search for closest vectors to query,
- *          predicated on a custom function that returns {@code true} for vectors to be included.
- *
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param query_vector [in] Pointer to the query vector data.
- *  @param query_kind [in] The scalar type used in the query vector data.
- *  @param count [in] Upper bound on the number of neighbors to search, the "k" in "kANN".
- *  @param filter [in] The custom filter function that returns {@code true} for vectors to be included.
- *  @param filter_state [in] The \b optional state pointer to be passed to the custom filter function.
- *  @param keys [out] Output buffer for up to {@code count} nearest neighbors keys.
- *  @param distances [out] Output buffer for up to {@code count} distances to nearest neighbors.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return Number of found matches.
- */
-public static class Filter extends FunctionPointer {
-    static { Loader.load(); }
-    /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    public    Filter(Pointer p) { super(p); }
-    protected Filter() { allocate(); }
-    private native void allocate();
-    public native int call(@Cast("usearch_key_t") long key, Pointer filter_state);
-}
-public static native long usearch_filtered_search(
-    @Cast("usearch_index_t") usearch_index_t index,
-    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
-    Filter filter, Pointer filter_state,
-    @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_filtered_search(
-    @Cast("usearch_index_t") usearch_index_t index,
-    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
-    Filter filter, Pointer filter_state,
-    @Cast("usearch_key_t*") LongBuffer keys, @Cast("usearch_distance_t*") FloatBuffer distances, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_filtered_search(
-    @Cast("usearch_index_t") usearch_index_t index,
-    @Const Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
-    Filter filter, Pointer filter_state,
-    @Cast("usearch_key_t*") long[] keys, @Cast("usearch_distance_t*") float[] distances, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Retrieves the vector associated with the given key from the index.
- *  @param index [in] The handle to the USearch index to be queried.
- *  @param key [in] The key of the vector to retrieve.
- *  @param vector [out] Pointer to the memory where the vector data will be copied.
- *  @param count [in] Number of vectors that can be fitted into {@code vector} for multi-vector entries.
- *  @param vector_kind [in] The scalar type used in the vector data.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return Number of vectors found under that name and exported to {@code vector}.
- */
-public static native long usearch_get(
-    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
-    Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_get(
-    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
-    Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_get(
-    @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
-    Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Removes the vector associated with the given key from the index.
- *  @param index [inout] The handle to the USearch index to be modified.
- *  @param key [in] The key of the vector to be removed.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return Number of vectors found under that name and dropped from the index.
- */
-public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Renames the vector to map to a different key.
- *  @param index [inout] The handle to the USearch index to be modified.
- *  @param from [in] The key of the vector to be renamed.
- *  @param to [in] New key for found entry.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return Number of vectors found under that name and renamed.
- */
-public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
-                                     @Cast("usearch_error_t*") BytePointer error);
-public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
-                                     @Cast("usearch_error_t*") ByteBuffer error);
-public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
-                                     @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Computes the distance between two equi-dimensional vectors.
- *  @param vector_first [in] The first vector for comparison.
- *  @param vector_second [in] The second vector for comparison.
- *  @param scalar_kind [in] The scalar type used in the vectors.
- *  @param dimensions [in] The number of dimensions in each vector.
- *  @param metric_kind [in] The metric kind used for distance calculation between vectors.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- *  @return Distance between given vectors.
- */
-public static native float usearch_distance(
-    @Const Pointer vector_first, @Const Pointer vector_second,
-    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") BytePointer error);
-public static native float usearch_distance(
-    @Const Pointer vector_first, @Const Pointer vector_second,
-    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") ByteBuffer error);
-public static native float usearch_distance(
-    @Const Pointer vector_first, @Const Pointer vector_second,
-    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") byte[] error);
-
-/**
- *  \brief Multi-threaded many-to-many exact nearest neighbors search for equi-dimensional vectors.
- *  @param dataset [in] Pointer to the first scalar of the dataset matrix.
- *  @param queries [in] Pointer to the first scalar of the queries matrix.
- *  @param dataset_size [in] Number of vectors in the {@code dataset}.
- *  @param queries_size [in] Number of vectors in the {@code queries} set.
- *  @param dataset_stride [in] Number of bytes between starts of consecutive vectors in {@code dataset}.
- *  @param queries_stride [in] Number of bytes between starts of consecutive vectors in {@code queries}.
- *  @param scalar_kind [in] The scalar type used in the vectors.
- *  @param dimensions [in] The number of dimensions in each vector.
- *  @param metric_kind [in] The metric kind used for distance calculation between vectors.
- *  @param count [in] Upper bound on the number of neighbors to search, the "k" in "kANN".
- *  @param threads [in] Upper bound for the number of CPU threads to use.
- *  @param keys [out] Output matrix for {@code queries_size * count} nearest neighbors keys. Each row of the
- *              matrix must be contiguous in memory, but different rows can be separated by {@code keys_stride} bytes.
- *  @param keys_stride [in] Number of bytes between starts of consecutive rows od scalars in {@code keys}.
- *  @param distances [out] Output matrix for {@code queries_size * count} distances to nearest neighbors. Each row of the
- *              matrix must be contiguous in memory, but different rows can be separated by {@code keys_stride} bytes.
- *  @param distances_stride [in] Number of bytes between starts of consecutive rows od scalars in {@code distances}.
- *  @param error [out] Pointer to a string where the error message will be stored, if an error occurs.
- */
-public static native void usearch_exact_search(
-    @Const Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
-    @Const Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
-    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
-    @Cast("usearch_key_t*") LongPointer keys, @Cast("size_t") long keys_stride,
-    @Cast("usearch_distance_t*") FloatPointer distances, @Cast("size_t") long distances_stride,
-    @Cast("usearch_error_t*") BytePointer error);
-public static native void usearch_exact_search(
-    @Const Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
-    @Const Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
-    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
-    @Cast("usearch_key_t*") LongBuffer keys, @Cast("size_t") long keys_stride,
-    @Cast("usearch_distance_t*") FloatBuffer distances, @Cast("size_t") long distances_stride,
-    @Cast("usearch_error_t*") ByteBuffer error);
-public static native void usearch_exact_search(
-    @Const Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
-    @Const Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
-    @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-    @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
-    @Cast("usearch_key_t*") long[] keys, @Cast("size_t") long keys_stride,
-    @Cast("usearch_distance_t*") float[] distances, @Cast("size_t") long distances_stride,
-    @Cast("usearch_error_t*") byte[] error);
-
-// #ifdef __cplusplus
-// #endif
-
-// #endif // UNUM_USEARCH_H
-
-
-// Parsed from dtlv.h
-
-/** \file dtlv.h
- *	Native supporting functions for Datalevin: a simple, fast and
- *  versatile Datalog database.
- *
- *  Datalevin works with LMDB, a Btree based key value store. This library
- *  provides an iterator interface to LMDB.
- *
- *	@author	Huahai Yang
- *
- *	\copyright Copyright 2020-2025. Huahai Yang. All rights reserved.
- *
- *  This code is released under Eclipse Public License 2.0.
- */
-
-// #include "lmdb/libraries/liblmdb/lmdb.h"
-// #include "usearch/c/usearch.h"
-
-// #ifdef __cplusplus
-// #endif
-
-public static final int DTLV_TRUE =	  255;
-public static final int DTLV_FALSE =	256;
-
- /**
-  * The main comparator that compare bytes in order.
-  */
-  public static native int dtlv_cmp_memn(@Const MDB_val a, @Const MDB_val b);
-
- /**
-  * Set the comparator for a DBI to the main comparator.
-  */
-  public static native int dtlv_set_comparator(MDB_txn txn, int dbi);
-
- /**
-  * Set the comparator for a list DBI to the main comparator.
-  */
-  public static native int dtlv_set_dupsort_comparator(MDB_txn txn, int dbi);
-
- /**
-  * Opaque structure for a iterator that iterates by keys only.
-  */
-  @Opaque public static class dtlv_key_iter extends Pointer {
-      /** Empty constructor. Calls {@code super((Pointer)null)}. */
-      public dtlv_key_iter() { super((Pointer)null); }
-      /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-      public dtlv_key_iter(Pointer p) { super(p); }
-  }
-
- /**
-  * A function to create a key iterator.
-  *
-  * @param iter The address where the iterator will be stored.
-  * @param cur The cursor.
-  * @param key Holder for the key.
-  * @param val Holder for the value.
-  * @param forward iterate forward (DTLV_TRUE) or backward (DTLV_FALSE).
-  * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
-  * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
-  * @param start_key The start key, could be null
-  * @param end_key The end key, could be null.
-  * @return A non-zero error value on failure and 0 on success.
-  */
-  public static native int dtlv_key_iter_create(@Cast("dtlv_key_iter**") PointerPointer iter,
-                             MDB_cursor cur, MDB_val key, MDB_val val,
-                             int forward, int start, int end,
-                             MDB_val start_key, MDB_val end_key);
-  public static native int dtlv_key_iter_create(@ByPtrPtr dtlv_key_iter iter,
-                             MDB_cursor cur, MDB_val key, MDB_val val,
-                             int forward, int start, int end,
-                             MDB_val start_key, MDB_val end_key);
-
-  /**
-   * A function to indicate if the key iterator has the next item. If it does,
-   * the key will be in the key argument passed to dtlv_key_iter_create, same
-   * with value.
-   *
-   * @param iter The iterator handle.
-   * @return DTLV_TRUE on true,  DTLV_FALSE on false, or an error code.
-   */
-  public static native int dtlv_key_iter_has_next(dtlv_key_iter iter);
-
- /**
-  * A function to release memory of the iterator.
-  *
-  * @param iter The iterator handle.
-  */
-  public static native void dtlv_key_iter_destroy(dtlv_key_iter iter);
-
-  /**
-   * Opaque structure for a list iterator that iterates both key and values (list)
-   * for a dupsort DBI.
-   */
-  @Opaque public static class dtlv_list_iter extends Pointer {
-      /** Empty constructor. Calls {@code super((Pointer)null)}. */
-      public dtlv_list_iter() { super((Pointer)null); }
-      /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-      public dtlv_list_iter(Pointer p) { super(p); }
-  }
-
- /**
-  * A function to create a list iterator.
-  *
-  * @param iter The address where the iterator will be stored.
-  * @param cur The cursor.
-  * @param key Holder for the key.
-  * @param val Holder for the value.
-  * @param kforward iterate keys forward (DTLV_TRUE) or not.
-  * @param kstart if to include (DTLV_TRUE) or not the start_key.
-  * @param kend if to include (DTLV_TRUE) or not the end_key.
-  * @param start_key The start key.
-  * @param end_key The end key..
-  * @param vforward iterate values forward (DTLV_TRUE) or not.
-  * @param vstart if to include (DTLV_TRUE) or not the start_val.
-  * @param vend if to include (DTLV_TRUE) or not the end_val.
-  * @param start_val The start value.
-  * @param end_val The end value.
-  * @return A non-zero error value on failure and 0 on success.
-  */
-  public static native int dtlv_list_iter_create(@Cast("dtlv_list_iter**") PointerPointer iter,
-                              MDB_cursor cur, MDB_val key, MDB_val val,
-                              int kforward, int kstart, int kend,
-                              MDB_val start_key, MDB_val end_key,
-                              int vforward, int vstart, int vend,
-                              MDB_val start_val, MDB_val end_val);
-  public static native int dtlv_list_iter_create(@ByPtrPtr dtlv_list_iter iter,
-                              MDB_cursor cur, MDB_val key, MDB_val val,
-                              int kforward, int kstart, int kend,
-                              MDB_val start_key, MDB_val end_key,
-                              int vforward, int vstart, int vend,
-                              MDB_val start_val, MDB_val end_val);
-
- /**
-  * A function to indicate if the list iterator has the next item. If it
-  * does, the key will be in the key argument passed to dtlv_list_iter_create,
-  * the same with value.
-  *
-  * @param iter The iterator handle.
-  * @return DTLV_TRUE on true and DTLV_FALSE on false.
-  */
-  public static native int dtlv_list_iter_has_next(dtlv_list_iter iter);
-
- /**
-  * A function to destroy the list iterator.
-  *
-  * @param iter The iterator handle.
-  */
-  public static native void dtlv_list_iter_destroy(dtlv_list_iter iter);
-
- /**
-  * Opaque structure for a list value iterator that iterates values
-  * (forward only currently) of keys for a dupsort DBI.
-  */
-  @Opaque public static class dtlv_list_val_iter extends Pointer {
-      /** Empty constructor. Calls {@code super((Pointer)null)}. */
-      public dtlv_list_val_iter() { super((Pointer)null); }
-      /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-      public dtlv_list_val_iter(Pointer p) { super(p); }
-  }
-
- /**
-  * A function to create a list values iterator.
-  *
-  * @param iter The address where the iterator will be stored.
-  * @param cur The cursor.
-  * @param key Holder for the key.
-  * @param val Holder for the value.
-  * @param vstart if to include (DTLV_TRUE) or not the start_val.
-  * @param vend if to include (DTLV_TRUE) or not the end_val.
-  * @param start_val The start value..
-  * @param end_val The end value.
-  * @return A non-zero error value on failure and 0 on success.
-  */
-  public static native int dtlv_list_val_iter_create(@Cast("dtlv_list_val_iter**") PointerPointer iter,
-                                  MDB_cursor cur, MDB_val key, MDB_val val,
-                                  int vstart, int vend,
-                                  MDB_val start_val, MDB_val end_val);
-  public static native int dtlv_list_val_iter_create(@ByPtrPtr dtlv_list_val_iter iter,
-                                  MDB_cursor cur, MDB_val key, MDB_val val,
-                                  int vstart, int vend,
-                                  MDB_val start_val, MDB_val end_val);
-
- /**
-  * A function to seek to a key.
-  *
-  * @param iter The iterator handle.
-  * @param k The key to seek.
-  * @return DTLV_TRUE on found and DTLV_FALSE when not found.
-  */
-  public static native int dtlv_list_val_iter_seek(dtlv_list_val_iter iter, MDB_val k);
-
- /**
-  * A function to indicate if the iterator has the next item. If it does,
-  * the value will be in val argument passed to dtlv_list_val_iter_create.
-  *
-  * @param iter The iterator handle.
-  * @return DTLV_TRUE on true and DTLV_FALSE on false.
-  */
-  public static native int dtlv_list_val_iter_has_next(dtlv_list_val_iter iter);
-
- /**
-  * A function to destroy the list val iterator.
-  *
-  * @param iter The iterator handle.
-  */
-  public static native void dtlv_list_val_iter_destroy(dtlv_list_val_iter iter);
-
- /**
-  * Opaque structure for a list value iterator that iterates all values
-  * of the key, without value comparisons, for a dupsort DBI.
-  */
-  @Opaque public static class dtlv_list_val_full_iter extends Pointer {
-      /** Empty constructor. Calls {@code super((Pointer)null)}. */
-      public dtlv_list_val_full_iter() { super((Pointer)null); }
-      /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-      public dtlv_list_val_full_iter(Pointer p) { super(p); }
-  }
-
- /**
-  * A function to create a list values full iterator.
-  *
-  * @param iter The address where the iterator will be stored.
-  * @param cur The cursor.
-  * @param key Holder for the key.
-  * @param val Holder for the value.
-  * @return A non-zero error value on failure and 0 on success.
-  */
-  public static native int dtlv_list_val_full_iter_create(@Cast("dtlv_list_val_full_iter**") PointerPointer iter,
-                                       MDB_cursor cur,
-                                       MDB_val key, MDB_val val);
-  public static native int dtlv_list_val_full_iter_create(@ByPtrPtr dtlv_list_val_full_iter iter,
-                                       MDB_cursor cur,
-                                       MDB_val key, MDB_val val);
-
- /**
-  * A function to seek to a key.
-  *
-  * @param iter The iterator handle.
-  * @param k The key to seek.
-  * @return DTLV_TRUE on found and DTLV_FALSE when not found.
-  */
-  public static native int dtlv_list_val_full_iter_seek(dtlv_list_val_full_iter iter, MDB_val k);
-
- /**
-  * A function to indicate if the iterator has the next item. If it does,
-  * the value will be in val argument passed to dtlv_list_val_full_iter_create.
-  *
-  * @param iter The iterator handle.
-  * @return DTLV_TRUE on true and DTLV_FALSE on false.
-  */
-  public static native int dtlv_list_val_full_iter_has_next(dtlv_list_val_full_iter iter);
-
- /**
-  * A function to destroy the list val full iterator.
-  *
-  * @param iter The iterator handle.
-  */
-  public static native void dtlv_list_val_full_iter_destroy(dtlv_list_val_full_iter iter);
-
- /**
-  * A function to return the count of values for a key.
-  *
-  * @param iter The cursor.
-  * @param key Holder for the key.
-  * @param val Holder for the value.
-  * @return The value count.
-  */
-  public static native @Cast("size_t") long dtlv_list_val_count(MDB_cursor cur, MDB_val key, MDB_val val);
-
-  /**
-  * A function to return the number of key-values in the specified value range of
-  * the specified key range, for a dupsort DBI.
-  *
-  * @param cur The cursor.
-  * @param key Holder for the key.
-  * @param val Holder for the value.
-  * @param kforward iterate keys forward (DTLV_TRUE) or not.
-  * @param kstart if to include (DTLV_TRUE) or not the start_key.
-  * @param kend if to include (DTLV_TRUE) or not the end_key.
-  * @param start_key The start key.
-  * @param end_key The end key..
-  * @param vforward iterate vals forward (DTLV_TRUE) or not.
-  * @param vstart if to include (DTLV_TRUE) or not the start_val.
-  * @param vend if to include (DTLV_TRUE) or not the end_val.
-  * @param start_val The start value.
-  * @param end_val The end value.
-  * @return The count
-  */
-  public static native @Cast("size_t") long dtlv_list_range_count(MDB_cursor cur,
-                                 MDB_val key, MDB_val val,
-                                 int kforward, int kstart, int kend,
-                                 MDB_val start_key, MDB_val end_key,
-                                 int vforward, int vstart, int vend,
-                                 MDB_val start_val, MDB_val end_val);
-
- /**
-  * A function to return the number of key-values in the specified value range of
-  * the specified key range, for a dupsort DBI. Capped. When cap is reached, stop
-  * counting and return cap;
-  *
-  * @param cur The cursor.
-  * @param cap The cap.
-  * @param key Holder for the key.
-  * @param val Holder for the value.
-  * @param kforward iterate keys forward (DTLV_TRUE) or not.
-  * @param kstart if to include (DTLV_TRUE) or not the start_key.
-  * @param kend if to include (DTLV_TRUE) or not the end_key.
-  * @param start_key The start key.
-  * @param end_key The end key..
-  * @param vforward iterate vals forward (DTLV_TRUE) or not.
-  * @param vstart if to include (DTLV_TRUE) or not the start_val.
-  * @param vend if to include (DTLV_TRUE) or not the end_val.
-  * @param start_val The start value.
-  * @param end_val The end value.
-  * @return The count
-  */
-  public static native @Cast("size_t") long dtlv_list_range_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
-                                     MDB_val key, MDB_val val,
-                                     int kforward, int kstart, int kend,
-                                     MDB_val start_key, MDB_val end_key,
-                                     int vforward, int vstart, int vend,
-                                     MDB_val start_val, MDB_val end_val);
-
-  /**
-   * A function to return the number of keys in a key range.
-   *
-   * @param cur The cursor.
-   * @param key Holder for the key.
-   * @param val Holder for the value.
-   * @param forward iterate keys forward (DTLV_TRUE) or not.
-   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
-   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
-   * @param start_key The start key, could be null
-   * @param end_key The end key, could be null.
-   * @return The count
-   */
-  public static native @Cast("size_t") long dtlv_key_range_count(MDB_cursor cur,
-                                MDB_val key, MDB_val val,
-                                int forward, int start, int end,
-                                MDB_val start_key, MDB_val end_key);
-
-  /**
-   * A function to return the number of keys in a key range. Capped. When cap is
-   * reached, stop counting and return cap;
-   *
-   * @param cur The cursor.
-   * @param cap The cap.
-   * @param key Holder for the key.
-   * @param val Holder for the value.
-   * @param forward iterate keys forward (DTLV_TRUE) or not.
-   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
-   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
-   * @param start_key The start key, could be null
-   * @param end_key The end key, could be null.
-   * @return The count
-   */
-  public static native @Cast("size_t") long dtlv_key_range_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
-                                    MDB_val key, MDB_val val,
-                                    int forward, int start, int end,
-                                    MDB_val start_key, MDB_val end_key);
-
-  /**
-   * A function to return the total number of values in a key range, for a
-   * dupsort DBI.
-   *
-   * @param cur The cursor.
-   * @param key Holder for the key.
-   * @param val Holder for the value.
-   * @param forward iterate keys forward (DTLV_TRUE) or not.
-   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
-   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
-   * @param start_key The start key, could be null
-   * @param end_key The end key, could be null.
-   * @return The count
-   */
-  public static native @Cast("size_t") long dtlv_key_range_list_count(MDB_cursor cur,
-                                     MDB_val key, MDB_val val,
-                                     int forward, int start, int end,
-                                     MDB_val start_key, MDB_val end_key);
-
-  /**
-   * A function to return the total number of values in a key range, for a
-   * dupsort DBI. Capped. When cap is reached, stop counting and return
-   * cap;
-   *
-   * @param cur The cursor.
-   * @param cap The cap.
-   * @param key Holder for the key.
-   * @param val Holder for the value.
-   * @param forward iterate keys forward (DTLV_TRUE) or not.
-   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
-   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
-   * @param start_key The start key, could be null
-   * @param end_key The end key, could be null.
-   * @return The count
-   */
-  public static native @Cast("size_t") long dtlv_key_range_list_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
-                                         MDB_val key, MDB_val val,
-                                         int forward, int start, int end,
-                                         MDB_val start_key, MDB_val end_key);
-
-  /**
-   * Opaque structure for a list sample iterator that return samples
-   * for a dupsort DBI.
-   */
-  @Opaque public static class dtlv_list_sample_iter extends Pointer {
-      /** Empty constructor. Calls {@code super((Pointer)null)}. */
-      public dtlv_list_sample_iter() { super((Pointer)null); }
-      /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-      public dtlv_list_sample_iter(Pointer p) { super(p); }
-  }
-
- /**
-  * A function to create a list sample iterator.
-  *
-  * @param iter The address where the iterator will be stored.
-  * @param indices The array of sample indices..
-  * @param samples The number of samples.
-  * @param cur The cursor.
-  * @param key Holder for the key.
-  * @param val Holder for the value.
-  * @param kforward iterate keys forward (DTLV_TRUE) or not.
-  * @param kstart if to include (DTLV_TRUE) or not the start_key.
-  * @param kend if to include (DTLV_TRUE) or not the end_key.
-  * @param start_key The start key.
-  * @param end_key The end key..
-  * @param vforward iterate vals forward (DTLV_TRUE) or not.
-  * @param vstart if to include (DTLV_TRUE) or not the start_val.
-  * @param vend if to include (DTLV_TRUE) or not the end_val.
-  * @param start_val The start value.
-  * @param end_val The end value.
-  * @return A non-zero error value on failure and 0 on success.
-  */
-  public static native int dtlv_list_sample_iter_create(@Cast("dtlv_list_sample_iter**") PointerPointer iter,
-                                     @Cast("size_t*") SizeTPointer indices, int samples,
-                                     MDB_cursor cur, MDB_val key, MDB_val val,
-                                     int kforward, int kstart, int kend,
-                                     MDB_val start_key, MDB_val end_key,
-                                     int vforward, int vstart, int vend,
-                                     MDB_val start_val, MDB_val end_val);
-  public static native int dtlv_list_sample_iter_create(@ByPtrPtr dtlv_list_sample_iter iter,
-                                     @Cast("size_t*") SizeTPointer indices, int samples,
-                                     MDB_cursor cur, MDB_val key, MDB_val val,
-                                     int kforward, int kstart, int kend,
-                                     MDB_val start_key, MDB_val end_key,
-                                     int vforward, int vstart, int vend,
-                                     MDB_val start_val, MDB_val end_val);
-
- /**
-  * A function to indicate if the list sample iterator has next sample. If
-  * it does, the sample will be in the key/val argument passed to
-  * dtlv_list_sample_iter_create.
-  *
-  * @param iter The iterator handle.
-  * @return DTLV_TRUE on true and DTLV_FALSE on false.
-  */
-  public static native int dtlv_list_sample_iter_has_next(dtlv_list_sample_iter iter);
-
- /**
-  * A function to destroy the list sample iterator.
-  *
-  * @param iter The iterator handle.
-  */
-  public static native void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter iter);
-
-// #ifdef __cplusplus
-// #endif
-
+    @Opaque
+    public static class MDB_txn extends Pointer {
+        /** Empty constructor. Calls {@code super((Pointer)null)}. */
+        public MDB_txn() {
+            super((Pointer) null);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public MDB_txn(Pointer p) {
+            super(p);
+        }
+    }
+
+    /** \brief A handle for an individual database in the DB environment. */
+
+    /** \brief Opaque structure for navigating through a database */
+    @Opaque
+    public static class MDB_cursor extends Pointer {
+        /** Empty constructor. Calls {@code super((Pointer)null)}. */
+        public MDB_cursor() {
+            super((Pointer) null);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public MDB_cursor(Pointer p) {
+            super(p);
+        }
+    }
+
+    /**
+     * \brief Generic structure used for passing keys and data in and out
+     * of the database.
+     *
+     * Values returned from the database are valid only until a subsequent
+     * update operation, or the end of the transaction. Do not modify or
+     * free them, they commonly point into the database itself.
+     *
+     * Key sizes must be between 1 and #mdb_env_get_maxkeysize() inclusive.
+     * The same applies to data sizes in databases with the #MDB_DUPSORT flag.
+     * Other data items can in theory be from 0 to 0xffffffff bytes long.
+     */
+    public static class MDB_val extends Pointer {
+        static {
+            Loader.load();
+        }
+
+        /** Default native constructor. */
+        public MDB_val() {
+            super((Pointer) null);
+            allocate();
+        }
+
+        /** Native array allocator. Access with {@link Pointer#position(long)}. */
+        public MDB_val(long size) {
+            super((Pointer) null);
+            allocateArray(size);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public MDB_val(Pointer p) {
+            super(p);
+        }
+
+        private native void allocate();
+
+        private native void allocateArray(long size);
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public MDB_val position(long position) {
+            return (MDB_val) super.position(position);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public MDB_val getPointer(long i) {
+            return new MDB_val((Pointer) this).offsetAddress(i);
+        }
+
+        /** size of the data item */
+        public native @Cast("size_t") long mv_size();
+
+        public native MDB_val mv_size(long setter);
+
+        /** address of the data item */
+        public native Pointer mv_data();
+
+        public native MDB_val mv_data(Pointer setter);
+    }
+
+    /** \brief A callback function used to compare two keys in a database */
+    public static class MDB_cmp_func extends FunctionPointer {
+        static {
+            Loader.load();
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public MDB_cmp_func(Pointer p) {
+            super(p);
+        }
+
+        protected MDB_cmp_func() {
+            allocate();
+        }
+
+        private native void allocate();
+
+        public native int call(@Const MDB_val a, @Const MDB_val b);
+    }
+
+    /**
+     * \brief A callback function used to relocate a position-dependent data item
+     * in a fixed-address database.
+     *
+     * The \b newptr gives the item's desired address in
+     * the memory map, and \b oldptr gives its previous address. The item's actual
+     * data resides at the address in \b item. This callback is expected to walk
+     * through the fields of the record in \b item and modify any
+     * values based at the \b oldptr address to be relative to the \b newptr
+     * address.
+     *
+     * @param item   [in,out] The item that is to be relocated.
+     * @param oldptr [in] The previous address.
+     * @param newptr [in] The new address to relocate to.
+     * @param relctx [in] An application-provided context, set by #mdb_set_relctx().
+     *               \todo This feature is currently unimplemented.
+     */
+    public static class MDB_rel_func extends FunctionPointer {
+        static {
+            Loader.load();
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public MDB_rel_func(Pointer p) {
+            super(p);
+        }
+
+        protected MDB_rel_func() {
+            allocate();
+        }
+
+        private native void allocate();
+
+        public native void call(MDB_val item, Pointer oldptr, Pointer newptr, Pointer relctx);
+    }
+
+    /**
+     * \defgroup mdb_env Environment Flags
+     * \{
+     */
+    /** mmap at a fixed address (experimental) */
+    public static final int MDB_FIXEDMAP = 0x01;
+    /** no environment directory */
+    public static final int MDB_NOSUBDIR = 0x4000;
+    /** don't fsync after commit */
+    public static final int MDB_NOSYNC = 0x10000;
+    /** read only */
+    public static final int MDB_RDONLY = 0x20000;
+    /** don't fsync metapage after commit */
+    public static final int MDB_NOMETASYNC = 0x40000;
+    /** use writable mmap */
+    public static final int MDB_WRITEMAP = 0x80000;
+    /** use asynchronous msync when #MDB_WRITEMAP is used */
+    public static final int MDB_MAPASYNC = 0x100000;
+    /** tie reader locktable slots to #MDB_txn objects instead of to threads */
+    public static final int MDB_NOTLS = 0x200000;
+    /** don't do any locking, caller must manage their own locks */
+    public static final int MDB_NOLOCK = 0x400000;
+    /** don't do readahead (no effect on Windows) */
+    public static final int MDB_NORDAHEAD = 0x800000;
+    /** don't initialize malloc'd memory before writing to datafile */
+    public static final int MDB_NOMEMINIT = 0x1000000;
+    /** \} */
+
+    /**
+     * \defgroup mdb_dbi_open Database Flags
+     * \{
+     */
+    /** use reverse string keys */
+    public static final int MDB_REVERSEKEY = 0x02;
+    /** use sorted duplicates */
+    public static final int MDB_DUPSORT = 0x04;
+    /**
+     * numeric keys in native byte order: either unsigned int or size_t.
+     * The keys must all be of the same size.
+     */
+    public static final int MDB_INTEGERKEY = 0x08;
+    /** with #MDB_DUPSORT, sorted dup items have fixed size */
+    public static final int MDB_DUPFIXED = 0x10;
+    /** with #MDB_DUPSORT, dups are #MDB_INTEGERKEY-style integers */
+    public static final int MDB_INTEGERDUP = 0x20;
+    /** with #MDB_DUPSORT, use reverse string dups */
+    public static final int MDB_REVERSEDUP = 0x40;
+    /** create DB if not already existing */
+    public static final int MDB_CREATE = 0x40000;
+    /** \} */
+
+    /**
+     * \defgroup mdb_put Write Flags
+     * \{
+     */
+    /** For put: Don't write if the key already exists. */
+    public static final int MDB_NOOVERWRITE = 0x10;
+    /**
+     * Only for #MDB_DUPSORT<br>
+     * For put: don't write if the key and data pair already exist.<br>
+     * For mdb_cursor_del: remove all duplicate data items.
+     */
+    public static final int MDB_NODUPDATA = 0x20;
+    /** For mdb_cursor_put: overwrite the current key/data pair */
+    public static final int MDB_CURRENT = 0x40;
+    /**
+     * For put: Just reserve space for data, don't copy it. Return a
+     * pointer to the reserved space.
+     */
+    public static final int MDB_RESERVE = 0x10000;
+    /** Data is being appended, don't split full pages. */
+    public static final int MDB_APPEND = 0x20000;
+    /** Duplicate data is being appended, don't split full pages. */
+    public static final int MDB_APPENDDUP = 0x40000;
+    /** Store multiple data items in one call. Only for #MDB_DUPFIXED. */
+    public static final int MDB_MULTIPLE = 0x80000;
+    /* @} */
+
+    /**
+     * \defgroup mdb_copy Copy Flags
+     * \{
+     */
+    /**
+     * Compacting copy: Omit free space from copy, and renumber all
+     * pages sequentially.
+     */
+    public static final int MDB_CP_COMPACT = 0x01;
+    /* @} */
+
+    /**
+     * \brief Cursor Get operations.
+     *
+     * This is the set of all operations for retrieving data
+     * using a cursor.
+     */
+    /** enum MDB_cursor_op */
+    public static final int
+    /** Position at first key/data item */
+    MDB_FIRST = 0,
+            /**
+             * Position at first data item of current key.
+             * Only for #MDB_DUPSORT
+             */
+            MDB_FIRST_DUP = 1,
+            /** Position at key/data pair. Only for #MDB_DUPSORT */
+            MDB_GET_BOTH = 2,
+            /** position at key, nearest data. Only for #MDB_DUPSORT */
+            MDB_GET_BOTH_RANGE = 3,
+            /** Return key/data at current cursor position */
+            MDB_GET_CURRENT = 4,
+            /**
+             * Return up to a page of duplicate data items
+             * from current cursor position. Move cursor to prepare
+             * for #MDB_NEXT_MULTIPLE. Only for #MDB_DUPFIXED
+             */
+            MDB_GET_MULTIPLE = 5,
+            /** Position at last key/data item */
+            MDB_LAST = 6,
+            /**
+             * Position at last data item of current key.
+             * Only for #MDB_DUPSORT
+             */
+            MDB_LAST_DUP = 7,
+            /** Position at next data item */
+            MDB_NEXT = 8,
+            /**
+             * Position at next data item of current key.
+             * Only for #MDB_DUPSORT
+             */
+            MDB_NEXT_DUP = 9,
+            /**
+             * Return up to a page of duplicate data items
+             * from next cursor position. Move cursor to prepare
+             * for #MDB_NEXT_MULTIPLE. Only for #MDB_DUPFIXED
+             */
+            MDB_NEXT_MULTIPLE = 10,
+            /** Position at first data item of next key */
+            MDB_NEXT_NODUP = 11,
+            /** Position at previous data item */
+            MDB_PREV = 12,
+            /**
+             * Position at previous data item of current key.
+             * Only for #MDB_DUPSORT
+             */
+            MDB_PREV_DUP = 13,
+            /** Position at last data item of previous key */
+            MDB_PREV_NODUP = 14,
+            /** Position at specified key */
+            MDB_SET = 15,
+            /** Position at specified key, return key + data */
+            MDB_SET_KEY = 16,
+            /** Position at first key greater than or equal to specified key. */
+            MDB_SET_RANGE = 17,
+            /**
+             * Position at previous page and return up to
+             * a page of duplicate data items. Only for #MDB_DUPFIXED
+             */
+            MDB_PREV_MULTIPLE = 18;
+
+    /**
+     * \defgroup errors Return Codes
+     *
+     * BerkeleyDB uses -30800 to -30999, we'll go under them
+     * \{
+     */
+    /** Successful result */
+    public static final int MDB_SUCCESS = 0;
+    /** key/data pair already exists */
+    public static final int MDB_KEYEXIST = (-30799);
+    /** key/data pair not found (EOF) */
+    public static final int MDB_NOTFOUND = (-30798);
+    /** Requested page not found - this usually indicates corruption */
+    public static final int MDB_PAGE_NOTFOUND = (-30797);
+    /** Located page was wrong type */
+    public static final int MDB_CORRUPTED = (-30796);
+    /** Update of meta page failed or environment had fatal error */
+    public static final int MDB_PANIC = (-30795);
+    /** Environment version mismatch */
+    public static final int MDB_VERSION_MISMATCH = (-30794);
+    /** File is not a valid LMDB file */
+    public static final int MDB_INVALID = (-30793);
+    /** Environment mapsize reached */
+    public static final int MDB_MAP_FULL = (-30792);
+    /** Environment maxdbs reached */
+    public static final int MDB_DBS_FULL = (-30791);
+    /** Environment maxreaders reached */
+    public static final int MDB_READERS_FULL = (-30790);
+    /** Too many TLS keys in use - Windows only */
+    public static final int MDB_TLS_FULL = (-30789);
+    /** Txn has too many dirty pages */
+    public static final int MDB_TXN_FULL = (-30788);
+    /** Cursor stack too deep - internal error */
+    public static final int MDB_CURSOR_FULL = (-30787);
+    /** Page has not enough space - internal error */
+    public static final int MDB_PAGE_FULL = (-30786);
+    /** Database contents grew beyond environment mapsize */
+    public static final int MDB_MAP_RESIZED = (-30785);
+    /**
+     * Operation and DB incompatible, or DB type changed. This can mean:
+     * <ul>
+     * <li>The operation expects an #MDB_DUPSORT / #MDB_DUPFIXED database.
+     * <li>Opening a named DB when the unnamed DB has #MDB_DUPSORT /
+     * #MDB_INTEGERKEY.
+     * <li>Accessing a data record as a database, or vice versa.
+     * <li>The database was dropped and recreated with different flags.
+     * </ul>
+     */
+    public static final int MDB_INCOMPATIBLE = (-30784);
+    /** Invalid reuse of reader locktable slot */
+    public static final int MDB_BAD_RSLOT = (-30783);
+    /** Transaction must abort, has a child, or is invalid */
+    public static final int MDB_BAD_TXN = (-30782);
+    /** Unsupported size of key/DB name/data, or wrong DUPFIXED size */
+    public static final int MDB_BAD_VALSIZE = (-30781);
+    /** The specified DBI was changed unexpectedly */
+    public static final int MDB_BAD_DBI = (-30780);
+    /** The last defined error code */
+    public static final int MDB_LAST_ERRCODE = MDB_BAD_DBI;
+
+    /** \} */
+
+    /** \brief Statistics for a database in the environment */
+    public static class MDB_stat extends Pointer {
+        static {
+            Loader.load();
+        }
+
+        /** Default native constructor. */
+        public MDB_stat() {
+            super((Pointer) null);
+            allocate();
+        }
+
+        /** Native array allocator. Access with {@link Pointer#position(long)}. */
+        public MDB_stat(long size) {
+            super((Pointer) null);
+            allocateArray(size);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public MDB_stat(Pointer p) {
+            super(p);
+        }
+
+        private native void allocate();
+
+        private native void allocateArray(long size);
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public MDB_stat position(long position) {
+            return (MDB_stat) super.position(position);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public MDB_stat getPointer(long i) {
+            return new MDB_stat((Pointer) this).offsetAddress(i);
+        }
+
+        /**
+         * Size of a database page.
+         * This is currently the same for all databases.
+         */
+        public native @Cast("unsigned int") int ms_psize();
+
+        public native MDB_stat ms_psize(int setter);
+
+        /** Depth (height) of the B-tree */
+        public native @Cast("unsigned int") int ms_depth();
+
+        public native MDB_stat ms_depth(int setter);
+
+        /** Number of internal (non-leaf) pages */
+        public native @Cast("size_t") long ms_branch_pages();
+
+        public native MDB_stat ms_branch_pages(long setter);
+
+        /** Number of leaf pages */
+        public native @Cast("size_t") long ms_leaf_pages();
+
+        public native MDB_stat ms_leaf_pages(long setter);
+
+        /** Number of overflow pages */
+        public native @Cast("size_t") long ms_overflow_pages();
+
+        public native MDB_stat ms_overflow_pages(long setter);
+
+        /** Number of data items */
+        public native @Cast("size_t") long ms_entries();
+
+        public native MDB_stat ms_entries(long setter);
+    }
+
+    /** \brief Information about the environment */
+    public static class MDB_envinfo extends Pointer {
+        static {
+            Loader.load();
+        }
+
+        /** Default native constructor. */
+        public MDB_envinfo() {
+            super((Pointer) null);
+            allocate();
+        }
+
+        /** Native array allocator. Access with {@link Pointer#position(long)}. */
+        public MDB_envinfo(long size) {
+            super((Pointer) null);
+            allocateArray(size);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public MDB_envinfo(Pointer p) {
+            super(p);
+        }
+
+        private native void allocate();
+
+        private native void allocateArray(long size);
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public MDB_envinfo position(long position) {
+            return (MDB_envinfo) super.position(position);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public MDB_envinfo getPointer(long i) {
+            return new MDB_envinfo((Pointer) this).offsetAddress(i);
+        }
+
+        /** Address of map, if fixed */
+        public native Pointer me_mapaddr();
+
+        public native MDB_envinfo me_mapaddr(Pointer setter);
+
+        /** Size of the data memory map */
+        public native @Cast("size_t") long me_mapsize();
+
+        public native MDB_envinfo me_mapsize(long setter);
+
+        /** ID of the last used page */
+        public native @Cast("size_t") long me_last_pgno();
+
+        public native MDB_envinfo me_last_pgno(long setter);
+
+        /** ID of the last committed transaction */
+        public native @Cast("size_t") long me_last_txnid();
+
+        public native MDB_envinfo me_last_txnid(long setter);
+
+        /** max reader slots in the environment */
+        public native @Cast("unsigned int") int me_maxreaders();
+
+        public native MDB_envinfo me_maxreaders(int setter);
+
+        /** max reader slots used in the environment */
+        public native @Cast("unsigned int") int me_numreaders();
+
+        public native MDB_envinfo me_numreaders(int setter);
+    }
+
+    /**
+     * \brief Return the LMDB library version information.
+     *
+     * @param major [out] if non-NULL, the library major version number is copied
+     *              here
+     * @param minor [out] if non-NULL, the library minor version number is copied
+     *              here
+     * @param patch [out] if non-NULL, the library patch version number is copied
+     *              here
+     *              \retval "version string" The library version as a string
+     */
+    public static native @Cast("char*") BytePointer mdb_version(IntPointer major, IntPointer minor, IntPointer patch);
+
+    public static native @Cast("char*") ByteBuffer mdb_version(IntBuffer major, IntBuffer minor, IntBuffer patch);
+
+    public static native @Cast("char*") byte[] mdb_version(int[] major, int[] minor, int[] patch);
+
+    /**
+     * \brief Return a string describing a given error code.
+     *
+     * This function is a superset of the ANSI C X3.159-1989 (ANSI C) strerror(3)
+     * function. If the error code is greater than or equal to 0, then the string
+     * returned by the system function strerror(3) is returned. If the error code
+     * is less than 0, an error string corresponding to the LMDB library error is
+     * returned. See \ref errors for a list of LMDB-specific error codes.
+     *
+     * @param err [in] The error code
+     *            \retval "error message" The description of the error
+     */
+    public static native @Cast("char*") BytePointer mdb_strerror(int err);
+
+    /**
+     * \brief Create an LMDB environment handle.
+     *
+     * This function allocates memory for a #MDB_env structure. To release
+     * the allocated memory and discard the handle, call #mdb_env_close().
+     * Before the handle may be used, it must be opened using #mdb_env_open().
+     * Various other options may also need to be set before opening the handle,
+     * e.g. #mdb_env_set_mapsize(), #mdb_env_set_maxreaders(),
+     * #mdb_env_set_maxdbs(),
+     * depending on usage requirements.
+     *
+     * @param env [out] The address where the new handle will be stored
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int mdb_env_create(@Cast("MDB_env**") PointerPointer env);
+
+    public static native int mdb_env_create(@ByPtrPtr MDB_env env);
+
+    /**
+     * \brief Open an environment handle.
+     *
+     * If this function fails, #mdb_env_close() must be called to discard the
+     * #MDB_env handle.
+     *
+     * @param env   [in] An environment handle returned by #mdb_env_create()
+     * @param path  [in] The directory in which the database files reside. This
+     *              directory must already exist and be writable.
+     * @param flags [in] Special options for this environment. This parameter
+     *              must be set to 0 or by bitwise OR'ing together one or more of
+     *              the
+     *              values described here.
+     *              Flags set by mdb_env_set_flags() are also used.
+     *              <ul>
+     *              <li>#MDB_FIXEDMAP
+     *              use a fixed address for the mmap region. This flag must be
+     *              specified
+     *              when creating the environment, and is stored persistently in the
+     *              environment.
+     *              If successful, the memory map will always reside at the same
+     *              virtual address
+     *              and pointers used to reference data items in the database will
+     *              be constant
+     *              across multiple invocations. This option may not always work,
+     *              depending on
+     *              how the operating system has allocated memory to shared
+     *              libraries and other uses.
+     *              The feature is highly experimental.
+     *              <li>#MDB_NOSUBDIR
+     *              By default, LMDB creates its environment in a directory whose
+     *              pathname is given in \b path, and creates its data and lock
+     *              files
+     *              under that directory. With this option, \b path is used as-is
+     *              for
+     *              the database main data file. The database lock file is the \b
+     *              path
+     *              with "-lock" appended.
+     *              <li>#MDB_RDONLY
+     *              Open the environment in read-only mode. No write operations will
+     *              be
+     *              allowed. LMDB will still modify the lock file - except on
+     *              read-only
+     *              filesystems, where LMDB does not use locks.
+     *              <li>#MDB_WRITEMAP
+     *              Use a writeable memory map unless MDB_RDONLY is set. This uses
+     *              fewer mallocs but loses protection from application bugs
+     *              like wild pointer writes and other bad updates into the
+     *              database.
+     *              This may be slightly faster for DBs that fit entirely in RAM,
+     *              but
+     *              is slower for DBs larger than RAM.
+     *              Incompatible with nested transactions.
+     *              Do not mix processes with and without MDB_WRITEMAP on the same
+     *              environment. This can defeat durability (#mdb_env_sync etc).
+     *              <li>#MDB_NOMETASYNC
+     *              Flush system buffers to disk only once per transaction, omit the
+     *              metadata flush. Defer that until the system flushes files to
+     *              disk,
+     *              or next non-MDB_RDONLY commit or #mdb_env_sync(). This
+     *              optimization
+     *              maintains database integrity, but a system crash may undo the
+     *              last
+     *              committed transaction. I.e. it preserves the ACI (atomicity,
+     *              consistency, isolation) but not D (durability) database
+     *              property.
+     *              This flag may be changed at any time using #mdb_env_set_flags().
+     *              <li>#MDB_NOSYNC
+     *              Don't flush system buffers to disk when committing a
+     *              transaction.
+     *              This optimization means a system crash can corrupt the database
+     *              or
+     *              lose the last transactions if buffers are not yet flushed to
+     *              disk.
+     *              The risk is governed by how often the system flushes dirty
+     *              buffers
+     *              to disk and how often #mdb_env_sync() is called. However, if the
+     *              filesystem preserves write order and the #MDB_WRITEMAP flag is
+     *              not
+     *              used, transactions exhibit ACI (atomicity, consistency,
+     *              isolation)
+     *              properties and only lose D (durability). I.e. database integrity
+     *              is maintained, but a system crash may undo the final
+     *              transactions.
+     *              Note that (#MDB_NOSYNC | #MDB_WRITEMAP) leaves the system with
+     *              no
+     *              hint for when to write transactions to disk, unless
+     *              #mdb_env_sync()
+     *              is called. (#MDB_MAPASYNC | #MDB_WRITEMAP) may be preferable.
+     *              This flag may be changed at any time using #mdb_env_set_flags().
+     *              <li>#MDB_MAPASYNC
+     *              When using #MDB_WRITEMAP, use asynchronous flushes to disk.
+     *              As with #MDB_NOSYNC, a system crash can then corrupt the
+     *              database or lose the last transactions. Calling #mdb_env_sync()
+     *              ensures on-disk database integrity until next commit.
+     *              This flag may be changed at any time using #mdb_env_set_flags().
+     *              <li>#MDB_NOTLS
+     *              Don't use Thread-Local Storage. Tie reader locktable slots to
+     *              #MDB_txn objects instead of to threads. I.e. #mdb_txn_reset()
+     *              keeps
+     *              the slot reserved for the #MDB_txn object. A thread may use
+     *              parallel
+     *              read-only transactions. A read-only transaction may span threads
+     *              if
+     *              the user synchronizes its use. Applications that multiplex many
+     *              user threads over individual OS threads need this option. Such
+     *              an
+     *              application must also serialize the write transactions in an OS
+     *              thread, since LMDB's write locking is unaware of the user
+     *              threads.
+     *              <li>#MDB_NOLOCK
+     *              Don't do any locking. If concurrent access is anticipated, the
+     *              caller must manage all concurrency itself. For proper operation
+     *              the caller must enforce single-writer semantics, and must ensure
+     *              that no readers are using old transactions while a writer is
+     *              active. The simplest approach is to use an exclusive lock so
+     *              that
+     *              no readers may be active at all when a writer begins.
+     *              <li>#MDB_NORDAHEAD
+     *              Turn off readahead. Most operating systems perform readahead on
+     *              read requests by default. This option turns it off if the OS
+     *              supports it. Turning it off may help random read performance
+     *              when the DB is larger than RAM and system RAM is full.
+     *              The option is not implemented on Windows.
+     *              <li>#MDB_NOMEMINIT
+     *              Don't initialize malloc'd memory before writing to unused spaces
+     *              in the data file. By default, memory for pages written to the
+     *              data
+     *              file is obtained using malloc. While these pages may be reused
+     *              in
+     *              subsequent transactions, freshly malloc'd pages will be
+     *              initialized
+     *              to zeroes before use. This avoids persisting leftover data from
+     *              other
+     *              code (that used the heap and subsequently freed the memory) into
+     *              the
+     *              data file. Note that many other system libraries may allocate
+     *              and free memory from the heap for arbitrary uses. E.g., stdio
+     *              may
+     *              use the heap for file I/O buffers. This initialization step has
+     *              a
+     *              modest performance cost so some applications may want to disable
+     *              it using this flag. This option can be a problem for
+     *              applications
+     *              which handle sensitive data like passwords, and it makes memory
+     *              checkers like Valgrind noisy. This flag is not needed with
+     *              #MDB_WRITEMAP,
+     *              which writes directly to the mmap instead of using malloc for
+     *              pages. The
+     *              initialization is also skipped if #MDB_RESERVE is used; the
+     *              caller is expected to overwrite all of the memory that was
+     *              reserved in that case.
+     *              This flag may be changed at any time using #mdb_env_set_flags().
+     *              </ul>
+     * @param mode  [in] The UNIX permissions to set on created files and
+     *              semaphores.
+     *              This parameter is ignored on Windows.
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>#MDB_VERSION_MISMATCH - the version of the LMDB library doesn't
+     *         match the
+     *         version that created the database environment.
+     *         <li>#MDB_INVALID - the environment file headers are corrupted.
+     *         <li>ENOENT - the directory specified by the path parameter doesn't
+     *         exist.
+     *         <li>EACCES - the user didn't have permission to access the
+     *         environment files.
+     *         <li>EAGAIN - the environment was locked by another process.
+     *         </ul>
+     */
+    public static native int mdb_env_open(MDB_env env, @Cast("const char*") BytePointer path,
+            @Cast("unsigned int") int flags, @Cast("mdb_mode_t") int mode);
+
+    public static native int mdb_env_open(MDB_env env, String path, @Cast("unsigned int") int flags,
+            @Cast("mdb_mode_t") int mode);
+
+    /**
+     * \brief Copy an LMDB environment to the specified path.
+     *
+     * This function may be used to make a backup of an existing environment.
+     * No lockfile is created, since it gets recreated at need.
+     * \note This call can trigger significant file size growth if run in
+     * parallel with write transactions, because it employs a read-only
+     * transaction. See long-lived transactions under \ref caveats_sec.
+     *
+     * @param env  [in] An environment handle returned by #mdb_env_create(). It
+     *             must have already been opened successfully.
+     * @param path [in] The directory in which the copy will reside. This
+     *             directory must already exist and be writable but must otherwise
+     *             be
+     *             empty.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int mdb_env_copy(MDB_env env, @Cast("const char*") BytePointer path);
+
+    public static native int mdb_env_copy(MDB_env env, String path);
+
+    /**
+     * \brief Copy an LMDB environment to the specified file descriptor.
+     *
+     * This function may be used to make a backup of an existing environment.
+     * No lockfile is created, since it gets recreated at need.
+     * \note This call can trigger significant file size growth if run in
+     * parallel with write transactions, because it employs a read-only
+     * transaction. See long-lived transactions under \ref caveats_sec.
+     *
+     * @param env [in] An environment handle returned by #mdb_env_create(). It
+     *            must have already been opened successfully.
+     * @param fd  [in] The filedescriptor to write the copy to. It must
+     *            have already been opened for Write access.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    // public static native int mdb_env_copyfd(MDB_env env, mdb_filehandle_t fd);
+
+    /**
+     * \brief Copy an LMDB environment to the specified path, with options.
+     *
+     * This function may be used to make a backup of an existing environment.
+     * No lockfile is created, since it gets recreated at need.
+     * \note This call can trigger significant file size growth if run in
+     * parallel with write transactions, because it employs a read-only
+     * transaction. See long-lived transactions under \ref caveats_sec.
+     *
+     * @param env   [in] An environment handle returned by #mdb_env_create(). It
+     *              must have already been opened successfully.
+     * @param path  [in] The directory in which the copy will reside. This
+     *              directory must already exist and be writable but must otherwise
+     *              be
+     *              empty.
+     * @param flags [in] Special options for this operation. This parameter
+     *              must be set to 0 or by bitwise OR'ing together one or more of
+     *              the
+     *              values described here.
+     *              <ul>
+     *              <li>#MDB_CP_COMPACT - Perform compaction while copying: omit
+     *              free
+     *              pages and sequentially renumber all pages in output. This option
+     *              consumes more CPU and runs more slowly than the default.
+     *              Currently it fails if the environment has suffered a page leak.
+     *              </ul>
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int mdb_env_copy2(MDB_env env, @Cast("const char*") BytePointer path,
+            @Cast("unsigned int") int flags);
+
+    public static native int mdb_env_copy2(MDB_env env, String path, @Cast("unsigned int") int flags);
+
+    /**
+     * \brief Copy an LMDB environment to the specified file descriptor,
+     * with options.
+     *
+     * This function may be used to make a backup of an existing environment.
+     * No lockfile is created, since it gets recreated at need. See
+     * #mdb_env_copy2() for further details.
+     * \note This call can trigger significant file size growth if run in
+     * parallel with write transactions, because it employs a read-only
+     * transaction. See long-lived transactions under \ref caveats_sec.
+     *
+     * @param env   [in] An environment handle returned by #mdb_env_create(). It
+     *              must have already been opened successfully.
+     * @param fd    [in] The filedescriptor to write the copy to. It must
+     *              have already been opened for Write access.
+     * @param flags [in] Special options for this operation.
+     *              See #mdb_env_copy2() for options.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    // public static native int mdb_env_copyfd2(MDB_env env, mdb_filehandle_t fd,
+    // @Cast("unsigned int") int flags);
+
+    /**
+     * \brief Return statistics about the LMDB environment.
+     *
+     * @param env  [in] An environment handle returned by #mdb_env_create()
+     * @param stat [out] The address of an #MDB_stat structure
+     *             where the statistics will be copied
+     */
+    public static native int mdb_env_stat(MDB_env env, MDB_stat stat);
+
+    /**
+     * \brief Return information about the LMDB environment.
+     *
+     * @param env  [in] An environment handle returned by #mdb_env_create()
+     * @param stat [out] The address of an #MDB_envinfo structure
+     *             where the information will be copied
+     */
+    public static native int mdb_env_info(MDB_env env, MDB_envinfo stat);
+
+    /**
+     * \brief Flush the data buffers to disk.
+     *
+     * Data is always written to disk when #mdb_txn_commit() is called,
+     * but the operating system may keep it buffered. LMDB always flushes
+     * the OS buffers upon commit as well, unless the environment was
+     * opened with #MDB_NOSYNC or in part #MDB_NOMETASYNC. This call is
+     * not valid if the environment was opened with #MDB_RDONLY.
+     *
+     * @param env   [in] An environment handle returned by #mdb_env_create()
+     * @param force [in] If non-zero, force a synchronous flush. Otherwise
+     *              if the environment has the #MDB_NOSYNC flag set the flushes
+     *              will be omitted, and with #MDB_MAPASYNC they will be
+     *              asynchronous.
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EACCES - the environment is read-only.
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         <li>EIO - an error occurred during synchronization.
+     *         </ul>
+     */
+    public static native int mdb_env_sync(MDB_env env, int force);
+
+    /**
+     * \brief Close the environment and release the memory map.
+     *
+     * Only a single thread may call this function. All transactions, databases,
+     * and cursors must already be closed before calling this function. Attempts to
+     * use any such handles after calling this function will cause a SIGSEGV.
+     * The environment handle will be freed and must not be used again after this
+     * call.
+     *
+     * @param env [in] An environment handle returned by #mdb_env_create()
+     */
+    public static native void mdb_env_close(MDB_env env);
+
+    /**
+     * \brief Set environment flags.
+     *
+     * This may be used to set some flags in addition to those from
+     * #mdb_env_open(), or to unset these flags. If several threads
+     * change the flags at the same time, the result is undefined.
+     *
+     * @param env   [in] An environment handle returned by #mdb_env_create()
+     * @param flags [in] The flags to change, bitwise OR'ed together
+     * @param onoff [in] A non-zero value sets the flags, zero clears them.
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_env_set_flags(MDB_env env, @Cast("unsigned int") int flags, int onoff);
+
+    /**
+     * \brief Get environment flags.
+     *
+     * @param env   [in] An environment handle returned by #mdb_env_create()
+     * @param flags [out] The address of an integer to store the flags
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_env_get_flags(MDB_env env, @Cast("unsigned int*") IntPointer flags);
+
+    public static native int mdb_env_get_flags(MDB_env env, @Cast("unsigned int*") IntBuffer flags);
+
+    public static native int mdb_env_get_flags(MDB_env env, @Cast("unsigned int*") int[] flags);
+
+    /**
+     * \brief Return the path that was used in #mdb_env_open().
+     *
+     * @param env  [in] An environment handle returned by #mdb_env_create()
+     * @param path [out] Address of a string pointer to contain the path. This
+     *             is the actual string in the environment, not a copy. It should
+     *             not be
+     *             altered in any way.
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_env_get_path(MDB_env env, @Cast("const char**") PointerPointer path);
+
+    public static native int mdb_env_get_path(MDB_env env, @Cast("const char**") @ByPtrPtr BytePointer path);
+
+    public static native int mdb_env_get_path(MDB_env env, @Cast("const char**") @ByPtrPtr ByteBuffer path);
+
+    public static native int mdb_env_get_path(MDB_env env, @Cast("const char**") @ByPtrPtr byte[] path);
+
+    /**
+     * \brief Return the filedescriptor for the given environment.
+     *
+     * This function may be called after fork(), so the descriptor can be
+     * closed before exec*(). Other LMDB file descriptors have FD_CLOEXEC.
+     * (Until LMDB 0.9.18, only the lockfile had that.)
+     *
+     * @param env [in] An environment handle returned by #mdb_env_create()
+     * @param fd  [out] Address of a mdb_filehandle_t to contain the descriptor.
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    // public static native int mdb_env_get_fd(MDB_env env, @ByPtrPtr
+    // mdb_filehandle_t fd);
+
+    /**
+     * \brief Set the size of the memory map to use for this environment.
+     *
+     * The size should be a multiple of the OS page size. The default is
+     * 10485760 bytes. The size of the memory map is also the maximum size
+     * of the database. The value should be chosen as large as possible,
+     * to accommodate future growth of the database.
+     * This function should be called after #mdb_env_create() and before
+     * #mdb_env_open().
+     * It may be called at later times if no transactions are active in
+     * this process. Note that the library does not check for this condition,
+     * the caller must ensure it explicitly.
+     *
+     * The new size takes effect immediately for the current process but
+     * will not be persisted to any others until a write transaction has been
+     * committed by the current process. Also, only mapsize increases are
+     * persisted into the environment.
+     *
+     * If the mapsize is increased by another process, and data has grown
+     * beyond the range of the current mapsize, #mdb_txn_begin() will
+     * return #MDB_MAP_RESIZED. This function may be called with a size
+     * of zero to adopt the new size.
+     *
+     * Any attempt to set a size smaller than the space already consumed
+     * by the environment will be silently changed to the current size of the used
+     * space.
+     *
+     * @param env  [in] An environment handle returned by #mdb_env_create()
+     * @param size [in] The size in bytes
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified, or the environment
+     *         has
+     *         an active write transaction.
+     *         </ul>
+     */
+    public static native int mdb_env_set_mapsize(MDB_env env, @Cast("size_t") long size);
+
+    /**
+     * \brief Set the maximum number of threads/reader slots for the environment.
+     *
+     * This defines the number of slots in the lock table that is used to track
+     * readers in the
+     * the environment. The default is 126.
+     * Starting a read-only transaction normally ties a lock table slot to the
+     * current thread until the environment closes or the thread exits. If
+     * MDB_NOTLS is in use, #mdb_txn_begin() instead ties the slot to the
+     * MDB_txn object until it or the #MDB_env object is destroyed.
+     * This function may only be called after #mdb_env_create() and before
+     * #mdb_env_open().
+     *
+     * @param env     [in] An environment handle returned by #mdb_env_create()
+     * @param readers [in] The maximum number of reader lock table slots
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified, or the environment
+     *         is already open.
+     *         </ul>
+     */
+    public static native int mdb_env_set_maxreaders(MDB_env env, @Cast("unsigned int") int readers);
+
+    /**
+     * \brief Get the maximum number of threads/reader slots for the environment.
+     *
+     * @param env     [in] An environment handle returned by #mdb_env_create()
+     * @param readers [out] Address of an integer to store the number of readers
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_env_get_maxreaders(MDB_env env, @Cast("unsigned int*") IntPointer readers);
+
+    public static native int mdb_env_get_maxreaders(MDB_env env, @Cast("unsigned int*") IntBuffer readers);
+
+    public static native int mdb_env_get_maxreaders(MDB_env env, @Cast("unsigned int*") int[] readers);
+
+    /**
+     * \brief Set the maximum number of named databases for the environment.
+     *
+     * This function is only needed if multiple databases will be used in the
+     * environment. Simpler applications that use the environment as a single
+     * unnamed database can ignore this option.
+     * This function may only be called after #mdb_env_create() and before
+     * #mdb_env_open().
+     *
+     * Currently a moderate number of slots are cheap but a huge number gets
+     * expensive: 7-120 words per transaction, and every #mdb_dbi_open()
+     * does a linear search of the opened slots.
+     *
+     * @param env [in] An environment handle returned by #mdb_env_create()
+     * @param dbs [in] The maximum number of databases
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified, or the environment
+     *         is already open.
+     *         </ul>
+     */
+    public static native int mdb_env_set_maxdbs(MDB_env env, int dbs);
+
+    /**
+     * \brief Get the maximum size of keys and #MDB_DUPSORT data we can write.
+     *
+     * Depends on the compile-time constant #MDB_MAXKEYSIZE. Default 511.
+     * See \ref MDB_val.
+     *
+     * @param env [in] An environment handle returned by #mdb_env_create()
+     * @return The maximum size of a key we can write
+     */
+    public static native int mdb_env_get_maxkeysize(MDB_env env);
+
+    /**
+     * \brief Set application information associated with the #MDB_env.
+     *
+     * @param env [in] An environment handle returned by #mdb_env_create()
+     * @param ctx [in] An arbitrary pointer for whatever the application needs.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int mdb_env_set_userctx(MDB_env env, Pointer ctx);
+
+    /**
+     * \brief Get the application information associated with the #MDB_env.
+     *
+     * @param env [in] An environment handle returned by #mdb_env_create()
+     * @return The pointer set by #mdb_env_set_userctx().
+     */
+    public static native Pointer mdb_env_get_userctx(MDB_env env);
+
+    /**
+     * \brief A callback function for most LMDB assert() failures,
+     * called before printing the message and aborting.
+     *
+     * @param env [in] An environment handle returned by #mdb_env_create().
+     * @param msg [in] The assertion message, not including newline.
+     */
+    public static class MDB_assert_func extends FunctionPointer {
+        static {
+            Loader.load();
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public MDB_assert_func(Pointer p) {
+            super(p);
+        }
+
+        protected MDB_assert_func() {
+            allocate();
+        }
+
+        private native void allocate();
+
+        public native void call(MDB_env env, @Cast("const char*") BytePointer msg);
+    }
+
+    /**
+     * Set or reset the assert() callback of the environment.
+     * Disabled if liblmdb is built with NDEBUG.
+     * \note This hack should become obsolete as lmdb's error handling matures.
+     *
+     * @param env  [in] An environment handle returned by #mdb_env_create().
+     * @param func [in] An #MDB_assert_func function, or 0.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int mdb_env_set_assert(MDB_env env, MDB_assert_func func);
+
+    /**
+     * \brief Create a transaction for use with the environment.
+     *
+     * The transaction handle may be discarded using #mdb_txn_abort() or
+     * #mdb_txn_commit().
+     * \note A transaction and its cursors must only be used by a single
+     * thread, and a thread may only have a single transaction at a time.
+     * If #MDB_NOTLS is in use, this does not apply to read-only transactions.
+     * \note Cursors may not span transactions.
+     *
+     * @param env    [in] An environment handle returned by #mdb_env_create()
+     * @param parent [in] If this parameter is non-NULL, the new transaction
+     *               will be a nested transaction, with the transaction indicated by
+     *               \b parent
+     *               as its parent. Transactions may be nested to any level. A
+     *               parent
+     *               transaction and its cursors may not issue any other operations
+     *               than
+     *               mdb_txn_commit and mdb_txn_abort while it has active child
+     *               transactions.
+     * @param flags  [in] Special options for this transaction. This parameter
+     *               must be set to 0 or by bitwise OR'ing together one or more of
+     *               the
+     *               values described here.
+     *               <ul>
+     *               <li>#MDB_RDONLY
+     *               This transaction will not perform any write operations.
+     *               </ul>
+     * @param txn    [out] Address where the new #MDB_txn handle will be stored
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>#MDB_PANIC - a fatal error occurred earlier and the environment
+     *         must be shut down.
+     *         <li>#MDB_MAP_RESIZED - another process wrote data beyond this
+     *         MDB_env's
+     *         mapsize and this environment's map must be resized as well.
+     *         See #mdb_env_set_mapsize().
+     *         <li>#MDB_READERS_FULL - a read-only transaction was requested and
+     *         the reader lock table is full. See #mdb_env_set_maxreaders().
+     *         <li>ENOMEM - out of memory.
+     *         </ul>
+     */
+    public static native int mdb_txn_begin(MDB_env env, MDB_txn parent, @Cast("unsigned int") int flags,
+            @Cast("MDB_txn**") PointerPointer txn);
+
+    public static native int mdb_txn_begin(MDB_env env, MDB_txn parent, @Cast("unsigned int") int flags,
+            @ByPtrPtr MDB_txn txn);
+
+    /**
+     * \brief Returns the transaction's #MDB_env
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     */
+    public static native MDB_env mdb_txn_env(MDB_txn txn);
+
+    /**
+     * \brief Return the transaction's ID.
+     *
+     * This returns the identifier associated with this transaction. For a
+     * read-only transaction, this corresponds to the snapshot being read;
+     * concurrent readers will frequently have the same transaction ID.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     * @return A transaction ID, valid if input is an active transaction.
+     */
+    public static native @Cast("size_t") long mdb_txn_id(MDB_txn txn);
+
+    /**
+     * \brief Commit all the operations of a transaction into the database.
+     *
+     * The transaction handle is freed. It and its cursors must not be used
+     * again after this call, except with #mdb_cursor_renew().
+     * \note Earlier documentation incorrectly said all cursors would be freed.
+     * Only write-transactions free cursors.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         <li>ENOSPC - no more disk space.
+     *         <li>EIO - a low-level I/O error occurred while writing.
+     *         <li>ENOMEM - out of memory.
+     *         </ul>
+     */
+    public static native int mdb_txn_commit(MDB_txn txn);
+
+    /**
+     * \brief Abandon all the operations of the transaction instead of saving them.
+     *
+     * The transaction handle is freed. It and its cursors must not be used
+     * again after this call, except with #mdb_cursor_renew().
+     * \note Earlier documentation incorrectly said all cursors would be freed.
+     * Only write-transactions free cursors.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     */
+    public static native void mdb_txn_abort(MDB_txn txn);
+
+    /**
+     * \brief Reset a read-only transaction.
+     *
+     * Abort the transaction like #mdb_txn_abort(), but keep the transaction
+     * handle. #mdb_txn_renew() may reuse the handle. This saves allocation
+     * overhead if the process will start a new read-only transaction soon,
+     * and also locking overhead if #MDB_NOTLS is in use. The reader table
+     * lock is released, but the table slot stays tied to its thread or
+     * #MDB_txn. Use mdb_txn_abort() to discard a reset handle, and to free
+     * its lock table slot if MDB_NOTLS is in use.
+     * Cursors opened within the transaction must not be used
+     * again after this call, except with #mdb_cursor_renew().
+     * Reader locks generally don't interfere with writers, but they keep old
+     * versions of database pages allocated. Thus they prevent the old pages
+     * from being reused when writers commit new data, and so under heavy load
+     * the database size may grow much more rapidly than otherwise.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     */
+    public static native void mdb_txn_reset(MDB_txn txn);
+
+    /**
+     * \brief Renew a read-only transaction.
+     *
+     * This acquires a new reader lock for a transaction handle that had been
+     * released by #mdb_txn_reset(). It must be called before a reset transaction
+     * may be used again.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>#MDB_PANIC - a fatal error occurred earlier and the environment
+     *         must be shut down.
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_txn_renew(MDB_txn txn);
+
+    /**
+     * Compat with version <= 0.9.4, avoid clash with libmdb from MDB Tools project
+     */
+    // #define mdb_open(txn,name,flags,dbi) mdb_dbi_open(txn,name,flags,dbi)
+    /**
+     * Compat with version <= 0.9.4, avoid clash with libmdb from MDB Tools project
+     */
+    // #define mdb_close(env,dbi) mdb_dbi_close(env,dbi)
+
+    /**
+     * \brief Open a database in the environment.
+     *
+     * A database handle denotes the name and parameters of a database,
+     * independently of whether such a database exists.
+     * The database handle may be discarded by calling #mdb_dbi_close().
+     * The old database handle is returned if the database was already open.
+     * The handle may only be closed once.
+     *
+     * The database handle will be private to the current transaction until
+     * the transaction is successfully committed. If the transaction is
+     * aborted the handle will be closed automatically.
+     * After a successful commit the handle will reside in the shared
+     * environment, and may be used by other transactions.
+     *
+     * This function must not be called from multiple concurrent
+     * transactions in the same process. A transaction that uses
+     * this function must finish (either commit or abort) before
+     * any other transaction in the process may use this function.
+     *
+     * To use named databases (with name != NULL), #mdb_env_set_maxdbs()
+     * must be called before opening the environment. Database names are
+     * keys in the unnamed database, and may be read but not written.
+     *
+     * @param txn   [in] A transaction handle returned by #mdb_txn_begin()
+     * @param name  [in] The name of the database to open. If only a single
+     *              database is needed in the environment, this value may be NULL.
+     * @param flags [in] Special options for this database. This parameter
+     *              must be set to 0 or by bitwise OR'ing together one or more of
+     *              the
+     *              values described here.
+     *              <ul>
+     *              <li>#MDB_REVERSEKEY
+     *              Keys are strings to be compared in reverse order, from the end
+     *              of the strings to the beginning. By default, Keys are treated as
+     *              strings and
+     *              compared from beginning to end.
+     *              <li>#MDB_DUPSORT
+     *              Duplicate keys may be used in the database. (Or, from another
+     *              perspective,
+     *              keys may have multiple data items, stored in sorted order.) By
+     *              default
+     *              keys must be unique and may have only a single data item.
+     *              <li>#MDB_INTEGERKEY
+     *              Keys are binary integers in native byte order, either unsigned
+     *              int
+     *              or size_t, and will be sorted as such.
+     *              The keys must all be of the same size.
+     *              <li>#MDB_DUPFIXED
+     *              This flag may only be used in combination with #MDB_DUPSORT.
+     *              This option
+     *              tells the library that the data items for this database are all
+     *              the same
+     *              size, which allows further optimizations in storage and
+     *              retrieval. When
+     *              all data items are the same size, the #MDB_GET_MULTIPLE,
+     *              #MDB_NEXT_MULTIPLE
+     *              and #MDB_PREV_MULTIPLE cursor operations may be used to retrieve
+     *              multiple
+     *              items at once.
+     *              <li>#MDB_INTEGERDUP
+     *              This option specifies that duplicate data items are binary
+     *              integers,
+     *              similar to #MDB_INTEGERKEY keys.
+     *              <li>#MDB_REVERSEDUP
+     *              This option specifies that duplicate data items should be
+     *              compared as
+     *              strings in reverse order.
+     *              <li>#MDB_CREATE
+     *              Create the named database if it doesn't exist. This option is
+     *              not
+     *              allowed in a read-only transaction or a read-only environment.
+     *              </ul>
+     * @param dbi   [out] Address where the new #MDB_dbi handle will be stored
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>#MDB_NOTFOUND - the specified database doesn't exist in the
+     *         environment
+     *         and #MDB_CREATE was not specified.
+     *         <li>#MDB_DBS_FULL - too many databases have been opened. See
+     *         #mdb_env_set_maxdbs().
+     *         </ul>
+     */
+    public static native int mdb_dbi_open(MDB_txn txn, @Cast("const char*") BytePointer name,
+            @Cast("unsigned int") int flags, @Cast("MDB_dbi*") IntPointer dbi);
+
+    public static native int mdb_dbi_open(MDB_txn txn, String name, @Cast("unsigned int") int flags,
+            @Cast("MDB_dbi*") IntBuffer dbi);
+
+    public static native int mdb_dbi_open(MDB_txn txn, @Cast("const char*") BytePointer name,
+            @Cast("unsigned int") int flags, @Cast("MDB_dbi*") int[] dbi);
+
+    public static native int mdb_dbi_open(MDB_txn txn, String name, @Cast("unsigned int") int flags,
+            @Cast("MDB_dbi*") IntPointer dbi);
+
+    public static native int mdb_dbi_open(MDB_txn txn, @Cast("const char*") BytePointer name,
+            @Cast("unsigned int") int flags, @Cast("MDB_dbi*") IntBuffer dbi);
+
+    public static native int mdb_dbi_open(MDB_txn txn, String name, @Cast("unsigned int") int flags,
+            @Cast("MDB_dbi*") int[] dbi);
+
+    /**
+     * \brief Retrieve statistics for a database.
+     *
+     * @param txn  [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi  [in] A database handle returned by #mdb_dbi_open()
+     * @param stat [out] The address of an #MDB_stat structure
+     *             where the statistics will be copied
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_stat(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_stat stat);
+
+    /**
+     * \brief Retrieve the DB flags for a database handle.
+     *
+     * @param txn   [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi   [in] A database handle returned by #mdb_dbi_open()
+     * @param flags [out] Address where the flags will be returned.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int mdb_dbi_flags(MDB_txn txn, @Cast("MDB_dbi") int dbi,
+            @Cast("unsigned int*") IntPointer flags);
+
+    public static native int mdb_dbi_flags(MDB_txn txn, @Cast("MDB_dbi") int dbi,
+            @Cast("unsigned int*") IntBuffer flags);
+
+    public static native int mdb_dbi_flags(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("unsigned int*") int[] flags);
+
+    /**
+     * \brief Close a database handle. Normally unnecessary. Use with care:
+     *
+     * This call is not mutex protected. Handles should only be closed by
+     * a single thread, and only if no other threads are going to reference
+     * the database handle or one of its cursors any further. Do not close
+     * a handle if an existing transaction has modified its database.
+     * Doing so can cause misbehavior from database corruption to errors
+     * like MDB_BAD_VALSIZE (since the DB name is gone).
+     *
+     * Closing a database handle is not necessary, but lets #mdb_dbi_open()
+     * reuse the handle value. Usually it's better to set a bigger
+     * #mdb_env_set_maxdbs(), unless that value would be large.
+     *
+     * @param env [in] An environment handle returned by #mdb_env_create()
+     * @param dbi [in] A database handle returned by #mdb_dbi_open()
+     */
+    public static native void mdb_dbi_close(MDB_env env, @Cast("MDB_dbi") int dbi);
+
+    /**
+     * \brief Empty or delete+close a database.
+     *
+     * See #mdb_dbi_close() for restrictions about closing the DB handle.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi [in] A database handle returned by #mdb_dbi_open()
+     * @param del [in] 0 to empty the DB, 1 to delete it from the
+     *            environment and close the DB handle.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int mdb_drop(MDB_txn txn, @Cast("MDB_dbi") int dbi, int del);
+
+    /**
+     * \brief Set a custom key comparison function for a database.
+     *
+     * The comparison function is called whenever it is necessary to compare a
+     * key specified by the application with a key currently stored in the database.
+     * If no comparison function is specified, and no special key flags were
+     * specified
+     * with #mdb_dbi_open(), the keys are compared lexically, with shorter keys
+     * collating
+     * before longer keys.
+     * \warning This function must be called before any data access functions are
+     * used,
+     * otherwise data corruption may occur. The same comparison function must be
+     * used by every
+     * program accessing the database, every time the database is used.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi [in] A database handle returned by #mdb_dbi_open()
+     * @param cmp [in] A #MDB_cmp_func function
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_set_compare(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_cmp_func cmp);
+
+    /**
+     * \brief Set a custom data comparison function for a #MDB_DUPSORT database.
+     *
+     * This comparison function is called whenever it is necessary to compare a data
+     * item specified by the application with a data item currently stored in the
+     * database.
+     * This function only takes effect if the database was opened with the
+     * #MDB_DUPSORT
+     * flag.
+     * If no comparison function is specified, and no special key flags were
+     * specified
+     * with #mdb_dbi_open(), the data items are compared lexically, with shorter
+     * items collating
+     * before longer items.
+     * \warning This function must be called before any data access functions are
+     * used,
+     * otherwise data corruption may occur. The same comparison function must be
+     * used by every
+     * program accessing the database, every time the database is used.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi [in] A database handle returned by #mdb_dbi_open()
+     * @param cmp [in] A #MDB_cmp_func function
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_set_dupsort(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_cmp_func cmp);
+
+    /**
+     * \brief Set a relocation function for a #MDB_FIXEDMAP database.
+     *
+     * \todo The relocation function is called whenever it is necessary to move the
+     * data
+     * of an item to a different position in the database (e.g. through tree
+     * balancing operations, shifts as a result of adds or deletes, etc.). It is
+     * intended to allow address/position-dependent data items to be stored in
+     * a database in an environment opened with the #MDB_FIXEDMAP option.
+     * Currently the relocation feature is unimplemented and setting
+     * this function has no effect.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi [in] A database handle returned by #mdb_dbi_open()
+     * @param rel [in] A #MDB_rel_func function
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_set_relfunc(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_rel_func rel);
+
+    /**
+     * \brief Set a context pointer for a #MDB_FIXEDMAP database's relocation
+     * function.
+     *
+     * See #mdb_set_relfunc and #MDB_rel_func for more details.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi [in] A database handle returned by #mdb_dbi_open()
+     * @param ctx [in] An arbitrary pointer for whatever the application needs.
+     *            It will be passed to the callback function set by #mdb_set_relfunc
+     *            as its \b relctx parameter whenever the callback is invoked.
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_set_relctx(MDB_txn txn, @Cast("MDB_dbi") int dbi, Pointer ctx);
+
+    /**
+     * \brief Get items from a database.
+     *
+     * This function retrieves key/data pairs from the database. The address
+     * and length of the data associated with the specified \b key are returned
+     * in the structure to which \b data refers.
+     * If the database supports duplicate keys (#MDB_DUPSORT) then the
+     * first data item for the key will be returned. Retrieval of other
+     * items requires the use of #mdb_cursor_get().
+     *
+     * \note The memory pointed to by the returned values is owned by the
+     * database. The caller need not dispose of the memory, and may not
+     * modify it in any way. For values returned in a read-only transaction
+     * any modification attempts will cause a SIGSEGV.
+     * \note Values returned from the database are valid only until a
+     * subsequent update operation, or the end of the transaction.
+     *
+     * @param txn  [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi  [in] A database handle returned by #mdb_dbi_open()
+     * @param key  [in] The key to search for in the database
+     * @param data [out] The data corresponding to the key
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>#MDB_NOTFOUND - the key was not in the database.
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_get(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_val key, MDB_val data);
+
+    /**
+     * \brief Store items into a database.
+     *
+     * This function stores key/data pairs in the database. The default behavior
+     * is to enter the new key/data pair, replacing any previously existing key
+     * if duplicates are disallowed, or adding a duplicate data item if
+     * duplicates are allowed (#MDB_DUPSORT).
+     *
+     * @param txn   [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi   [in] A database handle returned by #mdb_dbi_open()
+     * @param key   [in] The key to store in the database
+     * @param data  [in,out] The data to store
+     * @param flags [in] Special options for this operation. This parameter
+     *              must be set to 0 or by bitwise OR'ing together one or more of
+     *              the
+     *              values described here.
+     *              <ul>
+     *              <li>#MDB_NODUPDATA - enter the new key/data pair only if it does
+     *              not
+     *              already appear in the database. This flag may only be specified
+     *              if the database was opened with #MDB_DUPSORT. The function will
+     *              return #MDB_KEYEXIST if the key/data pair already appears in the
+     *              database.
+     *              <li>#MDB_NOOVERWRITE - enter the new key/data pair only if the
+     *              key
+     *              does not already appear in the database. The function will
+     *              return
+     *              #MDB_KEYEXIST if the key already appears in the database, even
+     *              if
+     *              the database supports duplicates (#MDB_DUPSORT). The \b data
+     *              parameter will be set to point to the existing item.
+     *              <li>#MDB_RESERVE - reserve space for data of the given size, but
+     *              don't copy the given data. Instead, return a pointer to the
+     *              reserved space, which the caller can fill in later - before
+     *              the next update operation or the transaction ends. This saves
+     *              an extra memcpy if the data is being generated later.
+     *              LMDB does nothing else with this memory, the caller is expected
+     *              to modify all of the space requested. This flag must not be
+     *              specified if the database was opened with #MDB_DUPSORT.
+     *              <li>#MDB_APPEND - append the given key/data pair to the end of
+     *              the
+     *              database. This option allows fast bulk loading when keys are
+     *              already known to be in the correct order. Loading unsorted keys
+     *              with this flag will cause a #MDB_KEYEXIST error.
+     *              <li>#MDB_APPENDDUP - as above, but for sorted dup data.
+     *              </ul>
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>#MDB_MAP_FULL - the database is full, see #mdb_env_set_mapsize().
+     *         <li>#MDB_TXN_FULL - the transaction has too many dirty pages.
+     *         <li>EACCES - an attempt was made to write in a read-only transaction.
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_put(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_val key, MDB_val data,
+            @Cast("unsigned int") int flags);
+
+    /**
+     * \brief Delete items from a database.
+     *
+     * This function removes key/data pairs from the database.
+     * If the database does not support sorted duplicate data items
+     * (#MDB_DUPSORT) the data parameter is ignored.
+     * If the database supports sorted duplicates and the data parameter
+     * is NULL, all of the duplicate data items for the key will be
+     * deleted. Otherwise, if the data parameter is non-NULL
+     * only the matching data item will be deleted.
+     * This function will return #MDB_NOTFOUND if the specified key/data
+     * pair is not in the database.
+     *
+     * @param txn  [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi  [in] A database handle returned by #mdb_dbi_open()
+     * @param key  [in] The key to delete from the database
+     * @param data [in] The data to delete
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EACCES - an attempt was made to write in a read-only transaction.
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_del(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_val key, MDB_val data);
+
+    /**
+     * \brief Create a cursor handle.
+     *
+     * A cursor is associated with a specific transaction and database.
+     * A cursor cannot be used when its database handle is closed. Nor
+     * when its transaction has ended, except with #mdb_cursor_renew().
+     * It can be discarded with #mdb_cursor_close().
+     * A cursor in a write-transaction can be closed before its transaction
+     * ends, and will otherwise be closed when its transaction ends.
+     * A cursor in a read-only transaction must be closed explicitly, before
+     * or after its transaction ends. It can be reused with
+     * #mdb_cursor_renew() before finally closing it.
+     * \note Earlier documentation said that cursors in every transaction
+     * were closed when the transaction committed or aborted.
+     *
+     * @param txn    [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi    [in] A database handle returned by #mdb_dbi_open()
+     * @param cursor [out] Address where the new #MDB_cursor handle will be stored
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_cursor_open(MDB_txn txn, @Cast("MDB_dbi") int dbi,
+            @Cast("MDB_cursor**") PointerPointer cursor);
+
+    public static native int mdb_cursor_open(MDB_txn txn, @Cast("MDB_dbi") int dbi, @ByPtrPtr MDB_cursor cursor);
+
+    /**
+     * \brief Close a cursor handle.
+     *
+     * The cursor handle will be freed and must not be used again after this call.
+     * Its transaction must still be live if it is a write-transaction.
+     *
+     * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
+     */
+    public static native void mdb_cursor_close(MDB_cursor cursor);
+
+    /**
+     * \brief Renew a cursor handle.
+     *
+     * A cursor is associated with a specific transaction and database.
+     * Cursors that are only used in read-only
+     * transactions may be re-used, to avoid unnecessary malloc/free overhead.
+     * The cursor may be associated with a new read-only transaction, and
+     * referencing the same database handle as it was created with.
+     * This may be done whether the previous transaction is live or dead.
+     *
+     * @param txn    [in] A transaction handle returned by #mdb_txn_begin()
+     * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_cursor_renew(MDB_txn txn, MDB_cursor cursor);
+
+    /**
+     * \brief Return the cursor's transaction handle.
+     *
+     * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
+     */
+    public static native MDB_txn mdb_cursor_txn(MDB_cursor cursor);
+
+    /**
+     * \brief Return the cursor's database handle.
+     *
+     * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
+     */
+    public static native @Cast("MDB_dbi") int mdb_cursor_dbi(MDB_cursor cursor);
+
+    /**
+     * \brief Retrieve by cursor.
+     *
+     * This function retrieves key/data pairs from the database. The address and
+     * length
+     * of the key are returned in the object to which \b key refers (except for the
+     * case of the #MDB_SET option, in which the \b key object is unchanged), and
+     * the address and length of the data are returned in the object to which \b
+     * data
+     * refers.
+     * See #mdb_get() for restrictions on using the output values.
+     *
+     * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
+     * @param key    [in,out] The key for a retrieved item
+     * @param data   [in,out] The data of a retrieved item
+     * @param op     [in] A cursor operation #MDB_cursor_op
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>#MDB_NOTFOUND - no matching key found.
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_cursor_get(MDB_cursor cursor, MDB_val key, MDB_val data,
+            @Cast("MDB_cursor_op") int op);
+
+    /**
+     * \brief Store by cursor.
+     *
+     * This function stores key/data pairs into the database.
+     * The cursor is positioned at the new item, or on failure usually near it.
+     * \note Earlier documentation incorrectly said errors would leave the
+     * state of the cursor unchanged.
+     *
+     * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
+     * @param key    [in] The key operated on.
+     * @param data   [in] The data operated on.
+     * @param flags  [in] Options for this operation. This parameter
+     *               must be set to 0 or one of the values described here.
+     *               <ul>
+     *               <li>#MDB_CURRENT - replace the item at the current cursor
+     *               position.
+     *               The \b key parameter must still be provided, and must match it.
+     *               If using sorted duplicates (#MDB_DUPSORT) the data item must
+     *               still
+     *               sort into the same place. This is intended to be used when the
+     *               new data is the same size as the old. Otherwise it will simply
+     *               perform a delete of the old record followed by an insert.
+     *               <li>#MDB_NODUPDATA - enter the new key/data pair only if it
+     *               does not
+     *               already appear in the database. This flag may only be specified
+     *               if the database was opened with #MDB_DUPSORT. The function will
+     *               return #MDB_KEYEXIST if the key/data pair already appears in
+     *               the
+     *               database.
+     *               <li>#MDB_NOOVERWRITE - enter the new key/data pair only if the
+     *               key
+     *               does not already appear in the database. The function will
+     *               return
+     *               #MDB_KEYEXIST if the key already appears in the database, even
+     *               if
+     *               the database supports duplicates (#MDB_DUPSORT).
+     *               <li>#MDB_RESERVE - reserve space for data of the given size,
+     *               but
+     *               don't copy the given data. Instead, return a pointer to the
+     *               reserved space, which the caller can fill in later - before
+     *               the next update operation or the transaction ends. This saves
+     *               an extra memcpy if the data is being generated later. This flag
+     *               must not be specified if the database was opened with
+     *               #MDB_DUPSORT.
+     *               <li>#MDB_APPEND - append the given key/data pair to the end of
+     *               the
+     *               database. No key comparisons are performed. This option allows
+     *               fast bulk loading when keys are already known to be in the
+     *               correct order. Loading unsorted keys with this flag will cause
+     *               a #MDB_KEYEXIST error.
+     *               <li>#MDB_APPENDDUP - as above, but for sorted dup data.
+     *               <li>#MDB_MULTIPLE - store multiple contiguous data elements in
+     *               a
+     *               single request. This flag may only be specified if the database
+     *               was opened with #MDB_DUPFIXED. The \b data argument must be an
+     *               array of two MDB_vals. The mv_size of the first MDB_val must be
+     *               the size of a single data element. The mv_data of the first
+     *               MDB_val
+     *               must point to the beginning of the array of contiguous data
+     *               elements.
+     *               The mv_size of the second MDB_val must be the count of the
+     *               number
+     *               of data elements to store. On return this field will be set to
+     *               the count of the number of elements actually written. The
+     *               mv_data
+     *               of the second MDB_val is unused.
+     *               </ul>
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>#MDB_MAP_FULL - the database is full, see #mdb_env_set_mapsize().
+     *         <li>#MDB_TXN_FULL - the transaction has too many dirty pages.
+     *         <li>EACCES - an attempt was made to write in a read-only transaction.
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_cursor_put(MDB_cursor cursor, MDB_val key, MDB_val data,
+            @Cast("unsigned int") int flags);
+
+    /**
+     * \brief Delete current key/data pair
+     *
+     * This function deletes the key/data pair to which the cursor refers.
+     * This does not invalidate the cursor, so operations such as MDB_NEXT
+     * can still be used on it.
+     * Both MDB_NEXT and MDB_GET_CURRENT will return the same record after
+     * this operation.
+     *
+     * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
+     * @param flags  [in] Options for this operation. This parameter
+     *               must be set to 0 or one of the values described here.
+     *               <ul>
+     *               <li>#MDB_NODUPDATA - delete all of the data items for the
+     *               current key.
+     *               This flag may only be specified if the database was opened with
+     *               #MDB_DUPSORT.
+     *               </ul>
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EACCES - an attempt was made to write in a read-only transaction.
+     *         <li>EINVAL - an invalid parameter was specified.
+     *         </ul>
+     */
+    public static native int mdb_cursor_del(MDB_cursor cursor, @Cast("unsigned int") int flags);
+
+    /**
+     * \brief Return count of duplicates for current key.
+     *
+     * This call is only valid on databases that support sorted duplicate
+     * data items #MDB_DUPSORT.
+     *
+     * @param cursor [in] A cursor handle returned by #mdb_cursor_open()
+     * @param countp [out] Address where the count will be stored
+     * @return A non-zero error value on failure and 0 on success. Some possible
+     *         errors are:
+     *         <ul>
+     *         <li>EINVAL - cursor is not initialized, or an invalid parameter was
+     *         specified.
+     *         </ul>
+     */
+    public static native int mdb_cursor_count(MDB_cursor cursor, @Cast("size_t*") SizeTPointer countp);
+
+    /**
+     * \brief Compare two data items according to a particular database.
+     *
+     * This returns a comparison as if the two data items were keys in the
+     * specified database.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi [in] A database handle returned by #mdb_dbi_open()
+     * @param a   [in] The first item to compare
+     * @param b   [in] The second item to compare
+     * @return < 0 if a < b, 0 if a == b, > 0 if a > b
+     */
+    public static native int mdb_cmp(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val a, @Const MDB_val b);
+
+    /**
+     * \brief Compare two data items according to a particular database.
+     *
+     * This returns a comparison as if the two items were data items of
+     * the specified database. The database must have the #MDB_DUPSORT flag.
+     *
+     * @param txn [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi [in] A database handle returned by #mdb_dbi_open()
+     * @param a   [in] The first item to compare
+     * @param b   [in] The second item to compare
+     * @return < 0 if a < b, 0 if a == b, > 0 if a > b
+     */
+    public static native int mdb_dcmp(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val a, @Const MDB_val b);
+
+    /**
+     * \brief A callback function used to print a message from the library.
+     *
+     * @param msg [in] The string to be printed.
+     * @param ctx [in] An arbitrary context pointer for the callback.
+     * @return < 0 on failure, >= 0 on success.
+     */
+    public static class MDB_msg_func extends FunctionPointer {
+        static {
+            Loader.load();
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public MDB_msg_func(Pointer p) {
+            super(p);
+        }
+
+        protected MDB_msg_func() {
+            allocate();
+        }
+
+        private native void allocate();
+
+        public native int call(@Cast("const char*") BytePointer msg, Pointer ctx);
+    }
+
+    /**
+     * \brief Dump the entries in the reader lock table.
+     *
+     * @param env  [in] An environment handle returned by #mdb_env_create()
+     * @param func [in] A #MDB_msg_func function
+     * @param ctx  [in] Anything the message function needs
+     * @return < 0 on failure, >= 0 on success.
+     */
+    public static native int mdb_reader_list(MDB_env env, MDB_msg_func func, Pointer ctx);
+
+    /**
+     * \brief Check for stale entries in the reader lock table.
+     *
+     * @param env  [in] An environment handle returned by #mdb_env_create()
+     * @param dead [out] Number of stale slots that were cleared
+     * @return 0 on success, non-zero on failure.
+     */
+    public static native int mdb_reader_check(MDB_env env, IntPointer dead);
+
+    public static native int mdb_reader_check(MDB_env env, IntBuffer dead);
+
+    public static native int mdb_reader_check(MDB_env env, int[] dead);
+    /** \} */
+
+    // #ifdef __cplusplus
+    // #endif
+    /**
+     * \page tools LMDB Command Line Tools
+     * The following describes the command line tools that are available for LMDB.
+     * \li \ref mdb_copy_1
+     * \li \ref mdb_dump_1
+     * \li \ref mdb_load_1
+     * \li \ref mdb_stat_1
+     */
+
+    // #endif /* _LMDB_H_ */
+
+    // Parsed from usearch.h
+    // Fixed tons of type errors in parsing
+
+    // #ifndef UNUM_USEARCH_H
+    // #define UNUM_USEARCH_H
+
+    // #ifdef __cplusplus
+    // #endif
+
+    // #ifndef USEARCH_EXPORT
+    // #if defined(_WIN32) && !defined(__MINGW32__)
+    // public static native @MemberGetter int USEARCH_EXPORT();
+    // public static final int USEARCH_EXPORT = USEARCH_EXPORT();
+    // #else
+    // #define USEARCH_EXPORT
+    // #endif
+    // #endif
+
+    // #include <stdbool.h> // `bool`
+    // #include <stddef.h> // `size_t`
+    // #include <stdint.h> // `uint64_t`
+
+    // USEARCH_EXPORT typedef void* usearch_index_t;
+    @Opaque
+    @Name("usearch_index_t")
+    public static class usearch_index_t extends Pointer {
+        public usearch_index_t() {super((Pointer) null);}
+        public usearch_index_t(Pointer p) {super(p);}
+    }
+
+    // USEARCH_EXPORT typedef uint64_t usearch_key_t;
+    // Use long directly
+
+    // USEARCH_EXPORT typedef float usearch_distance_t;
+    // Use float directly
+
+    /**
+     * \brief Pointer to a null-terminated error message.
+     * Returned error messages \b don't need to be deallocated.
+     */
+    // USEARCH_EXPORT typedef char const* usearch_error_t;
+    // Map to bytes
+
+    /**
+     * \brief Type-punned callback for "metrics" or "distance functions",
+     * that accepts pointers to two vectors and measures their \b dis-similarity.
+     */
+    // USEARCH_EXPORT typedef usearch_distance_t (*usearch_metric_t)(void const*,
+    // void const*);
+    public static class usearch_metric_t extends FunctionPointer {
+        static {
+            Loader.load();
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public usearch_metric_t(Pointer p) {
+            super(p);
+        }
+
+        protected usearch_metric_t() {
+            allocate();
+        }
+
+        private native void allocate();
+
+        public native float call(@Cast("void const*") Pointer vectorA, @Cast("void const*") Pointer vectorB);
+    }
+
+    /**
+     * \brief Enumerator for the most common kinds of {@code usearch_metric_t}.
+     * Those are supported out of the box, with SIMD-optimizations for most common
+     * hardware.
+     */
+    /** enum usearch_metric_kind_t */
+    public static final int usearch_metric_unknown_k = 0,
+            usearch_metric_cos_k = 1,
+            usearch_metric_ip_k = 2,
+            usearch_metric_l2sq_k = 3,
+            usearch_metric_haversine_k = 4,
+            usearch_metric_divergence_k = 5,
+            usearch_metric_pearson_k = 6,
+            usearch_metric_jaccard_k = 7,
+            usearch_metric_hamming_k = 8,
+            usearch_metric_tanimoto_k = 9,
+            usearch_metric_sorensen_k = 10;
+
+    /** enum usearch_scalar_kind_t */
+    public static final int usearch_scalar_unknown_k = 0,
+            usearch_scalar_f32_k = 1,
+            usearch_scalar_f64_k = 2,
+            usearch_scalar_f16_k = 3,
+            usearch_scalar_i8_k = 4,
+            usearch_scalar_b1_k = 5;
+
+    public static class usearch_init_options_t extends Pointer {
+        static {
+            Loader.load();
+        }
+
+        /** Default native constructor. */
+        public usearch_init_options_t() {
+            super((Pointer) null);
+            allocate();
+        }
+
+        /** Native array allocator. Access with {@link Pointer#position(long)}. */
+        public usearch_init_options_t(long size) {
+            super((Pointer) null);
+            allocateArray(size);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public usearch_init_options_t(Pointer p) {
+            super(p);
+        }
+
+        private native void allocate();
+
+        private native void allocateArray(long size);
+
+        @Override
+        public usearch_init_options_t position(long position) {
+            return (usearch_init_options_t) super.position(position);
+        }
+
+        @Override
+        public usearch_init_options_t getPointer(long i) {
+            return new usearch_init_options_t((Pointer) this).offsetAddress(i);
+        }
+
+        /**
+         * \brief The metric kind used for distance calculation between vectors.
+         */
+        public native @Cast("usearch_metric_kind_t") int metric_kind();
+
+        public native usearch_init_options_t metric_kind(int setter);
+
+        /**
+         * \brief The \b optional custom distance metric function used for distance
+         * calculation between vectors.
+         * If the {@code metric_kind} is set to {@code usearch_metric_unknown_k}, this
+         * function pointer mustn't be {@code NULL}.
+         */
+        public native usearch_metric_t metric();
+
+        public native usearch_init_options_t metric(usearch_metric_t setter);
+
+        /**
+         * \brief The scalar kind used for quantization of vector data during indexing.
+         * In most cases, on modern hardware, it's recommended to use half-precision
+         * floating-point numbers.
+         * When quantization is enabled, the "get"-like functions won't be able to
+         * recover the original data,
+         * so you may want to replicate the original vectors elsewhere.
+         *
+         * Quantizing to integers is also possible, but it's important to note that it's
+         * only valid for cosine-like
+         * metrics. As part of the quantization process, the vectors are normalized to
+         * unit length and later scaled
+         * to \b [-127,127] range to occupy the full 8-bit range.
+         *
+         * Quantizing to 1-bit booleans is also possible, but it's only valid for binary
+         * metrics like Jaccard, Hamming,
+         * etc. As part of the quantization process, the scalar components greater than
+         * zero are set to {@code true}, and the
+         * rest to {@code false}.
+         */
+        public native @Cast("usearch_scalar_kind_t") int quantization();
+
+        public native usearch_init_options_t quantization(int setter);
+
+        /**
+         * \brief The number of dimensions in the vectors to be indexed.
+         * Must be defined for most metrics, but can be avoided for
+         * {@code usearch_metric_haversine_k}.
+         */
+        public native @Cast("size_t") long dimensions();
+
+        public native usearch_init_options_t dimensions(long setter);
+
+        /**
+         * \brief The \b optional connectivity parameter that limits
+         * connections-per-node in graph.
+         */
+        public native @Cast("size_t") long connectivity();
+
+        public native usearch_init_options_t connectivity(long setter);
+
+        /**
+         * \brief The \b optional expansion factor used for index construction when
+         * adding vectors.
+         */
+        public native @Cast("size_t") long expansion_add();
+
+        public native usearch_init_options_t expansion_add(long setter);
+
+        /**
+         * \brief The \b optional expansion factor used for index construction during
+         * search operations.
+         */
+        public native @Cast("size_t") long expansion_search();
+
+        public native usearch_init_options_t expansion_search(long setter);
+
+        /**
+         * \brief When set allows multiple vectors to map to the same key.
+         */
+        public native @Cast("bool") boolean multi();
+
+        public native usearch_init_options_t multi(boolean setter);
+    }
+
+    /**
+     * \brief Retrieves the version of the library.
+     *
+     * @return The version of the library.
+     */
+    public static native @Const BytePointer usearch_version();
+
+    /**
+     * \brief Initializes a new instance of the index.
+     *
+     * @param options Pointer to the {@code usearch_init_options_t} structure
+     *                containing initialization options.
+     * @param error   [out] Pointer to a string where the error message will be
+     *                stored, if an error occurs.
+     * @return A handle to the initialized USearch index, or {@code NULL} on
+     *         failure.
+     */
+    public static native @Cast("usearch_index_t") usearch_index_t usearch_init(usearch_init_options_t options,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native @Cast("usearch_index_t") usearch_index_t usearch_init(usearch_init_options_t options,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native @Cast("usearch_index_t") usearch_index_t usearch_init(usearch_init_options_t options,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Frees the resources associated with the index.
+     *
+     * @param index [inout] The handle to the USearch index to be freed.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     */
+    public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Reports the memory usage of the index.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     * @return Number of bytes used by the index.
+     */
+    public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Reports the SIMD capabilities used by the index on the current CPU.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     * @return The codename of the SIMD instruction set used by the index.
+     */
+    public static native @Const BytePointer usearch_hardware_acceleration(
+            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native @Const ByteBuffer usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native @Const byte[] usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Reports expected file size after serialization.
+     *
+     * @param index [in] The handle to the USearch index to be serialized.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     */
+    public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Saves the index to a file.
+     *
+     * @param index [in] The handle to the USearch index to be serialized.
+     * @param path  [in] The file path where the index will be saved.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     */
+    public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
+
+    public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Loads the index from a file.
+     *
+     * @param index [inout] The handle to the USearch index to be populated from
+     *              path.
+     * @param path  [in] The file path from where the index will be loaded.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     */
+    public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
+
+    public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Creates a view of the index from a file without copying it into
+     * memory.
+     *
+     * @param index [inout] The handle to the USearch index to be populated with a
+     *              file view.
+     * @param path  [in] The file path from where the view will be created.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     */
+    public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
+
+    public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Loads index metadata from a file.
+     *
+     * @param path    [in] The file path from where the index will be loaded.
+     * @param options [out] Pointer to the {@code usearch_init_options_t} structure
+     *                to be populated.
+     * @param error   [out] Pointer to a string where the error message will be
+     *                stored, if an error occurs.
+     */
+    public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_metadata(String path, usearch_init_options_t options,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options,
+            @Cast("usearch_error_t*") byte[] error);
+
+    public static native void usearch_metadata(String path, usearch_init_options_t options,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_metadata(String path, usearch_init_options_t options,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Saves the index to an in-memory buffer.
+     *
+     * @param index  [in] The handle to the USearch index to be serialized.
+     * @param buffer [in] The in-memory continuous buffer where the index will be
+     *               saved.
+     * @param length [in] The length of the buffer in bytes.
+     * @param error  [out] Pointer to a string where the error message will be
+     *               stored, if an error occurs.
+     */
+    public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer,
+            @Cast("size_t") long length, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer,
+            @Cast("size_t") long length, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer,
+            @Cast("size_t") long length, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Loads the index from an in-memory buffer.
+     *
+     * @param index  [inout] The handle to the USearch index to be populated from
+     *               buffer.
+     * @param buffer [in] The in-memory continuous buffer from where the index will
+     *               be loaded.
+     * @param length [in] The length of the buffer in bytes.
+     * @param error  [out] Pointer to a string where the error message will be
+     *               stored, if an error occurs.
+     */
+    public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
+            @Cast("size_t") long length,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
+            @Cast("size_t") long length,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
+            @Cast("size_t") long length,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Creates a view of the index from an in-memory buffer without copying
+     * it into memory.
+     *
+     * @param index  [inout] The handle to the USearch index to be populated with a
+     *               buffer view.
+     * @param buffer [in] The in-memory continuous buffer from where the view will
+     *               be created.
+     * @param length [in] The length of the buffer in bytes.
+     * @param error  [out] Pointer to a string where the error message will be
+     *               stored, if an error occurs.
+     */
+    public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
+            @Cast("size_t") long length,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
+            @Cast("size_t") long length,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
+            @Cast("size_t") long length,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Loads index metadata from an in-memory buffer.
+     *
+     * @param buffer  [in] The in-memory continuous buffer from where the view will
+     *                be created.
+     * @param options [out] Pointer to the {@code usearch_init_options_t} structure
+     *                to be populated.
+     * @param error   [out] Pointer to a string where the error message will be
+     *                stored, if an error occurs.
+     */
+    public static native void usearch_metadata_buffer(@Cast("void const*") Pointer buffer, @Cast("size_t") long length,
+            usearch_init_options_t options,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_metadata_buffer(@Cast("void const*") Pointer buffer, @Cast("size_t") long length,
+            usearch_init_options_t options,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_metadata_buffer(@Cast("void const*") Pointer buffer, @Cast("size_t") long length,
+            usearch_init_options_t options,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Reports the current size (number of vectors) of the index.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     */
+    public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Reports the current capacity (number of vectors) of the index.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     */
+    public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Reports the current dimensions of the vectors in the index.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     */
+    public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Reports the current connectivity of the index.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     */
+    public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Reserves memory for a specified number of incoming vectors.
+     *
+     * @param index    [inout] The handle to the USearch index to be resized.
+     * @param capacity [in] The desired total capacity including current size.
+     * @param error    [out] Pointer to a string where the error message will be
+     *                 stored, if an error occurs.
+     */
+    public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long _capacity, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long _capacity, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long _capacity, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Retrieves the expansion value used during index creation.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     * @return The expansion value used during index creation.
+     */
+    public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Retrieves the expansion value used during search.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     * @return The expansion value used during search.
+     */
+    public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Updates the expansion value used during index creation. Rarely used.
+     *
+     * @param index     [in] The handle to the USearch index to be queried.
+     * @param expansion [in] The new expansion value.
+     * @param error     [out] Pointer to a string where the error message will be
+     *                  stored, if an error occurs.
+     */
+    public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long expansion, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long expansion, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long expansion, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Updates the expansion value used during search. Rarely used.
+     *
+     * @param index     [in] The handle to the USearch index to be queried.
+     * @param expansion [in] The new expansion value.
+     * @param error     [out] Pointer to a string where the error message will be
+     *                  stored, if an error occurs.
+     */
+    public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long expansion, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long expansion, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long expansion, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Updates the number of threads that would be used to construct the
+     * index. Rarely used.
+     *
+     * @param index   [in] The handle to the USearch index to be queried.
+     * @param threads [in] The new limit for the number of concurrent threads.
+     * @param error   [out] Pointer to a string where the error message will be
+     *                stored, if an error occurs.
+     */
+    public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long threads, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long threads, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long threads, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Updates the number of threads that will be performing concurrent
+     * traversals. Rarely used.
+     *
+     * @param index   [in] The handle to the USearch index to be queried.
+     * @param threads [in] The new limit for the number of concurrent threads.
+     * @param error   [out] Pointer to a string where the error message will be
+     *                stored, if an error occurs.
+     */
+    public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long threads, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long threads, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("size_t") long threads, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Updates the metric kind used for distance calculation between vectors.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param kind  [in] The metric kind used for distance calculation between
+     *              vectors.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     */
+    public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_metric_kind_t") int kind,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_metric_kind_t") int kind,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_metric_kind_t") int kind,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Updates the custom metric function used for distance calculation
+     * between vectors.
+     *
+     * @param index  [in] The handle to the USearch index to be queried.
+     * @param metric [in] The custom metric function used for distance calculation
+     *               between vectors.
+     * @param state  [in] The \b optional state pointer to be passed to the custom
+     *               metric function.
+     * @param kind   [in] The metric kind used for distance calculation between
+     *               vectors. Needed for serialization.
+     * @param error  [out] Pointer to a string where the error message will be
+     *               stored, if an error occurs.
+     */
+    public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index,
+            usearch_metric_t metric, Pointer state,
+            @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index,
+            usearch_metric_t metric, Pointer state,
+            @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index,
+            usearch_metric_t metric, Pointer state,
+            @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Adds a vector with a key to the index.
+     *
+     * @param index       [inout] The handle to the USearch index to be populated.
+     * @param key         [in] The key associated with the vector.
+     * @param vector      [in] Pointer to the vector data.
+     * @param vector_kind [in] The scalar type used in the vector data.
+     * @param error       [out] Pointer to a string where the error message will be
+     *                    stored, if an error occurs.
+     */
+    public static native void usearch_add(
+            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
+            @Cast("void const*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_add(
+            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
+            @Cast("void const*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_add(
+            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
+            @Cast("void const*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Checks if the index contains a vector with a specific key.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param key   [in] The key to be checked.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     * @return {@code true} if the index contains the vector with the given key,
+     *         {@code false} otherwise.
+     */
+    public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Counts the number of entries in the index under a specific key.
+     *
+     * @param index [in] The handle to the USearch index to be queried.
+     * @param key   [in] The key to be checked.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     * @return Number of vectors found under that key.
+     */
+    public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Performs k-Approximate Nearest Neighbors (kANN) Search for closest
+     * vectors to query.
+     *
+     * @param index        [in] The handle to the USearch index to be queried.
+     * @param query_vector [in] Pointer to the query vector data.
+     * @param query_kind   [in] The scalar type used in the query vector data.
+     * @param count        [in] Upper bound on the number of neighbors to search,
+     *                     the "k" in "kANN".
+     * @param keys         [out] Output buffer for up to {@code count} nearest
+     *                     neighbors keys.
+     * @param distances    [out] Output buffer for up to {@code count} distances to
+     *                     nearest neighbors.
+     * @param error        [out] Pointer to a string where the error message will be
+     *                     stored, if an error occurs.
+     * @return Number of found matches.
+     */
+    public static native long usearch_search(
+            @Cast("usearch_index_t") usearch_index_t index,
+            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+            @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_search(
+            @Cast("usearch_index_t") usearch_index_t index,
+            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+            @Cast("usearch_key_t*") LongBuffer keys, @Cast("usearch_distance_t*") FloatBuffer distances,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_search(
+            @Cast("usearch_index_t") usearch_index_t index,
+            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+            @Cast("usearch_key_t*") long[] keys, @Cast("usearch_distance_t*") float[] distances,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Performs k-Approximate Nearest Neighbors (kANN) Search for closest
+     * vectors to query,
+     * predicated on a custom function that returns {@code true} for vectors to be
+     * included.
+     *
+     * @param index        [in] The handle to the USearch index to be queried.
+     * @param query_vector [in] Pointer to the query vector data.
+     * @param query_kind   [in] The scalar type used in the query vector data.
+     * @param count        [in] Upper bound on the number of neighbors to search,
+     *                     the "k" in "kANN".
+     * @param filter       [in] The custom filter function that returns {@code true}
+     *                     for vectors to be included.
+     * @param filter_state [in] The \b optional state pointer to be passed to the
+     *                     custom filter function.
+     * @param keys         [out] Output buffer for up to {@code count} nearest
+     *                     neighbors keys.
+     * @param distances    [out] Output buffer for up to {@code count} distances to
+     *                     nearest neighbors.
+     * @param error        [out] Pointer to a string where the error message will be
+     *                     stored, if an error occurs.
+     * @return Number of found matches.
+     */
+    public static class usearch_filter extends FunctionPointer {
+        static {
+            Loader.load();
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public usearch_filter(Pointer p) {
+            super(p);
+        }
+
+        protected usearch_filter() {
+            allocate();
+        }
+
+        private native void allocate();
+
+        public native int call(@Cast("usearch_key_t") long key, Pointer filter_state);
+    }
+
+    public static native long usearch_filtered_search(
+            @Cast("usearch_index_t") usearch_index_t index,
+            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+            usearch_filter filter, Pointer filter_state,
+            @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_filtered_search(
+            @Cast("usearch_index_t") usearch_index_t index,
+            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+            usearch_filter filter, Pointer filter_state,
+            @Cast("usearch_key_t*") LongBuffer keys, @Cast("usearch_distance_t*") FloatBuffer distances,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_filtered_search(
+            @Cast("usearch_index_t") usearch_index_t index,
+            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+            usearch_filter filter, Pointer filter_state,
+            @Cast("usearch_key_t*") long[] keys, @Cast("usearch_distance_t*") float[] distances,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Retrieves the vector associated with the given key from the index.
+     *
+     * @param index       [in] The handle to the USearch index to be queried.
+     * @param key         [in] The key of the vector to retrieve.
+     * @param vector      [out] Pointer to the memory where the vector data will be
+     *                    copied.
+     * @param count       [in] Number of vectors that can be fitted into
+     *                    {@code vector} for multi-vector entries.
+     * @param vector_kind [in] The scalar type used in the vector data.
+     * @param error       [out] Pointer to a string where the error message will be
+     *                    stored, if an error occurs.
+     * @return Number of vectors found under that name and exported to
+     *         {@code vector}.
+     */
+    public static native long usearch_get(
+            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
+            @Cast("void*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_get(
+            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
+            @Cast("void*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_get(
+            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
+            @Cast("void*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Removes the vector associated with the given key from the index.
+     *
+     * @param index [inout] The handle to the USearch index to be modified.
+     * @param key   [in] The key of the vector to be removed.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     * @return Number of vectors found under that name and dropped from the index.
+     */
+    public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Renames the vector to map to a different key.
+     *
+     * @param index [inout] The handle to the USearch index to be modified.
+     * @param from  [in] The key of the vector to be renamed.
+     * @param to    [in] New key for found entry.
+     * @param error [out] Pointer to a string where the error message will be
+     *              stored, if an error occurs.
+     * @return Number of vectors found under that name and renamed.
+     */
+    public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
+            @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Computes the distance between two equi-dimensional vectors.
+     *
+     * @param vector_first  [in] The first vector for comparison.
+     * @param vector_second [in] The second vector for comparison.
+     * @param scalar_kind   [in] The scalar type used in the vectors.
+     * @param dimensions    [in] The number of dimensions in each vector.
+     * @param metric_kind   [in] The metric kind used for distance calculation
+     *                      between vectors.
+     * @param error         [out] Pointer to a string where the error message will
+     *                      be stored, if an error occurs.
+     * @return Distance between given vectors.
+     */
+    public static native float usearch_distance(
+            @Cast("void const*") Pointer vector_first,
+            @Cast("void const*") Pointer vector_second,
+            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") BytePointer error);
+
+    public static native float usearch_distance(
+            @Cast("void const*") Pointer vector_first,
+            @Cast("void const*") Pointer vector_second,
+            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native float usearch_distance(
+            @Cast("void const*") Pointer vector_first,
+            @Cast("void const*") Pointer vector_second,
+            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") byte[] error);
+
+    /**
+     * \brief Multi-threaded many-to-many exact nearest neighbors search for
+     * equi-dimensional vectors.
+     *
+     * @param dataset          [in] Pointer to the first scalar of the dataset
+     *                         matrix.
+     * @param queries          [in] Pointer to the first scalar of the queries
+     *                         matrix.
+     * @param dataset_size     [in] Number of vectors in the {@code dataset}.
+     * @param queries_size     [in] Number of vectors in the {@code queries} set.
+     * @param dataset_stride   [in] Number of bytes between starts of consecutive
+     *                         vectors in {@code dataset}.
+     * @param queries_stride   [in] Number of bytes between starts of consecutive
+     *                         vectors in {@code queries}.
+     * @param scalar_kind      [in] The scalar type used in the vectors.
+     * @param dimensions       [in] The number of dimensions in each vector.
+     * @param metric_kind      [in] The metric kind used for distance calculation
+     *                         between vectors.
+     * @param count            [in] Upper bound on the number of neighbors to
+     *                         search, the "k" in "kANN".
+     * @param threads          [in] Upper bound for the number of CPU threads to
+     *                         use.
+     * @param keys             [out] Output matrix for {@code queries_size * count}
+     *                         nearest neighbors keys. Each row of the
+     *                         matrix must be contiguous in memory, but different
+     *                         rows can be separated by {@code keys_stride} bytes.
+     * @param keys_stride      [in] Number of bytes between starts of consecutive
+     *                         rows od scalars in {@code keys}.
+     * @param distances        [out] Output matrix for {@code queries_size * count}
+     *                         distances to nearest neighbors. Each row of the
+     *                         matrix must be contiguous in memory, but different
+     *                         rows can be separated by {@code keys_stride} bytes.
+     * @param distances_stride [in] Number of bytes between starts of consecutive
+     *                         rows od scalars in {@code distances}.
+     * @param error            [out] Pointer to a string where the error message
+     *                         will be stored, if an error occurs.
+     */
+    public static native void usearch_exact_search(@Cast("void const*") Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
+                                                   @Cast("void const*") Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
+            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
+            @Cast("usearch_key_t*") LongPointer keys, @Cast("size_t") long keys_stride,
+            @Cast("usearch_distance_t*") FloatPointer distances, @Cast("size_t") long distances_stride,
+            @Cast("usearch_error_t*") BytePointer error);
+
+    public static native void usearch_exact_search(
+                                                   @Cast("void const*") Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
+                                                   @Cast("void const*") Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
+            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
+            @Cast("usearch_key_t*") LongBuffer keys, @Cast("size_t") long keys_stride,
+            @Cast("usearch_distance_t*") FloatBuffer distances, @Cast("size_t") long distances_stride,
+            @Cast("usearch_error_t*") ByteBuffer error);
+
+    public static native void usearch_exact_search(
+                                                   @Cast("void const*") Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
+                                                   @Cast("void const*") Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
+            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
+            @Cast("usearch_key_t*") long[] keys, @Cast("size_t") long keys_stride,
+            @Cast("usearch_distance_t*") float[] distances, @Cast("size_t") long distances_stride,
+            @Cast("usearch_error_t*") byte[] error);
+
+    // #ifdef __cplusplus
+    // #endif
+
+    // #endif // UNUM_USEARCH_H
+
+    // Parsed from dtlv.h
+
+    /**
+     * \file dtlv.h
+     * Native supporting functions for Datalevin: a simple, fast and
+     * versatile Datalog database.
+     *
+     * Datalevin works with LMDB, a Btree based key value store. This library
+     * provides an iterator interface to LMDB.
+     *
+     * @author Huahai Yang
+     *
+     *         \copyright Copyright 2020-2025. Huahai Yang. All rights reserved.
+     *
+     *         This code is released under Eclipse Public License 2.0.
+     */
+
+    // #include "lmdb/libraries/liblmdb/lmdb.h"
+    // #include "usearch/c/usearch.h"
+
+    // #ifdef __cplusplus
+    // #endif
+
+    public static final int DTLV_TRUE = 255;
+    public static final int DTLV_FALSE = 256;
+
+    /**
+     * The main comparator that compare bytes in order.
+     */
+    public static native int dtlv_cmp_memn(@Const MDB_val a, @Const MDB_val b);
+
+    /**
+     * Set the comparator for a DBI to the main comparator.
+     */
+    public static native int dtlv_set_comparator(MDB_txn txn, int dbi);
+
+    /**
+     * Set the comparator for a list DBI to the main comparator.
+     */
+    public static native int dtlv_set_dupsort_comparator(MDB_txn txn, int dbi);
+
+    /**
+     * Opaque structure for a iterator that iterates by keys only.
+     */
+    @Opaque
+    public static class dtlv_key_iter extends Pointer {
+        /** Empty constructor. Calls {@code super((Pointer)null)}. */
+        public dtlv_key_iter() {
+            super((Pointer) null);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public dtlv_key_iter(Pointer p) {
+            super(p);
+        }
+    }
+
+    /**
+     * A function to create a key iterator.
+     *
+     * @param iter      The address where the iterator will be stored.
+     * @param cur       The cursor.
+     * @param key       Holder for the key.
+     * @param val       Holder for the value.
+     * @param forward   iterate forward (DTLV_TRUE) or backward (DTLV_FALSE).
+     * @param start     if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+     * @param end       if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+     * @param start_key The start key, could be null
+     * @param end_key   The end key, could be null.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int dtlv_key_iter_create(@Cast("dtlv_key_iter**") PointerPointer iter,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int forward, int start, int end,
+            MDB_val start_key, MDB_val end_key);
+
+    public static native int dtlv_key_iter_create(@ByPtrPtr dtlv_key_iter iter,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int forward, int start, int end,
+            MDB_val start_key, MDB_val end_key);
+
+    /**
+     * A function to indicate if the key iterator has the next item. If it does,
+     * the key will be in the key argument passed to dtlv_key_iter_create, same
+     * with value.
+     *
+     * @param iter The iterator handle.
+     * @return DTLV_TRUE on true, DTLV_FALSE on false, or an error code.
+     */
+    public static native int dtlv_key_iter_has_next(dtlv_key_iter iter);
+
+    /**
+     * A function to release memory of the iterator.
+     *
+     * @param iter The iterator handle.
+     */
+    public static native void dtlv_key_iter_destroy(dtlv_key_iter iter);
+
+    /**
+     * Opaque structure for a list iterator that iterates both key and values (list)
+     * for a dupsort DBI.
+     */
+    @Opaque
+    public static class dtlv_list_iter extends Pointer {
+        /** Empty constructor. Calls {@code super((Pointer)null)}. */
+        public dtlv_list_iter() {
+            super((Pointer) null);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public dtlv_list_iter(Pointer p) {
+            super(p);
+        }
+    }
+
+    /**
+     * A function to create a list iterator.
+     *
+     * @param iter      The address where the iterator will be stored.
+     * @param cur       The cursor.
+     * @param key       Holder for the key.
+     * @param val       Holder for the value.
+     * @param kforward  iterate keys forward (DTLV_TRUE) or not.
+     * @param kstart    if to include (DTLV_TRUE) or not the start_key.
+     * @param kend      if to include (DTLV_TRUE) or not the end_key.
+     * @param start_key The start key.
+     * @param end_key   The end key..
+     * @param vforward  iterate values forward (DTLV_TRUE) or not.
+     * @param vstart    if to include (DTLV_TRUE) or not the start_val.
+     * @param vend      if to include (DTLV_TRUE) or not the end_val.
+     * @param start_val The start value.
+     * @param end_val   The end value.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int dtlv_list_iter_create(@Cast("dtlv_list_iter**") PointerPointer iter,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int kforward, int kstart, int kend,
+            MDB_val start_key, MDB_val end_key,
+            int vforward, int vstart, int vend,
+            MDB_val start_val, MDB_val end_val);
+
+    public static native int dtlv_list_iter_create(@ByPtrPtr dtlv_list_iter iter,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int kforward, int kstart, int kend,
+            MDB_val start_key, MDB_val end_key,
+            int vforward, int vstart, int vend,
+            MDB_val start_val, MDB_val end_val);
+
+    /**
+     * A function to indicate if the list iterator has the next item. If it
+     * does, the key will be in the key argument passed to dtlv_list_iter_create,
+     * the same with value.
+     *
+     * @param iter The iterator handle.
+     * @return DTLV_TRUE on true and DTLV_FALSE on false.
+     */
+    public static native int dtlv_list_iter_has_next(dtlv_list_iter iter);
+
+    /**
+     * A function to destroy the list iterator.
+     *
+     * @param iter The iterator handle.
+     */
+    public static native void dtlv_list_iter_destroy(dtlv_list_iter iter);
+
+    /**
+     * Opaque structure for a list value iterator that iterates values
+     * (forward only currently) of keys for a dupsort DBI.
+     */
+    @Opaque
+    public static class dtlv_list_val_iter extends Pointer {
+        /** Empty constructor. Calls {@code super((Pointer)null)}. */
+        public dtlv_list_val_iter() {
+            super((Pointer) null);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public dtlv_list_val_iter(Pointer p) {
+            super(p);
+        }
+    }
+
+    /**
+     * A function to create a list values iterator.
+     *
+     * @param iter      The address where the iterator will be stored.
+     * @param cur       The cursor.
+     * @param key       Holder for the key.
+     * @param val       Holder for the value.
+     * @param vstart    if to include (DTLV_TRUE) or not the start_val.
+     * @param vend      if to include (DTLV_TRUE) or not the end_val.
+     * @param start_val The start value..
+     * @param end_val   The end value.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int dtlv_list_val_iter_create(@Cast("dtlv_list_val_iter**") PointerPointer iter,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int vstart, int vend,
+            MDB_val start_val, MDB_val end_val);
+
+    public static native int dtlv_list_val_iter_create(@ByPtrPtr dtlv_list_val_iter iter,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int vstart, int vend,
+            MDB_val start_val, MDB_val end_val);
+
+    /**
+     * A function to seek to a key.
+     *
+     * @param iter The iterator handle.
+     * @param k    The key to seek.
+     * @return DTLV_TRUE on found and DTLV_FALSE when not found.
+     */
+    public static native int dtlv_list_val_iter_seek(dtlv_list_val_iter iter, MDB_val k);
+
+    /**
+     * A function to indicate if the iterator has the next item. If it does,
+     * the value will be in val argument passed to dtlv_list_val_iter_create.
+     *
+     * @param iter The iterator handle.
+     * @return DTLV_TRUE on true and DTLV_FALSE on false.
+     */
+    public static native int dtlv_list_val_iter_has_next(dtlv_list_val_iter iter);
+
+    /**
+     * A function to destroy the list val iterator.
+     *
+     * @param iter The iterator handle.
+     */
+    public static native void dtlv_list_val_iter_destroy(dtlv_list_val_iter iter);
+
+    /**
+     * Opaque structure for a list value iterator that iterates all values
+     * of the key, without value comparisons, for a dupsort DBI.
+     */
+    @Opaque
+    public static class dtlv_list_val_full_iter extends Pointer {
+        /** Empty constructor. Calls {@code super((Pointer)null)}. */
+        public dtlv_list_val_full_iter() {
+            super((Pointer) null);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public dtlv_list_val_full_iter(Pointer p) {
+            super(p);
+        }
+    }
+
+    /**
+     * A function to create a list values full iterator.
+     *
+     * @param iter The address where the iterator will be stored.
+     * @param cur  The cursor.
+     * @param key  Holder for the key.
+     * @param val  Holder for the value.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int dtlv_list_val_full_iter_create(@Cast("dtlv_list_val_full_iter**") PointerPointer iter,
+            MDB_cursor cur,
+            MDB_val key, MDB_val val);
+
+    public static native int dtlv_list_val_full_iter_create(@ByPtrPtr dtlv_list_val_full_iter iter,
+            MDB_cursor cur,
+            MDB_val key, MDB_val val);
+
+    /**
+     * A function to seek to a key.
+     *
+     * @param iter The iterator handle.
+     * @param k    The key to seek.
+     * @return DTLV_TRUE on found and DTLV_FALSE when not found.
+     */
+    public static native int dtlv_list_val_full_iter_seek(dtlv_list_val_full_iter iter, MDB_val k);
+
+    /**
+     * A function to indicate if the iterator has the next item. If it does,
+     * the value will be in val argument passed to dtlv_list_val_full_iter_create.
+     *
+     * @param iter The iterator handle.
+     * @return DTLV_TRUE on true and DTLV_FALSE on false.
+     */
+    public static native int dtlv_list_val_full_iter_has_next(dtlv_list_val_full_iter iter);
+
+    /**
+     * A function to destroy the list val full iterator.
+     *
+     * @param iter The iterator handle.
+     */
+    public static native void dtlv_list_val_full_iter_destroy(dtlv_list_val_full_iter iter);
+
+    /**
+     * A function to return the count of values for a key.
+     *
+     * @param iter The cursor.
+     * @param key  Holder for the key.
+     * @param val  Holder for the value.
+     * @return The value count.
+     */
+    public static native @Cast("size_t") long dtlv_list_val_count(MDB_cursor cur, MDB_val key, MDB_val val);
+
+    /**
+     * A function to return the number of key-values in the specified value range of
+     * the specified key range, for a dupsort DBI.
+     *
+     * @param cur       The cursor.
+     * @param key       Holder for the key.
+     * @param val       Holder for the value.
+     * @param kforward  iterate keys forward (DTLV_TRUE) or not.
+     * @param kstart    if to include (DTLV_TRUE) or not the start_key.
+     * @param kend      if to include (DTLV_TRUE) or not the end_key.
+     * @param start_key The start key.
+     * @param end_key   The end key..
+     * @param vforward  iterate vals forward (DTLV_TRUE) or not.
+     * @param vstart    if to include (DTLV_TRUE) or not the start_val.
+     * @param vend      if to include (DTLV_TRUE) or not the end_val.
+     * @param start_val The start value.
+     * @param end_val   The end value.
+     * @return The count
+     */
+    public static native @Cast("size_t") long dtlv_list_range_count(MDB_cursor cur,
+            MDB_val key, MDB_val val,
+            int kforward, int kstart, int kend,
+            MDB_val start_key, MDB_val end_key,
+            int vforward, int vstart, int vend,
+            MDB_val start_val, MDB_val end_val);
+
+    /**
+     * A function to return the number of key-values in the specified value range of
+     * the specified key range, for a dupsort DBI. Capped. When cap is reached, stop
+     * counting and return cap;
+     *
+     * @param cur       The cursor.
+     * @param cap       The cap.
+     * @param key       Holder for the key.
+     * @param val       Holder for the value.
+     * @param kforward  iterate keys forward (DTLV_TRUE) or not.
+     * @param kstart    if to include (DTLV_TRUE) or not the start_key.
+     * @param kend      if to include (DTLV_TRUE) or not the end_key.
+     * @param start_key The start key.
+     * @param end_key   The end key..
+     * @param vforward  iterate vals forward (DTLV_TRUE) or not.
+     * @param vstart    if to include (DTLV_TRUE) or not the start_val.
+     * @param vend      if to include (DTLV_TRUE) or not the end_val.
+     * @param start_val The start value.
+     * @param end_val   The end value.
+     * @return The count
+     */
+    public static native @Cast("size_t") long dtlv_list_range_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
+            MDB_val key, MDB_val val,
+            int kforward, int kstart, int kend,
+            MDB_val start_key, MDB_val end_key,
+            int vforward, int vstart, int vend,
+            MDB_val start_val, MDB_val end_val);
+
+    /**
+     * A function to return the number of keys in a key range.
+     *
+     * @param cur       The cursor.
+     * @param key       Holder for the key.
+     * @param val       Holder for the value.
+     * @param forward   iterate keys forward (DTLV_TRUE) or not.
+     * @param start     if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+     * @param end       if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+     * @param start_key The start key, could be null
+     * @param end_key   The end key, could be null.
+     * @return The count
+     */
+    public static native @Cast("size_t") long dtlv_key_range_count(MDB_cursor cur,
+            MDB_val key, MDB_val val,
+            int forward, int start, int end,
+            MDB_val start_key, MDB_val end_key);
+
+    /**
+     * A function to return the number of keys in a key range. Capped. When cap is
+     * reached, stop counting and return cap;
+     *
+     * @param cur       The cursor.
+     * @param cap       The cap.
+     * @param key       Holder for the key.
+     * @param val       Holder for the value.
+     * @param forward   iterate keys forward (DTLV_TRUE) or not.
+     * @param start     if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+     * @param end       if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+     * @param start_key The start key, could be null
+     * @param end_key   The end key, could be null.
+     * @return The count
+     */
+    public static native @Cast("size_t") long dtlv_key_range_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
+            MDB_val key, MDB_val val,
+            int forward, int start, int end,
+            MDB_val start_key, MDB_val end_key);
+
+    /**
+     * A function to return the total number of values in a key range, for a
+     * dupsort DBI.
+     *
+     * @param cur       The cursor.
+     * @param key       Holder for the key.
+     * @param val       Holder for the value.
+     * @param forward   iterate keys forward (DTLV_TRUE) or not.
+     * @param start     if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+     * @param end       if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+     * @param start_key The start key, could be null
+     * @param end_key   The end key, could be null.
+     * @return The count
+     */
+    public static native @Cast("size_t") long dtlv_key_range_list_count(MDB_cursor cur,
+            MDB_val key, MDB_val val,
+            int forward, int start, int end,
+            MDB_val start_key, MDB_val end_key);
+
+    /**
+     * A function to return the total number of values in a key range, for a
+     * dupsort DBI. Capped. When cap is reached, stop counting and return
+     * cap;
+     *
+     * @param cur       The cursor.
+     * @param cap       The cap.
+     * @param key       Holder for the key.
+     * @param val       Holder for the value.
+     * @param forward   iterate keys forward (DTLV_TRUE) or not.
+     * @param start     if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+     * @param end       if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+     * @param start_key The start key, could be null
+     * @param end_key   The end key, could be null.
+     * @return The count
+     */
+    public static native @Cast("size_t") long dtlv_key_range_list_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
+            MDB_val key, MDB_val val,
+            int forward, int start, int end,
+            MDB_val start_key, MDB_val end_key);
+
+    /**
+     * Opaque structure for a list sample iterator that return samples
+     * for a dupsort DBI.
+     */
+    @Opaque
+    public static class dtlv_list_sample_iter extends Pointer {
+        /** Empty constructor. Calls {@code super((Pointer)null)}. */
+        public dtlv_list_sample_iter() {
+            super((Pointer) null);
+        }
+
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
+        public dtlv_list_sample_iter(Pointer p) {
+            super(p);
+        }
+    }
+
+    /**
+     * A function to create a list sample iterator.
+     *
+     * @param iter      The address where the iterator will be stored.
+     * @param indices   The array of sample indices..
+     * @param samples   The number of samples.
+     * @param cur       The cursor.
+     * @param key       Holder for the key.
+     * @param val       Holder for the value.
+     * @param kforward  iterate keys forward (DTLV_TRUE) or not.
+     * @param kstart    if to include (DTLV_TRUE) or not the start_key.
+     * @param kend      if to include (DTLV_TRUE) or not the end_key.
+     * @param start_key The start key.
+     * @param end_key   The end key..
+     * @param vforward  iterate vals forward (DTLV_TRUE) or not.
+     * @param vstart    if to include (DTLV_TRUE) or not the start_val.
+     * @param vend      if to include (DTLV_TRUE) or not the end_val.
+     * @param start_val The start value.
+     * @param end_val   The end value.
+     * @return A non-zero error value on failure and 0 on success.
+     */
+    public static native int dtlv_list_sample_iter_create(@Cast("dtlv_list_sample_iter**") PointerPointer iter,
+            @Cast("size_t*") SizeTPointer indices, int samples,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int kforward, int kstart, int kend,
+            MDB_val start_key, MDB_val end_key,
+            int vforward, int vstart, int vend,
+            MDB_val start_val, MDB_val end_val);
+
+    public static native int dtlv_list_sample_iter_create(@ByPtrPtr dtlv_list_sample_iter iter,
+            @Cast("size_t*") SizeTPointer indices, int samples,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int kforward, int kstart, int kend,
+            MDB_val start_key, MDB_val end_key,
+            int vforward, int vstart, int vend,
+            MDB_val start_val, MDB_val end_val);
+
+    /**
+     * A function to indicate if the list sample iterator has next sample. If
+     * it does, the sample will be in the key/val argument passed to
+     * dtlv_list_sample_iter_create.
+     *
+     * @param iter The iterator handle.
+     * @return DTLV_TRUE on true and DTLV_FALSE on false.
+     */
+    public static native int dtlv_list_sample_iter_has_next(dtlv_list_sample_iter iter);
+
+    /**
+     * A function to destroy the list sample iterator.
+     *
+     * @param iter The iterator handle.
+     */
+    public static native void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter iter);
+
+    // #ifdef __cplusplus
+    // #endif
 
 }

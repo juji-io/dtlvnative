@@ -4,6 +4,35 @@ set -eou pipefail
 
 cd src
 
-make clean
+export SOEXT=.so
 
-make CC=gcc
+# export CC=gcc
+
+
+# build usearch
+
+cd src/usearch
+
+cmake \
+    -D CMAKE_BUILD_TYPE=Release \
+    -D CMAKE_C_COMPILER="$(brew --prefix llvm)/bin/clang" \
+    -D CMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++" \
+    -D USEARCH_USE_FP16LIB=1 \
+    -D USEARCH_USE_OPENMP=1 \
+    -D USEARCH_USE_SIMSIMD=1 \
+    -D USEARCH_BUILD_TEST_CPP=1 \
+    -D USEARCH_BUILD_TEST_C=1 \
+    -D USEARCH_BUILD_LIB_C=1 \
+    -B build_release
+
+cmake --build build_release --config Release
+
+build_release/test_cpp
+build_release/test_c
+
+# build lmdb and dtlv
+
+export OMP_LIB="-fopenmp"
+
+make clean
+make
