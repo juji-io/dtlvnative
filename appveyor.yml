@@ -40,6 +40,9 @@ environment:
 
 build_script:
 - cmd: >-
+
+    mkdir windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
+
     call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 
     call script\build.bat
@@ -62,7 +65,6 @@ build_script:
 
     cd ..\..
 
-    mkdir windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
 
     copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
 
@@ -75,3 +77,4 @@ build_script:
 artifacts:
   - path: '**\hs_err_pid*.log'
     name: crash-logs
+    deploy_on_failure: true
