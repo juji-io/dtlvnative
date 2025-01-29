@@ -2,12 +2,7 @@
 
 set -eou pipefail
 
-cd src
-
 export SOEXT=.so
-
-# export CC=gcc
-
 
 # build usearch
 
@@ -15,8 +10,6 @@ cd src/usearch
 
 cmake \
     -D CMAKE_BUILD_TYPE=Release \
-    -D CMAKE_C_COMPILER="$(brew --prefix llvm)/bin/clang" \
-    -D CMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++" \
     -D USEARCH_USE_FP16LIB=1 \
     -D USEARCH_USE_OPENMP=1 \
     -D USEARCH_USE_SIMSIMD=1 \
@@ -33,6 +26,8 @@ build_release/test_c
 # build lmdb and dtlv
 
 export OMP_LIB="-fopenmp"
+export USEARCH_LIB="-Wl,--whole-archive -lusearch -Wl,--no-whole-archive"
 
+cd ..
 make clean
 make
