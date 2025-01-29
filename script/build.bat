@@ -6,6 +6,7 @@ set CPATH=%PWD%\src
 cd %CPATH%\usearch
 
 cmake -G "Visual Studio 17 2022" ^
+      -D CMAKE_BUILD_TYPE=Debug ^
       -D USEARCH_USE_FP16LIB=1 ^
       -D USEARCH_USE_OPENMP=1 ^
       -D USEARCH_USE_SIMSIMD=1 ^
@@ -34,6 +35,7 @@ cd build_dtlv
 
 cmake .. ^
   -G "Visual Studio 17 2022" ^
+  -D CMAKE_BUILD_TYPE=Debug ^
   -DCLOSE_WARNING=on ^
   -DBUILD_TEST=off ^
   -DCMAKE_INSTALL_PREFIX=%CPATH% ^
@@ -52,3 +54,16 @@ dumpbin /directives dtlv.lib
 dir %CPATH%
 
 cd %PWD%
+
+cd src\java
+
+java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" ^
+    -Dcompiler=msvc ^
+    -DcompilerOptions=/MDd ^
+    -DlinkerOptions="/DEBUG /INCREMENTAL" ^
+    -DdeleteJniFiles=false ^
+    datalevin.dtlvnative.DTLV
+
+cd ..\..
+
+copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\

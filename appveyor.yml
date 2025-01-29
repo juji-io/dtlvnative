@@ -43,14 +43,6 @@ build_script:
 
     mkdir windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
 
-    call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-
-    call script\build.bat
-
-- cmd: >-
-
-    cd
-
     powershell -Command "(New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein.bat', 'lein.bat')"
 
     call lein.bat self-install
@@ -59,13 +51,13 @@ build_script:
 
     call ..\lein.bat deps
 
-    cd ..\src\java
+- cmd: >-
 
-    java -jar %USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar -Dcompiler=msvc -DcompilerOptions=/MDd -DlinkerOptions="/DEBUG /INCREMENTAL" -DdeleteJniFiles=false datalevin\dtlvnative\DTLV.java
+    cd
 
-    cd ..\..
+    call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 
-    copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
+    call script\build.bat
 
     cd windows-x86_64
 
