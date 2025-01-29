@@ -75,14 +75,7 @@ build_script:
     # call ..\lein.bat deploy clojars
 
 on_finish:
-  - cmd: >
-      echo "Checking for crash logs..."
-      IF EXIST hs_err_pid*.log (
-        echo "Found crash logs:"
-        dir hs_err_pid*.log
-        for %%F in (hs_err_pid*.log) do (
-          echo "----------------------------------------"
-          echo "Dumping %%F:"
-          type "%%F"
-        )
-      )
+  - cmd: echo "Checking for crash logs..."
+  - cmd: IF EXIST hs_err_pid*.log echo "Found crash logs:"
+  - cmd: IF EXIST hs_err_pid*.log dir hs_err_pid*.log
+  - cmd: IF EXIST hs_err_pid*.log for %%F in (hs_err_pid*.log) do ( echo "----------------------------------------" && echo "Dumping %%F:" && type "%%F" )
