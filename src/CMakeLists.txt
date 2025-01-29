@@ -17,7 +17,7 @@ if(CLOSE_WARNING)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
-# LMDB library (static)
+# LMDB static
 add_library(lmdb STATIC
     lmdb/libraries/liblmdb/mdb.c
     lmdb/libraries/liblmdb/midl.c
@@ -33,13 +33,23 @@ install(TARGETS lmdb
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
 
-# DTLV library (static)
+# usearch static
+add_library(usearch STATIC IMPORTED)
+set_target_properties(usearch PROPERTIES
+    IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}"
+)
+
+# DTLV static
 add_library(dtlv STATIC
     dtlv.c
 )
 
-# Link the LMDB static library to DTLV
+# Link the LMDB static to DTLV
 target_link_libraries(dtlv PRIVATE lmdb)
+
+# Link the usearch static to DTLV
+target_link_options(dtlv PRIVATE "/WHOLEARCHIVE:usearch.lib")
+target_link_libraries(dtlv PRIVATE usearch)
 
 set_target_properties(dtlv PROPERTIES
     OUTPUT_NAME dtlv

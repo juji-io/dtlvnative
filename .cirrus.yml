@@ -6,8 +6,8 @@ env:
 task:
   arm_container:
     image: ubuntu:latest
-  # only_if: $CIRRUS_TAG != ''
-  only_if: "changesInclude('linux-arm64/*', '.cirrus.yml')"
+  only_if: $CIRRUS_TAG != ''
+  # only_if: "changesInclude('linux-arm64/*', '.cirrus.yml')"
   script: |
     DEBIAN_FRONTEND=noninteractive apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y curl git wget tar openjdk-21-jdk-headless build-essential cmake g++-12 gcc-12

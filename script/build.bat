@@ -1,6 +1,27 @@
 
 set PWD=%cd%
+
 set CPATH=%PWD%\src
+
+cd %CPATH%\usearch
+
+cmake ^
+    -D CMAKE_BUILD_TYPE=Release ^
+    -D USEARCH_USE_FP16LIB=1 ^
+    -D USEARCH_USE_OPENMP=1 ^
+    -D USEARCH_USE_SIMSIMD=1 ^
+    -D USEARCH_BUILD_TEST_CPP=1 ^
+    -D USEARCH_BUILD_TEST_C=1 ^
+    -D USEARCH_BUILD_LIB_C=1 ^
+    -B build_release
+
+cmake --build build_release --config Release
+
+build_release\test_cpp
+
+build_release\test_c
+
+copy build_release\usearch_static_c.lib %CPATH%\
 
 cd %CPATH%
 

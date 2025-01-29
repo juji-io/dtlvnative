@@ -6,7 +6,7 @@ branches:
   only:
     - master
 
-skip_non_tags: true
+skip_non_tags: false
 
 image: Visual Studio 2019
 
