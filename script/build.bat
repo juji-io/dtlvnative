@@ -53,9 +53,7 @@ dumpbin /directives dtlv.lib
 
 dir %CPATH%
 
-cd %PWD%
-
-cd src\java
+cd java
 
 java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" ^
     -Dcompiler=msvc ^
