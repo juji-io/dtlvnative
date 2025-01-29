@@ -77,4 +77,4 @@ build_script:
 artifacts:
   - path: '**\hs_err_pid*.log'
     name: crash-logs
-    deploy_on_failure: true
+    upload_on_condition: always
