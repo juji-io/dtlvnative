@@ -15,7 +15,6 @@ cmake -G "Visual Studio 17 2022" ^
 
 cmake --build build_dtlv --config Release --target install
 
-
 cd %PWD%
 
 cd %CPATH%
@@ -33,4 +32,5 @@ dumpbin /linkermember:2 datalevin\dtlvnative\windows-x86_64\jniDTLV.dll
 
 cd ..\..
 
-copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
+copy src\java\datalevin\dtlvnative\windows-x86_64\* windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
+copy src\*.dll windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
