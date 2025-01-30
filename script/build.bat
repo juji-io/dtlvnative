@@ -33,4 +33,7 @@ dir datalevin\dtlvnative\windows-x86_64
 cd ..\..
 
 copy src\java\datalevin\dtlvnative\windows-x86_64\* windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
+
 copy src\*.dll windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
+
+dir windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
