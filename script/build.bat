@@ -28,12 +28,12 @@ java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.
 
 dir datalevin\dtlvnative\windows-x86_64
 
-dumpbin /DEPENDENTS datalevin\dtlvnative\windows-x86_64\jniDTLV.dll
+dumpbin /linkermember:2 datalevin\dtlvnative\windows-x86_64\jniDTLV.dll
 
 cd ..\..
 
 copy src\java\datalevin\dtlvnative\windows-x86_64\* windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
 
-copy src\*.dll windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
+copy src\*.lib windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
 
 dir windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
