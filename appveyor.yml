@@ -68,9 +68,9 @@ on_finish:
       echo "Looking for Clojure logs in %TEMP%..."
       pushd "%TEMP%"
       dir /b clojure-*.edn
-      for /F %F in ('dir /b clojure-*.edn 2^>nul') do (
-        echo Dumping file: %F
-        type %F
+      for /F "delims=" %%F in ('dir /b clojure-*.edn 2^>nul') do (
+        echo Dumping file: %%F
+        type %%F
       )
       popd
   - cmd: IF EXIST hs_err_pid*.log echo "Found crash logs:"
