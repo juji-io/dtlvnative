@@ -57,5 +57,15 @@ set(USEARCH_USE_SIMSIMD        ON CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_LIB_C        ON CACHE BOOL "" FORCE)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_c_build)
-target_link_libraries(dtlv PRIVATE usearch_static_c)
-target_link_options(dtlv PRIVATE "/WHOLEARCHIVE:usearch_static_c")
+target_link_libraries(dtlv PRIVATE usearch_c)
+
+set_target_properties(usearch_c PROPERTIES
+    OUTPUT_NAME usearch_c
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+)
+
+install(TARGETS usearch_c
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}
+)
