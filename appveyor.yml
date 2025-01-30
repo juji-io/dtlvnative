@@ -64,8 +64,13 @@ build_script:
     call ..\lein.bat run
 
 on_finish:
-  - cmd: IF EXIST %TEMP%\1\clojure-*.edn echo "Found clojure error log:"
-  - cmd: IF EXIST %TEMP%\1\clojure-*.edn type %TEMP%\1\clojure-*.edn
+  - cmd: dir /s "%TEMP%\clojure-*.edn"
+  - cmd: >
+      for %%F in ("%TEMP%\clojure-*.edn") do (
+        echo "----------------------------------------"
+        echo "Dumping %%~F:"
+        type "%%~F"
+      )
   - cmd: IF EXIST hs_err_pid*.log echo "Found crash logs:"
   - cmd: IF EXIST hs_err_pid*.log dir hs_err_pid*.log
   - cmd: IF EXIST hs_err_pid*.log for %%F in (hs_err_pid*.log) do ( echo "----------------------------------------" && echo "Dumping %%F:" && type "%%F" )
