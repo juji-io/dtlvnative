@@ -15,11 +15,14 @@ cmake -G "Visual Studio 17 2022" ^
 
 cmake --build build_dtlv --config Release --target install
 
+
 cd %PWD%
 
 cd %CPATH%
 
 dir %CPATH%
+
+dumpbin dtlv.lib
 
 cd java
 
