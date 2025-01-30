@@ -64,15 +64,19 @@ build_script:
     call ..\lein.bat run
 
 on_finish:
-  - cmd: |
-      echo "Looking for Clojure logs in %TEMP%..."
-      pushd "%TEMP%"
-      dir /b clojure-*.edn
-      for /F "delims=" %%F in ('dir /b clojure-*.edn 2^>nul') do (
-        echo Dumping file: %%F
-        type %%F
-      )
-      popd
+  - ps: |
+      Write-Host "Looking for Clojure logs in $env:TEMP ..."
+      Push-Location $env:TEMP
+      $files = Get-ChildItem -LiteralPath . -Filter clojure-*.edn -File 2>$null
+      if ($files) {
+        foreach ($file in $files) {
+          Write-Host "Dumping file: $($file.FullName)"
+          Get-Content $file.FullName
+        }
+      } else {
+        Write-Host "No matching clojure-*.edn logs found."
+      }
+      Pop-Location
   - cmd: IF EXIST hs_err_pid*.log echo "Found crash logs:"
   - cmd: IF EXIST hs_err_pid*.log dir hs_err_pid*.log
   - cmd: IF EXIST hs_err_pid*.log for %%F in (hs_err_pid*.log) do ( echo "----------------------------------------" && echo "Dumping %%F:" && type "%%F" )
