@@ -59,11 +59,7 @@ build_script:
 
     call script\build.bat
 
-    # cd windows-x86_64
-
-    # call ..\lein.bat run
-
-    # call ..\lein.bat deploy clojars
+    call ..\lein.bat run
 
 on_finish:
   - cmd: echo "Checking for crash logs..."
