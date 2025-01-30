@@ -6,7 +6,7 @@ branches:
   only:
     - master
 
-skip_non_tags: false
+skip_non_tags: true
 
 image: Visual Studio 2022
 
@@ -61,7 +61,7 @@ build_script:
 
     cd windows-x86_64
 
-    call ..\lein.bat run
+    call ..\lein.bat deploy clojars
 
 on_finish:
   - ps: |
