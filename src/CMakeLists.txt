@@ -59,9 +59,9 @@ set(USEARCH_BUILD_SHARED_C     OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS          OFF CACHE BOOL "Build statically" FORCE)
 set(USEARCH_BUILD_LIB_C        ON CACHE BOOL "" FORCE)
 
-add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_c_build)
+add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
 
-set_target_properties(usearch_c PROPERTIES
+set_target_properties(usearch_static_c PROPERTIES
     OUTPUT_NAME usearch_static_c
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
 )
@@ -69,6 +69,6 @@ set_target_properties(usearch_c PROPERTIES
 target_link_options(dtlv PRIVATE "/WHOLEARCHIVE:usearch_static_c")
 target_link_libraries(dtlv PRIVATE usearch_static_c)
 
-install(TARGETS usearch_c
+install(TARGETS usearch_static_c
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
