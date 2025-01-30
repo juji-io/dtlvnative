@@ -22,14 +22,14 @@ cd %CPATH%
 
 dir %CPATH%
 
-dumpbin dtlv.lib
+dumpbin /linkermember:2 dtlv.lib
 
 cd java
 
 java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" ^
     datalevin/dtlvnative/DTLV.java
 
-dumpbin datalevin\dtlvnative\windows-x86_64\jniDTLV.dll
+dumpbin /linkermember:2 datalevin\dtlvnative\windows-x86_64\jniDTLV.dll
 
 cd ..\..
 
