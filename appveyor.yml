@@ -65,12 +65,7 @@ build_script:
 
 on_finish:
   - cmd: dir /s "%TEMP%\clojure-*.edn"
-  - cmd: >
-      for %%F in ("%TEMP%\clojure-*.edn") do (
-        echo "----------------------------------------"
-        echo "Dumping %%~F:"
-        type "%%~F"
-      )
+  - cmd: for %F in ("%TEMP%\clojure-*.edn") do type "%F"
   - cmd: IF EXIST hs_err_pid*.log echo "Found crash logs:"
   - cmd: IF EXIST hs_err_pid*.log dir hs_err_pid*.log
   - cmd: IF EXIST hs_err_pid*.log for %%F in (hs_err_pid*.log) do ( echo "----------------------------------------" && echo "Dumping %%F:" && type "%%F" )
