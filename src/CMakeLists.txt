@@ -50,3 +50,12 @@ set_target_properties(dtlv PROPERTIES
 install(TARGETS dtlv
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
+
+set(USEARCH_USE_FP16LIB        ON CACHE BOOL "" FORCE)
+set(USEARCH_USE_OPENMP         ON CACHE BOOL "" FORCE)
+set(USEARCH_USE_SIMSIMD        ON CACHE BOOL "" FORCE)
+set(USEARCH_BUILD_LIB_C        ON CACHE BOOL "" FORCE)
+
+add_subdirectory(${PROJECT_SOURCE_DIR}/usearch/c usearch_c_build)
+target_link_libraries(dtlv PRIVATE usearch_static_c)
+target_link_options(dtlv PRIVATE "/WHOLEARCHIVE:usearch_static_c")
