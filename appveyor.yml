@@ -65,14 +65,14 @@ build_script:
 
 on_finish:
   - cmd: |
-    echo "Looking for Clojure logs in %TEMP%..."
-    pushd "%TEMP%"
-    dir /b clojure-*.edn
-    for /F %F in ('dir /b clojure-*.edn 2^>nul') do (
-      echo Dumping file: %F
-      type %F
-    )
-    popd
+      echo "Looking for Clojure logs in %TEMP%..."
+      pushd "%TEMP%"
+      dir /b clojure-*.edn
+      for /F %F in ('dir /b clojure-*.edn 2^>nul') do (
+        echo Dumping file: %F
+        type %F
+      )
+      popd
   - cmd: IF EXIST hs_err_pid*.log echo "Found crash logs:"
   - cmd: IF EXIST hs_err_pid*.log dir hs_err_pid*.log
   - cmd: IF EXIST hs_err_pid*.log for %%F in (hs_err_pid*.log) do ( echo "----------------------------------------" && echo "Dumping %%F:" && type "%%F" )
