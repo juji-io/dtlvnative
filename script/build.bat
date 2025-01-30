@@ -51,7 +51,7 @@ dir %CPATH%
 cd java
 
 java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" ^
-    -Dplatform.compiler.output="/Z7 /MDd /Od /W3" ^
+    -Dplatform.compiler.options="/Z7 /MDd /Od" ^
     -DlinkerOptions="/DEBUG /INCREMENTAL" ^
     -DdeleteJniFiles=false ^
     -Dorg.bytedeco.javacpp.buildtype=Debug ^
