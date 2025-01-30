@@ -59,9 +59,9 @@ build_script:
 
     call script\build.bat
 
-    cd windows-x86_64
+    # cd windows-x86_64
 
-    call ..\lein.bat run
+    # call ..\lein.bat run
 
     # call ..\lein.bat deploy clojars
 
