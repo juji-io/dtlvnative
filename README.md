@@ -5,11 +5,11 @@ Provides pre-built native dependencies for
 packaging the compiled native libraries and JavaCPP JNI library files in the
 platform specific JAR files.
 
-In addition to JavaCPP's JNI library, these native libraries areincluded:
+In addition to JavaCPP's JNI library, these native libraries are included:
 
 * `lmdb` LMDB key value library.
-* `usearch` Vector indexing and similartiy search libary.
-* `dtlv `wraps LMDB, and implements Datalevin comparator, iterators and samplers.
+* `usearch` Vector indexing and similartiy search library.
+* `dtlv` wraps LMDB and implements Datalevin comparator, iterators and samplers.
 
 The following platforms are currently supported:
 
@@ -17,7 +17,7 @@ The following platforms are currently supported:
 * macosx-x86_64
 * linux-arm64
 * linux-x86_64
-* windows-x86-64
+* windows-x86-64 (usearch currently is not working)
 
 The name of the released JAR is `org.clojars.huahaiy/dtlvnative-PLATFORM`
 where `PLATFORM` is one of the above.
