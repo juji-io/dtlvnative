@@ -1,4 +1,4 @@
-(def version "0.11.4")
+(def version "0.12.0")
 
 (defproject org.clojars.huahaiy/dtlvnative-windows-x86_64 version
   :description "Native dependency of Datalevin database on Windows"
