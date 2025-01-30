@@ -49,6 +49,8 @@ cd java
 java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" ^
     datalevin/dtlvnative/DTLV.java
 
+dumpbin datalevin\dtlvnative\windows-x86_64\jniDTLV.dll
+
 cd ..\..
 
 copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
