@@ -6,7 +6,7 @@ branches:
   only:
     - master
 
-skip_non_tags: true
+skip_non_tags: false
 
 image: Visual Studio 2022
 
@@ -80,3 +80,4 @@ on_finish:
   - cmd: IF EXIST hs_err_pid*.log echo "Found crash logs:"
   - cmd: IF EXIST hs_err_pid*.log dir hs_err_pid*.log
   - cmd: IF EXIST hs_err_pid*.log for %%F in (hs_err_pid*.log) do ( echo "----------------------------------------" && echo "Dumping %%F:" && type "%%F" )
+  - cmd: IF EXIST hs_err_pid*.mdmp for %%F in (hs_err_pid*.mdmp) do ( echo "----------------------------------------" && echo "Dumping %%F:" && type "%%F" )

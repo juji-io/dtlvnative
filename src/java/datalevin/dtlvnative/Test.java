@@ -187,9 +187,10 @@ public class Test {
 
     static void testUsearchInit(int collSize, int dimensions) {
 
-        byte[] error = null;
-
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
+        System.out.println("created opts");
+
+        BytePointer error = null;
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
         expect(index != null, "Failed to init index");
 
@@ -228,9 +229,9 @@ public class Test {
         expect(connectivity == opts.connectivity(),
                 "Failed to get index connectivity");
 
-        byte[] hardware = DTLV.usearch_hardware_acceleration(index, error);
+        BytePointer hardware = DTLV.usearch_hardware_acceleration(index, error);
         expect(error == null, "Failed to get hardware");
-        System.out.println("SIMD Hardware ISA Name is: " + new String(hardware));
+        System.out.println("SIMD Hardware ISA Name is: " + hardware.getString());
 
         long memory = DTLV.usearch_memory_usage(index, error);
         expect(memory > 0, "Failed to get memory usage");
@@ -245,7 +246,7 @@ public class Test {
 
     static void testUsearchAdd(int collSize, int dimensions) {
 
-        byte[] error = null;
+        BytePointer error = null;
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
@@ -279,7 +280,7 @@ public class Test {
 
     static void testUsearchFind(int collSize, int dimensions) {
 
-        byte[] error = null;
+        BytePointer error = null;
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
@@ -293,8 +294,8 @@ public class Test {
             expect(error == null, "Failed to add to index");
         }
 
-        long[] keys = new long[collSize];
-        float[] distances = new float[collSize];
+        LongPointer keys = new LongPointer(new long[collSize]);
+        FloatPointer distances = new FloatPointer(new float[collSize]);
 
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
@@ -310,7 +311,7 @@ public class Test {
 
     static void testUsearchGet(int collSize, int dimensions) {
 
-        byte[] error = null;
+        BytePointer error = null;
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         opts.multi(true);
@@ -340,7 +341,7 @@ public class Test {
 
     static void testUsearchRemove(int collSize, int dimensions) {
 
-        byte[] error = null;
+        BytePointer error = null;
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
@@ -365,7 +366,7 @@ public class Test {
 
     static void testUsearchLoad(int collSize, int dimensions) {
 
-        byte[] error = null;
+        BytePointer error = null;
 
         DTLV.usearch_init_options_t weird_opts = createOpts(dimensions);
         weird_opts.connectivity(11)
@@ -411,8 +412,8 @@ public class Test {
                    "Fail to find key in index");
         }
 
-        long[] keys = new long[collSize];
-        float[] distances = new float[collSize];
+        LongPointer keys = new LongPointer(new long[collSize]);
+        FloatPointer distances = new FloatPointer(new float[collSize]);
 
         DTLV.usearch_change_threads_search(index, 1, error);
         for (int i = 0; i < collSize; i++) {
@@ -433,7 +434,7 @@ public class Test {
 
     static void testUsearchView(int collSize, int dimensions) {
 
-        byte[] error = null;
+        BytePointer error = null;
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
