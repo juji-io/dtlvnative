@@ -2278,8 +2278,13 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     @Opaque
     @Name("usearch_index_t")
     public static class usearch_index_t extends Pointer {
-        public usearch_index_t() {super((Pointer) null);}
-        public usearch_index_t(Pointer p) {super(p);}
+        public usearch_index_t() {
+            super((Pointer) null);
+        }
+
+        public usearch_index_t(Pointer p) {
+            super(p);
+        }
     }
 
     // USEARCH_EXPORT typedef uint64_t usearch_key_t;
@@ -2293,7 +2298,29 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * Returned error messages \b don't need to be deallocated.
      */
     // USEARCH_EXPORT typedef char const* usearch_error_t;
-    // Map to bytes
+    public static class usearch_error_t extends BytePointer {
+        static { Loader.load(); } // Load the native library
+
+        // Default constructor (for allocation via native code)
+        public usearch_error_t() {
+            super((Pointer) null);
+            // allocate();
+        }
+
+        // Constructor to wrap an existing native pointer
+        public usearch_error_t(Pointer p) {
+            super(p);
+        }
+
+        // Access the underlying C string as a Java String
+        public String getMessage() {
+            return getString(); // Inherited from Pointer; decodes the C string
+        }
+
+        public boolean noError() {
+            return isNull(this);
+        }
+    }
 
     /**
      * \brief Type-punned callback for "metrics" or "distance functions",
@@ -2481,14 +2508,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return A handle to the initialized USearch index, or {@code NULL} on
      *         failure.
      */
-    public static native @Cast("usearch_index_t") usearch_index_t usearch_init(usearch_init_options_t options,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native @Cast("usearch_index_t") usearch_index_t usearch_init(usearch_init_options_t options,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native @Cast("usearch_index_t") usearch_index_t usearch_init(usearch_init_options_t options,
-            @Cast("usearch_error_t*") byte[] error);
+    public static native @Cast("usearch_index_t") usearch_index_t usearch_init(usearch_init_options_t options, usearch_error_t error);
 
     /**
      * \brief Frees the resources associated with the index.
@@ -2498,13 +2518,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Reports the memory usage of the index.
@@ -2515,13 +2529,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return Number of bytes used by the index.
      */
     public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Reports the SIMD capabilities used by the index on the current CPU.
@@ -2532,13 +2540,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The codename of the SIMD instruction set used by the index.
      */
     public static native @Const BytePointer usearch_hardware_acceleration(
-            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native @Const ByteBuffer usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native @Const byte[] usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") byte[] error);
+            @Cast("usearch_index_t") usearch_index_t index, usearch_error_t error);
 
     /**
      * \brief Reports expected file size after serialization.
@@ -2548,13 +2550,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Saves the index to a file.
@@ -2565,22 +2561,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
+            @Cast("const char*") BytePointer path, usearch_error_t error);
 
     public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
-
-    public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Loads the index from a file.
@@ -2592,22 +2576,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
+            @Cast("const char*") BytePointer path, usearch_error_t error);
 
     public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
-
-    public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Creates a view of the index from a file without copying it into
@@ -2620,22 +2592,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") BytePointer error);
+            @Cast("const char*") BytePointer path, usearch_error_t error);
 
     public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") byte[] error);
-
-    public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Loads index metadata from a file.
@@ -2647,22 +2607,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                stored, if an error occurs.
      */
     public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options,
-            @Cast("usearch_error_t*") BytePointer error);
+            usearch_error_t error);
 
     public static native void usearch_metadata(String path, usearch_init_options_t options,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options,
-            @Cast("usearch_error_t*") byte[] error);
-
-    public static native void usearch_metadata(String path, usearch_init_options_t options,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_metadata(String path, usearch_init_options_t options,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Saves the index to an in-memory buffer.
@@ -2675,13 +2623,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *               stored, if an error occurs.
      */
     public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer,
-            @Cast("size_t") long length, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer,
-            @Cast("size_t") long length, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer,
-            @Cast("size_t") long length, @Cast("usearch_error_t*") byte[] error);
+            @Cast("size_t") long length, usearch_error_t error);
 
     /**
      * \brief Loads the index from an in-memory buffer.
@@ -2694,17 +2636,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @param error  [out] Pointer to a string where the error message will be
      *               stored, if an error occurs.
      */
-    public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
+    public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("void const*") Pointer buffer,
             @Cast("size_t") long length,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
-            @Cast("size_t") long length,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
-            @Cast("size_t") long length,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Creates a view of the index from an in-memory buffer without copying
@@ -2718,17 +2653,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @param error  [out] Pointer to a string where the error message will be
      *               stored, if an error occurs.
      */
-    public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
+    public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index,
+            @Cast("void const*") Pointer buffer,
             @Cast("size_t") long length,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
-            @Cast("size_t") long length,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index, @Cast("void const*") Pointer buffer,
-            @Cast("size_t") long length,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Loads index metadata from an in-memory buffer.
@@ -2742,15 +2670,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      */
     public static native void usearch_metadata_buffer(@Cast("void const*") Pointer buffer, @Cast("size_t") long length,
             usearch_init_options_t options,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_metadata_buffer(@Cast("void const*") Pointer buffer, @Cast("size_t") long length,
-            usearch_init_options_t options,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_metadata_buffer(@Cast("void const*") Pointer buffer, @Cast("size_t") long length,
-            usearch_init_options_t options,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Reports the current size (number of vectors) of the index.
@@ -2760,13 +2680,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Reports the current capacity (number of vectors) of the index.
@@ -2776,13 +2690,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Reports the current dimensions of the vectors in the index.
@@ -2792,13 +2700,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Reports the current connectivity of the index.
@@ -2808,13 +2710,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Reserves memory for a specified number of incoming vectors.
@@ -2825,13 +2721,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                 stored, if an error occurs.
      */
     public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long _capacity, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long _capacity, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long _capacity, @Cast("usearch_error_t*") byte[] error);
+            @Cast("size_t") long _capacity, usearch_error_t error);
 
     /**
      * \brief Retrieves the expansion value used during index creation.
@@ -2842,13 +2732,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The expansion value used during index creation.
      */
     public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Retrieves the expansion value used during search.
@@ -2859,13 +2743,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The expansion value used during search.
      */
     public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Updates the expansion value used during index creation. Rarely used.
@@ -2876,13 +2754,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                  stored, if an error occurs.
      */
     public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long expansion, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long expansion, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long expansion, @Cast("usearch_error_t*") byte[] error);
+            @Cast("size_t") long expansion, usearch_error_t error);
 
     /**
      * \brief Updates the expansion value used during search. Rarely used.
@@ -2893,13 +2765,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                  stored, if an error occurs.
      */
     public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long expansion, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long expansion, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long expansion, @Cast("usearch_error_t*") byte[] error);
+            @Cast("size_t") long expansion, usearch_error_t error);
 
     /**
      * \brief Updates the number of threads that would be used to construct the
@@ -2911,13 +2777,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                stored, if an error occurs.
      */
     public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long threads, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long threads, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long threads, @Cast("usearch_error_t*") byte[] error);
+            @Cast("size_t") long threads, usearch_error_t error);
 
     /**
      * \brief Updates the number of threads that will be performing concurrent
@@ -2929,13 +2789,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                stored, if an error occurs.
      */
     public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long threads, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long threads, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long threads, @Cast("usearch_error_t*") byte[] error);
+            @Cast("size_t") long threads, usearch_error_t error);
 
     /**
      * \brief Updates the metric kind used for distance calculation between vectors.
@@ -2948,15 +2802,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      */
     public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index,
             @Cast("usearch_metric_kind_t") int kind,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_metric_kind_t") int kind,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_metric_kind_t") int kind,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Updates the custom metric function used for distance calculation
@@ -2974,15 +2820,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      */
     public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index,
             usearch_metric_t metric, Pointer state,
-            @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index,
-            usearch_metric_t metric, Pointer state,
-            @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index,
-            usearch_metric_t metric, Pointer state,
-            @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") byte[] error);
+            @Cast("usearch_metric_kind_t") int kind, usearch_error_t error);
 
     /**
      * \brief Adds a vector with a key to the index.
@@ -2997,17 +2835,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native void usearch_add(
             @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
             @Cast("void const*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_add(
-            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
-            @Cast("void const*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_add(
-            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
-            @Cast("void const*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Checks if the index contains a vector with a specific key.
@@ -3020,13 +2848,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *         {@code false} otherwise.
      */
     public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
+            @Cast("usearch_key_t") long key, usearch_error_t error);
 
     /**
      * \brief Counts the number of entries in the index under a specific key.
@@ -3038,13 +2860,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return Number of vectors found under that key.
      */
     public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
+            @Cast("usearch_key_t") long key, usearch_error_t error);
 
     /**
      * \brief Performs k-Approximate Nearest Neighbors (kANN) Search for closest
@@ -3065,21 +2881,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      */
     public static native long usearch_search(
             @Cast("usearch_index_t") usearch_index_t index,
-            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind,
+            @Cast("size_t") long count,
             @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_search(
-            @Cast("usearch_index_t") usearch_index_t index,
-            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
-            @Cast("usearch_key_t*") LongBuffer keys, @Cast("usearch_distance_t*") FloatBuffer distances,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_search(
-            @Cast("usearch_index_t") usearch_index_t index,
-            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
-            @Cast("usearch_key_t*") long[] keys, @Cast("usearch_distance_t*") float[] distances,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Performs k-Approximate Nearest Neighbors (kANN) Search for closest
@@ -3125,24 +2930,11 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
 
     public static native long usearch_filtered_search(
             @Cast("usearch_index_t") usearch_index_t index,
-            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
+            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind,
+            @Cast("size_t") long count,
             usearch_filter filter, Pointer filter_state,
             @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_filtered_search(
-            @Cast("usearch_index_t") usearch_index_t index,
-            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
-            usearch_filter filter, Pointer filter_state,
-            @Cast("usearch_key_t*") LongBuffer keys, @Cast("usearch_distance_t*") FloatBuffer distances,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_filtered_search(
-            @Cast("usearch_index_t") usearch_index_t index,
-            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind, @Cast("size_t") long count,
-            usearch_filter filter, Pointer filter_state,
-            @Cast("usearch_key_t*") long[] keys, @Cast("usearch_distance_t*") float[] distances,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Retrieves the vector associated with the given key from the index.
@@ -3162,15 +2954,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native long usearch_get(
             @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
             @Cast("void*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_get(
-            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
-            @Cast("void*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_get(
-            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
-            @Cast("void*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind, @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Removes the vector associated with the given key from the index.
@@ -3182,13 +2966,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return Number of vectors found under that name and dropped from the index.
      */
     public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") byte[] error);
+            @Cast("usearch_key_t") long key, usearch_error_t error);
 
     /**
      * \brief Renames the vector to map to a different key.
@@ -3202,15 +2980,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      */
     public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index,
             @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     /**
      * \brief Computes the distance between two equi-dimensional vectors.
@@ -3229,19 +2999,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
             @Cast("void const*") Pointer vector_first,
             @Cast("void const*") Pointer vector_second,
             @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") BytePointer error);
-
-    public static native float usearch_distance(
-            @Cast("void const*") Pointer vector_first,
-            @Cast("void const*") Pointer vector_second,
-            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native float usearch_distance(
-            @Cast("void const*") Pointer vector_first,
-            @Cast("void const*") Pointer vector_second,
-            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") byte[] error);
+            @Cast("usearch_metric_kind_t") int metric_kind, usearch_error_t error);
 
     /**
      * \brief Multi-threaded many-to-many exact nearest neighbors search for
@@ -3280,31 +3038,15 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @param error            [out] Pointer to a string where the error message
      *                         will be stored, if an error occurs.
      */
-    public static native void usearch_exact_search(@Cast("void const*") Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
-                                                   @Cast("void const*") Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
+    public static native void usearch_exact_search(@Cast("void const*") Pointer dataset,
+            @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
+            @Cast("void const*") Pointer queries, @Cast("size_t") long queries_size,
+            @Cast("size_t") long queries_stride,
             @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
             @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
             @Cast("usearch_key_t*") LongPointer keys, @Cast("size_t") long keys_stride,
             @Cast("usearch_distance_t*") FloatPointer distances, @Cast("size_t") long distances_stride,
-            @Cast("usearch_error_t*") BytePointer error);
-
-    public static native void usearch_exact_search(
-                                                   @Cast("void const*") Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
-                                                   @Cast("void const*") Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
-            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
-            @Cast("usearch_key_t*") LongBuffer keys, @Cast("size_t") long keys_stride,
-            @Cast("usearch_distance_t*") FloatBuffer distances, @Cast("size_t") long distances_stride,
-            @Cast("usearch_error_t*") ByteBuffer error);
-
-    public static native void usearch_exact_search(
-                                                   @Cast("void const*") Pointer dataset, @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
-                                                   @Cast("void const*") Pointer queries, @Cast("size_t") long queries_size, @Cast("size_t") long queries_stride,
-            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
-            @Cast("usearch_key_t*") long[] keys, @Cast("size_t") long keys_stride,
-            @Cast("usearch_distance_t*") float[] distances, @Cast("size_t") long distances_stride,
-            @Cast("usearch_error_t*") byte[] error);
+            usearch_error_t error);
 
     // #ifdef __cplusplus
     // #endif
