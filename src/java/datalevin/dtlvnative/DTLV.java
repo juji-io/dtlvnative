@@ -2304,8 +2304,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
         // Default constructor (for allocation via native code)
         public usearch_error_t() {
             super((Pointer) null);
-            // allocate();
+            allocate();
         }
+
+        private native void allocate();
 
         // Constructor to wrap an existing native pointer
         public usearch_error_t(Pointer p) {

@@ -191,6 +191,7 @@ public class Test {
         System.out.println("created opts");
 
         DTLV.usearch_error_t error = new DTLV.usearch_error_t();
+        System.out.println("created error");
 
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
         expect(index != null, "Failed to init index");
