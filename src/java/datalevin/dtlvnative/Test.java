@@ -193,18 +193,14 @@ public class Test {
     static void testUsearchInit(int collSize, int dimensions) {
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
-        System.out.println("created opts");
 
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
-        System.out.println("created error");
 
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
-        System.out.println("created index");
         expect(index != null, "Failed to init index");
 
         DTLV.usearch_free(index, error);
         expect(noError(error), "Failed to free index");
-        System.out.println("freed index");
 
         index = DTLV.usearch_init(opts, error);
         expect(index != null, "Failed to init index");
@@ -223,7 +219,7 @@ public class Test {
                 "Failed to get index connectivity");
 
         DTLV.usearch_reserve(index, collSize, error);
-        // expect(error.noError(), "Failed to reserve");
+        expect(noError(error), "Failed to reserve");
 
         size = DTLV.usearch_size(index, error);
         expect(size == 0, "Failed to get index size");

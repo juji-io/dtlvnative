@@ -2298,52 +2298,6 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * Returned error messages \b don't need to be deallocated.
      */
     // USEARCH_EXPORT typedef char const* usearch_error_t;
-    // public static class usearch_error_t extends BytePointer {
-    //     static {
-    //         Loader.load();
-    //     } // Load the native library
-
-    //     // Default constructor (for allocation via native code)
-    //     public usearch_error_t() {
-    //         super((Pointer) null);
-    //         allocate();
-    //     }
-
-    //     public usearch_error_t(long size) {
-    //         super((Pointer) null);
-    //         allocateArray(size);
-    //     }
-
-    //     /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-    //     public usearch_error_t(Pointer p) {
-    //         super(p);
-    //     }
-
-    //     private native void allocate();
-
-    //     private native void allocateArray(long size);
-
-    //     @Override
-    //     @SuppressWarnings("unchecked")
-    //     public usearch_error_t position(long position) {
-    //         return (usearch_error_t) super.position(position);
-    //     }
-
-    //     @Override
-    //     @SuppressWarnings("unchecked")
-    //     public usearch_error_t getPointer(long i) {
-    //         return new usearch_error_t((Pointer) this).offsetAddress(i);
-    //     }
-
-    //     // Access the underlying C string as a Java String
-    //     public String getMessage() {
-    //         return getString(); // Inherited from Pointer; decodes the C string
-    //     }
-
-    //     public boolean noError() {
-    //         return isNull(this);
-    //     }
-    // }
 
     /**
      * \brief Type-punned callback for "metrics" or "distance functions",
