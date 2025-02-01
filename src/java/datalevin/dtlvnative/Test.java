@@ -190,7 +190,7 @@ public class Test {
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         System.out.println("created opts");
 
-        DTLV.usearch_error_t error = new DTLV.usearch_error_t();
+        DTLV.usearch_error_t error = new DTLV.usearch_error_t(1);
         System.out.println("created error");
 
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
@@ -250,7 +250,7 @@ public class Test {
 
     static void testUsearchAdd(int collSize, int dimensions) {
 
-        DTLV.usearch_error_t error = new DTLV.usearch_error_t();
+        DTLV.usearch_error_t error = new DTLV.usearch_error_t(1);
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
@@ -284,7 +284,7 @@ public class Test {
 
     static void testUsearchFind(int collSize, int dimensions) {
 
-        DTLV.usearch_error_t error = new DTLV.usearch_error_t();
+        DTLV.usearch_error_t error = new DTLV.usearch_error_t(1);
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
@@ -315,7 +315,7 @@ public class Test {
 
     static void testUsearchGet(int collSize, int dimensions) {
 
-        DTLV.usearch_error_t error = new DTLV.usearch_error_t();
+        DTLV.usearch_error_t error = new DTLV.usearch_error_t(1);
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         opts.multi(true);
@@ -345,7 +345,7 @@ public class Test {
 
     static void testUsearchRemove(int collSize, int dimensions) {
 
-        DTLV.usearch_error_t error = new DTLV.usearch_error_t();
+        DTLV.usearch_error_t error = new DTLV.usearch_error_t(1);
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
@@ -370,7 +370,7 @@ public class Test {
 
     static void testUsearchLoad(int collSize, int dimensions) {
 
-        DTLV.usearch_error_t error = new DTLV.usearch_error_t();
+        DTLV.usearch_error_t error = new DTLV.usearch_error_t(1);
 
         DTLV.usearch_init_options_t weird_opts = createOpts(dimensions);
         weird_opts.connectivity(11)
@@ -437,7 +437,7 @@ public class Test {
 
     static void testUsearchView(int collSize, int dimensions) {
 
-        DTLV.usearch_error_t error = new DTLV.usearch_error_t();
+        DTLV.usearch_error_t error = new DTLV.usearch_error_t(1);
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);

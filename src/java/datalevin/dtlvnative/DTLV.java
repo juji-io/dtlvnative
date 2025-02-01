@@ -2299,7 +2299,9 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      */
     // USEARCH_EXPORT typedef char const* usearch_error_t;
     public static class usearch_error_t extends BytePointer {
-        static { Loader.load(); } // Load the native library
+        static {
+            Loader.load();
+        } // Load the native library
 
         // Default constructor (for allocation via native code)
         public usearch_error_t() {
@@ -2307,11 +2309,30 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
             allocate();
         }
 
-        private native void allocate();
+        public usearch_error_t(long size) {
+            super((Pointer) null);
+            allocateArray(size);
+        }
 
-        // Constructor to wrap an existing native pointer
+        /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
         public usearch_error_t(Pointer p) {
             super(p);
+        }
+
+        private native void allocate();
+
+        private native void allocateArray(long size);
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public usearch_error_t position(long position) {
+            return (usearch_error_t) super.position(position);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public usearch_error_t getPointer(long i) {
+            return new usearch_error_t((Pointer) this).offsetAddress(i);
         }
 
         // Access the underlying C string as a Java String
@@ -2402,11 +2423,13 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
         private native void allocateArray(long size);
 
         @Override
+        @SuppressWarnings("unchecked")
         public usearch_init_options_t position(long position) {
             return (usearch_init_options_t) super.position(position);
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public usearch_init_options_t getPointer(long i) {
             return new usearch_init_options_t((Pointer) this).offsetAddress(i);
         }
