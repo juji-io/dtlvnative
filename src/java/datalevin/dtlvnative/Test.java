@@ -168,17 +168,17 @@ public class Test {
         DTLV.usearch_init_options_t opts = new DTLV.usearch_init_options_t();
         opts.connectivity(3)
             .dimensions(dimensions)
-            .expansion_add(40)
-            .expansion_search(16)
-            .metric_kind(DTLV.usearch_metric_ip_k)
-            .metric(null)
-            .quantization(DTLV.usearch_scalar_f32_k)
-            .multi(false);
+                .expansion_add(40)
+                .expansion_search(16)
+                .metric_kind(DTLV.usearch_metric_ip_k)
+                .quantization(DTLV.usearch_scalar_f32_k)
+                .multi(false);
         return opts;
     }
 
     static void expect(boolean must_be_true, String message) {
-        if (must_be_true) return;
+        if (must_be_true)
+            return;
 
         message = (message != null ? message : "Unit test failed");
         System.out.println(message);
@@ -194,8 +194,8 @@ public class Test {
         System.out.println("created error");
 
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
-        expect(index != null, "Failed to init index");
         System.out.println("created index");
+        expect(index != null, "Failed to init index");
 
         DTLV.usearch_free(index, error);
         // expect(error.noError(), "Failed to free index");
