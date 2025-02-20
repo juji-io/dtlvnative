@@ -6,7 +6,7 @@
   :dependencies [[org.clojure/clojure "1.12.0"]
                  [org.bytedeco/javacpp "1.5.11"]]
   :java-source-paths ["../src/java"]
-  :javac-options ["-Xlint:unchecked" "-Xlint:-options" "--release" "8"]
+  :javac-options ["-Xlint:unchecked" "-Xlint:-options" "--release" "11"]
   :main datalevin.dtlvnative.Test
   :deploy-repositories [["clojars" {:url           "https://repo.clojars.org"
                                     :username      :env/clojars_username
