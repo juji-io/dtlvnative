@@ -1,3 +1,4 @@
 [submodule "lmdb"]
 	path = src/lmdb
 	url = https://git.openldap.org/openldap/openldap.git
+  branch = mdb.master
