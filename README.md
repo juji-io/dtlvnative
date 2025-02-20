@@ -2,14 +2,14 @@
 
 Provides pre-built native dependencies for
 [Datalevin](https://github.com/juji-io/datalevin) database. This is done by
-packaging the compiled shared C libraries and JavaCPP library files in the
+packaging the compiled native libraries and JavaCPP JNI library files in the
 platform specific JAR files.
 
-The following two shared libraries are included as resources in the JAR:
+In addition to JavaCPP's JNI library, these native libraries are included:
 
-* `dtlv `shared library wraps LMDB library, and implements comparator, iterators
-  and samplers.
-* `jniDTLV` shared library includes helpers for JavaCPP to wrap dtlv using JNI.
+* `lmdb` LMDB key value library.
+* `dtlv `wraps LMDB and implements Datalevin comparator, iterators, counters and
+  samplers.
 
 The following platforms are currently supported:
 
@@ -17,7 +17,10 @@ The following platforms are currently supported:
 * macosx-x86_64
 * linux-arm64
 * linux-x86_64
-* windows-x86-64
+* windows-x86_64
+
+The name of the released JAR is org.clojars.huahaiy/dtlvnative-PLATFORM where
+PLATFORM is one of the above.
 
 ## License
 
