@@ -15,7 +15,7 @@ jobs:
       CLOJARS_PASSWORD: ${{secrets.CLOJARSPASSWORD}}
     strategy:
       matrix:
-        os: [macos-13, ubuntu-24.04]
+        os: [macos-13, ubuntu-22.04]
 
     steps:
       - name: Checkout repository and submodules

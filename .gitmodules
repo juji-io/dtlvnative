@@ -1,6 +1,7 @@
 [submodule "lmdb"]
 	path = src/lmdb
 	url = https://git.openldap.org/openldap/openldap.git
+  branch = mdb.master
 [submodule "usearch"]
 	path = src/usearch
 	url = https://github.com/unum-cloud/usearch.git
