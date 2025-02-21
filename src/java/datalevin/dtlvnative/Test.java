@@ -186,8 +186,10 @@ public class Test {
     }
 
     static void expectNoError(PointerPointer<BytePointer> error, String message) {
-        if (error.get() != null) {
-            String msg = error.get().getString();
+
+        BytePointer errPtr = error.get();
+        if (errPtr != null) {
+            String msg = errPtr.getString();
             System.out.println(message + ": " + msg);
             System.exit(-1);
         }
