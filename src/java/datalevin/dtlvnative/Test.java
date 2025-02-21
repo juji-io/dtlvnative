@@ -185,9 +185,12 @@ public class Test {
         System.exit(-1);
     }
 
-    static boolean noError(PointerPointer<BytePointer> error) {
-        BytePointer msgPtr = error.get(BytePointer.class, 0);
-        return msgPtr == null;
+    static void expectNoError(PointerPointer<BytePointer> error, String message) {
+        if (error.get() != null) {
+            String msg = error.get().getString();
+            System.out.println(message + ": " + msg);
+            System.exit(-1);
+        }
     }
 
     static void testUsearchInit(int collSize, int dimensions) {
@@ -200,7 +203,7 @@ public class Test {
         expect(index != null, "Failed to init index");
 
         DTLV.usearch_free(index, error);
-        expect(noError(error), "Failed to free index");
+        expectNoError(error, "Fail to free index");
 
         index = DTLV.usearch_init(opts, error);
         expect(index != null, "Failed to init index");
@@ -219,7 +222,7 @@ public class Test {
                 "Failed to get index connectivity");
 
         DTLV.usearch_reserve(index, collSize, error);
-        expect(noError(error), "Failed to reserve");
+        expectNoError(error, "Fail to reserve");
 
         size = DTLV.usearch_size(index, error);
         expect(size == 0, "Failed to get index size");
@@ -235,7 +238,7 @@ public class Test {
                 "Failed to get index connectivity");
 
         BytePointer hardware = DTLV.usearch_hardware_acceleration(index, error);
-        expect(noError(error), "Failed to get hardware");
+        expectNoError(error, "Fail to get hardware");
         System.out.println("SIMD Hardware ISA Name is: " + hardware.getString());
 
         long memory = DTLV.usearch_memory_usage(index, error);
@@ -243,7 +246,7 @@ public class Test {
         System.out.println("Memory Usage is: " + memory);
 
         DTLV.usearch_free(index, error);
-        expect(noError(error), "Failed to free index");
+        expectNoError(error, "Fail to free index");
 
         System.out.println("Passed init.");
     }
@@ -263,7 +266,7 @@ public class Test {
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
             DTLV.usearch_add(index, (long)i, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expect(noError(error), "Failed to add to index");
+            expectNoError(error, "Fail to add vector");
         }
 
         long size = DTLV.usearch_size(index, error);
@@ -296,7 +299,7 @@ public class Test {
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
             DTLV.usearch_add(index, (long) i, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expect(noError(error), "Failed to add to index");
+            expectNoError(error, "Fail to add vector");
         }
 
         LongPointer keys = new LongPointer(new long[collSize]);
@@ -306,7 +309,7 @@ public class Test {
             FloatPointer vecPtr = new FloatPointer(data[i]);
             long found = DTLV.usearch_search(index, vecPtr, DTLV.usearch_scalar_f32_k,
                                              (long)collSize, keys, distances, error);
-            expect(noError(error), "Failed to search index");
+            expectNoError(error, "Fail to search");
             expect(found >= 1 && found <= collSize, "Vector cannot be found");
         }
 
@@ -329,14 +332,14 @@ public class Test {
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
             DTLV.usearch_add(index, key, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expect(noError(error), "Failed to add to index");
+            expectNoError(error, "Fail to add vector");
         }
 
         float[] vectors = new float[collSize * dimensions];
         FloatPointer vPtr= new FloatPointer(vectors);
         long found = DTLV.usearch_get(index, key, (long) collSize, vPtr,
                                       DTLV.usearch_scalar_f32_k, error);
-        expect(noError(error), "Failed to get key from index");
+        expectNoError(error, "Fail to get");
         expect(found == collSize, "Key is missing");
 
         DTLV.usearch_free(index, error);
@@ -357,12 +360,12 @@ public class Test {
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
             DTLV.usearch_add(index, (long)i, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expect(noError(error), "Failed to add to index");
+            expectNoError(error, "Fail to add");
         }
 
         for (int i = 0; i < collSize; i++) {
             DTLV.usearch_remove(index, (long) i, error);
-            expect(noError(error), "Failed to remove key from index");
+            expectNoError(error, "Fail to remove");
         }
 
         DTLV.usearch_free(index, error);
@@ -387,20 +390,20 @@ public class Test {
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
             DTLV.usearch_add(index, (long) i, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expect(noError(error), "Failed to add to index");
+            expectNoError(error, "Fail to add");
         }
 
         String dir = "us";
 
         DTLV.usearch_save(index, dir, error);
-        expect(noError(error), "Failed to save index");
+        expectNoError(error, "Fail to save");
         DTLV.usearch_free(index, error);
 
         index = DTLV.usearch_init(null, error);
-        expect(noError(error), "Failed to init index");
+        expectNoError(error, "Fail to init");
 
         DTLV.usearch_load(index, "us", error);
-        expect(noError(error), "Failed to load index");
+        expectNoError(error, "Fail to load");
 
         long size = DTLV.usearch_size(index, error);
         expect(size == collSize, "Failed to get index size");
@@ -425,7 +428,7 @@ public class Test {
             FloatPointer vecPtr = new FloatPointer(data[i]);
             long found = DTLV.usearch_search(index, vecPtr, DTLV.usearch_scalar_f32_k,
                                              (long)collSize, keys, distances, error);
-            expect(noError(error), "Failed to search index");
+            expectNoError(error, "Fail to search");
             expect(found >= 1 && found <= collSize, "Vector cannot be found");
         }
 
@@ -449,19 +452,19 @@ public class Test {
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
             DTLV.usearch_add(index, (long)i, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expect(noError(error), "Failed to add to index");
+            expectNoError(error, "Fail to add");
         }
 
         String dir = "us";
 
         DTLV.usearch_save(index, dir, error);
-        expect(noError(error), "Failed to save index");
+        expectNoError(error, "Fail to save");
         DTLV.usearch_free(index, error);
 
         index = DTLV.usearch_init(opts, error);
 
         DTLV.usearch_view(index, dir, error);
-        expect(noError(error), "Failed to view index");
+        expectNoError(error, "Fail to view");
 
         DTLV.usearch_free(index, error);
 

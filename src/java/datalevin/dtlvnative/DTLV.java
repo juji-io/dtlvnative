@@ -528,66 +528,66 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     /** enum MDB_cursor_op */
     public static final int
     /** Position at first key/data item */
-    MDB_FIRST = 0,
-            /**
-             * Position at first data item of current key.
-             * Only for #MDB_DUPSORT
-             */
-            MDB_FIRST_DUP = 1,
-            /** Position at key/data pair. Only for #MDB_DUPSORT */
-            MDB_GET_BOTH = 2,
-            /** position at key, nearest data. Only for #MDB_DUPSORT */
-            MDB_GET_BOTH_RANGE = 3,
-            /** Return key/data at current cursor position */
-            MDB_GET_CURRENT = 4,
-            /**
-             * Return up to a page of duplicate data items
-             * from current cursor position. Move cursor to prepare
-             * for #MDB_NEXT_MULTIPLE. Only for #MDB_DUPFIXED
-             */
-            MDB_GET_MULTIPLE = 5,
-            /** Position at last key/data item */
-            MDB_LAST = 6,
-            /**
-             * Position at last data item of current key.
-             * Only for #MDB_DUPSORT
-             */
-            MDB_LAST_DUP = 7,
-            /** Position at next data item */
-            MDB_NEXT = 8,
-            /**
-             * Position at next data item of current key.
-             * Only for #MDB_DUPSORT
-             */
-            MDB_NEXT_DUP = 9,
-            /**
-             * Return up to a page of duplicate data items
-             * from next cursor position. Move cursor to prepare
-             * for #MDB_NEXT_MULTIPLE. Only for #MDB_DUPFIXED
-             */
-            MDB_NEXT_MULTIPLE = 10,
-            /** Position at first data item of next key */
-            MDB_NEXT_NODUP = 11,
-            /** Position at previous data item */
-            MDB_PREV = 12,
-            /**
-             * Position at previous data item of current key.
-             * Only for #MDB_DUPSORT
-             */
-            MDB_PREV_DUP = 13,
-            /** Position at last data item of previous key */
-            MDB_PREV_NODUP = 14,
-            /** Position at specified key */
-            MDB_SET = 15,
-            /** Position at specified key, return key + data */
-            MDB_SET_KEY = 16,
-            /** Position at first key greater than or equal to specified key. */
-            MDB_SET_RANGE = 17,
-            /**
-             * Position at previous page and return up to
-             * a page of duplicate data items. Only for #MDB_DUPFIXED
-             */
-            MDB_PREV_MULTIPLE = 18;
+        MDB_FIRST = 0,
+    /**
+     * Position at first data item of current key.
+     * Only for #MDB_DUPSORT
+     */
+        MDB_FIRST_DUP = 1,
+    /** Position at key/data pair. Only for #MDB_DUPSORT */
+        MDB_GET_BOTH = 2,
+    /** position at key, nearest data. Only for #MDB_DUPSORT */
+        MDB_GET_BOTH_RANGE = 3,
+    /** Return key/data at current cursor position */
+        MDB_GET_CURRENT = 4,
+    /**
+     * Return up to a page of duplicate data items
+     * from current cursor position. Move cursor to prepare
+     * for #MDB_NEXT_MULTIPLE. Only for #MDB_DUPFIXED
+     */
+        MDB_GET_MULTIPLE = 5,
+    /** Position at last key/data item */
+        MDB_LAST = 6,
+    /**
+     * Position at last data item of current key.
+     * Only for #MDB_DUPSORT
+     */
+        MDB_LAST_DUP = 7,
+    /** Position at next data item */
+        MDB_NEXT = 8,
+    /**
+     * Position at next data item of current key.
+     * Only for #MDB_DUPSORT
+     */
+        MDB_NEXT_DUP = 9,
+    /**
+     * Return up to a page of duplicate data items
+     * from next cursor position. Move cursor to prepare
+     * for #MDB_NEXT_MULTIPLE. Only for #MDB_DUPFIXED
+     */
+        MDB_NEXT_MULTIPLE = 10,
+    /** Position at first data item of next key */
+        MDB_NEXT_NODUP = 11,
+    /** Position at previous data item */
+        MDB_PREV = 12,
+    /**
+     * Position at previous data item of current key.
+     * Only for #MDB_DUPSORT
+     */
+        MDB_PREV_DUP = 13,
+    /** Position at last data item of previous key */
+        MDB_PREV_NODUP = 14,
+    /** Position at specified key */
+        MDB_SET = 15,
+    /** Position at specified key, return key + data */
+        MDB_SET_KEY = 16,
+    /** Position at first key greater than or equal to specified key. */
+        MDB_SET_RANGE = 17,
+    /**
+     * Position at previous page and return up to
+     * a page of duplicate data items. Only for #MDB_DUPFIXED
+     */
+        MDB_PREV_MULTIPLE = 18;
 
     /**
      * \defgroup errors Return Codes
@@ -1015,10 +1015,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *         </ul>
      */
     public static native int mdb_env_open(MDB_env env, @Cast("const char*") BytePointer path,
-            @Cast("unsigned int") int flags, @Cast("mdb_mode_t") int mode);
+                                          @Cast("unsigned int") int flags, @Cast("mdb_mode_t") int mode);
 
     public static native int mdb_env_open(MDB_env env, String path, @Cast("unsigned int") int flags,
-            @Cast("mdb_mode_t") int mode);
+                                          @Cast("mdb_mode_t") int mode);
 
     /**
      * \brief Copy an LMDB environment to the specified path.
@@ -1087,7 +1087,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return A non-zero error value on failure and 0 on success.
      */
     public static native int mdb_env_copy2(MDB_env env, @Cast("const char*") BytePointer path,
-            @Cast("unsigned int") int flags);
+                                           @Cast("unsigned int") int flags);
 
     public static native int mdb_env_copy2(MDB_env env, String path, @Cast("unsigned int") int flags);
 
@@ -1456,10 +1456,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *         </ul>
      */
     public static native int mdb_txn_begin(MDB_env env, MDB_txn parent, @Cast("unsigned int") int flags,
-            @Cast("MDB_txn**") PointerPointer txn);
+                                           @Cast("MDB_txn**") PointerPointer txn);
 
     public static native int mdb_txn_begin(MDB_env env, MDB_txn parent, @Cast("unsigned int") int flags,
-            @ByPtrPtr MDB_txn txn);
+                                           @ByPtrPtr MDB_txn txn);
 
     /**
      * \brief Returns the transaction's #MDB_env
@@ -1645,22 +1645,22 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *         </ul>
      */
     public static native int mdb_dbi_open(MDB_txn txn, @Cast("const char*") BytePointer name,
-            @Cast("unsigned int") int flags, @Cast("MDB_dbi*") IntPointer dbi);
+                                          @Cast("unsigned int") int flags, @Cast("MDB_dbi*") IntPointer dbi);
 
     public static native int mdb_dbi_open(MDB_txn txn, String name, @Cast("unsigned int") int flags,
-            @Cast("MDB_dbi*") IntBuffer dbi);
+                                          @Cast("MDB_dbi*") IntBuffer dbi);
 
     public static native int mdb_dbi_open(MDB_txn txn, @Cast("const char*") BytePointer name,
-            @Cast("unsigned int") int flags, @Cast("MDB_dbi*") int[] dbi);
+                                          @Cast("unsigned int") int flags, @Cast("MDB_dbi*") int[] dbi);
 
     public static native int mdb_dbi_open(MDB_txn txn, String name, @Cast("unsigned int") int flags,
-            @Cast("MDB_dbi*") IntPointer dbi);
+                                          @Cast("MDB_dbi*") IntPointer dbi);
 
     public static native int mdb_dbi_open(MDB_txn txn, @Cast("const char*") BytePointer name,
-            @Cast("unsigned int") int flags, @Cast("MDB_dbi*") IntBuffer dbi);
+                                          @Cast("unsigned int") int flags, @Cast("MDB_dbi*") IntBuffer dbi);
 
     public static native int mdb_dbi_open(MDB_txn txn, String name, @Cast("unsigned int") int flags,
-            @Cast("MDB_dbi*") int[] dbi);
+                                          @Cast("MDB_dbi*") int[] dbi);
 
     /**
      * \brief Retrieve statistics for a database.
@@ -1686,10 +1686,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return A non-zero error value on failure and 0 on success.
      */
     public static native int mdb_dbi_flags(MDB_txn txn, @Cast("MDB_dbi") int dbi,
-            @Cast("unsigned int*") IntPointer flags);
+                                           @Cast("unsigned int*") IntPointer flags);
 
     public static native int mdb_dbi_flags(MDB_txn txn, @Cast("MDB_dbi") int dbi,
-            @Cast("unsigned int*") IntBuffer flags);
+                                           @Cast("unsigned int*") IntBuffer flags);
 
     public static native int mdb_dbi_flags(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("unsigned int*") int[] flags);
 
@@ -1911,7 +1911,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *         </ul>
      */
     public static native int mdb_put(MDB_txn txn, @Cast("MDB_dbi") int dbi, MDB_val key, MDB_val data,
-            @Cast("unsigned int") int flags);
+                                     @Cast("unsigned int") int flags);
 
     /**
      * \brief Delete items from a database.
@@ -1964,7 +1964,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *         </ul>
      */
     public static native int mdb_cursor_open(MDB_txn txn, @Cast("MDB_dbi") int dbi,
-            @Cast("MDB_cursor**") PointerPointer cursor);
+                                             @Cast("MDB_cursor**") PointerPointer cursor);
 
     public static native int mdb_cursor_open(MDB_txn txn, @Cast("MDB_dbi") int dbi, @ByPtrPtr MDB_cursor cursor);
 
@@ -2036,7 +2036,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *         </ul>
      */
     public static native int mdb_cursor_get(MDB_cursor cursor, MDB_val key, MDB_val data,
-            @Cast("MDB_cursor_op") int op);
+                                            @Cast("MDB_cursor_op") int op);
 
     /**
      * \brief Store by cursor.
@@ -2115,7 +2115,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *         </ul>
      */
     public static native int mdb_cursor_put(MDB_cursor cursor, MDB_val key, MDB_val data,
-            @Cast("unsigned int") int flags);
+                                            @Cast("unsigned int") int flags);
 
     /**
      * \brief Delete current key/data pair
@@ -2331,24 +2331,24 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      */
     /** enum usearch_metric_kind_t */
     public static final int usearch_metric_unknown_k = 0,
-            usearch_metric_cos_k = 1,
-            usearch_metric_ip_k = 2,
-            usearch_metric_l2sq_k = 3,
-            usearch_metric_haversine_k = 4,
-            usearch_metric_divergence_k = 5,
-            usearch_metric_pearson_k = 6,
-            usearch_metric_jaccard_k = 7,
-            usearch_metric_hamming_k = 8,
-            usearch_metric_tanimoto_k = 9,
-            usearch_metric_sorensen_k = 10;
+        usearch_metric_cos_k = 1,
+        usearch_metric_ip_k = 2,
+        usearch_metric_l2sq_k = 3,
+        usearch_metric_haversine_k = 4,
+        usearch_metric_divergence_k = 5,
+        usearch_metric_pearson_k = 6,
+        usearch_metric_jaccard_k = 7,
+        usearch_metric_hamming_k = 8,
+        usearch_metric_tanimoto_k = 9,
+        usearch_metric_sorensen_k = 10;
 
     /** enum usearch_scalar_kind_t */
     public static final int usearch_scalar_unknown_k = 0,
-            usearch_scalar_f32_k = 1,
-            usearch_scalar_f64_k = 2,
-            usearch_scalar_f16_k = 3,
-            usearch_scalar_i8_k = 4,
-            usearch_scalar_b1_k = 5;
+        usearch_scalar_f32_k = 1,
+        usearch_scalar_f64_k = 2,
+        usearch_scalar_f16_k = 3,
+        usearch_scalar_i8_k = 4,
+        usearch_scalar_b1_k = 5;
 
     public static class usearch_init_options_t extends Pointer {
         static {
@@ -2487,7 +2487,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return A handle to the initialized USearch index, or {@code NULL} on
      *         failure.
      */
-    public static native @Cast("usearch_index_t") usearch_index_t usearch_init(usearch_init_options_t options, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+    public static native @Cast("usearch_index_t") usearch_index_t usearch_init(usearch_init_options_t options, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Frees the resources associated with the index.
@@ -2497,7 +2497,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native void usearch_free(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                           @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Reports the memory usage of the index.
@@ -2508,7 +2508,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return Number of bytes used by the index.
      */
     public static native long usearch_memory_usage(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                   @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Reports the SIMD capabilities used by the index on the current CPU.
@@ -2518,8 +2518,8 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      * @return The codename of the SIMD instruction set used by the index.
      */
-    public static native @Const BytePointer usearch_hardware_acceleration(
-            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+    public static native @Const BytePointer usearch_hardware_acceleration(@Cast("usearch_index_t") usearch_index_t index,
+                                                                          @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Reports expected file size after serialization.
@@ -2529,7 +2529,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native long usearch_serialized_length(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                        @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Saves the index to a file.
@@ -2540,10 +2540,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                           @Cast("const char*") BytePointer path, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     public static native void usearch_save(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                           @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Loads the index from a file.
@@ -2555,10 +2555,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                           @Cast("const char*") BytePointer path, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     public static native void usearch_load(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                           @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Creates a view of the index from a file without copying it into
@@ -2571,10 +2571,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("const char*") BytePointer path, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                           @Cast("const char*") BytePointer path, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     public static native void usearch_view(@Cast("usearch_index_t") usearch_index_t index, String path,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                           @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Loads index metadata from a file.
@@ -2586,10 +2586,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                stored, if an error occurs.
      */
     public static native void usearch_metadata(@Cast("const char*") BytePointer path, usearch_init_options_t options,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                               @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     public static native void usearch_metadata(String path, usearch_init_options_t options,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                               @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Saves the index to an in-memory buffer.
@@ -2602,7 +2602,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *               stored, if an error occurs.
      */
     public static native void usearch_save_buffer(@Cast("usearch_index_t") usearch_index_t index, Pointer buffer,
-            @Cast("size_t") long length, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                  @Cast("size_t") long length, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Loads the index from an in-memory buffer.
@@ -2616,9 +2616,9 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *               stored, if an error occurs.
      */
     public static native void usearch_load_buffer(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("void const*") Pointer buffer,
-            @Cast("size_t") long length,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                  @Cast("void const*") Pointer buffer,
+                                                  @Cast("size_t") long length,
+                                                  @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Creates a view of the index from an in-memory buffer without copying
@@ -2633,9 +2633,9 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *               stored, if an error occurs.
      */
     public static native void usearch_view_buffer(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("void const*") Pointer buffer,
-            @Cast("size_t") long length,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                  @Cast("void const*") Pointer buffer,
+                                                  @Cast("size_t") long length,
+                                                  @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Loads index metadata from an in-memory buffer.
@@ -2648,8 +2648,8 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                stored, if an error occurs.
      */
     public static native void usearch_metadata_buffer(@Cast("void const*") Pointer buffer, @Cast("size_t") long length,
-            usearch_init_options_t options,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                      usearch_init_options_t options,
+                                                      @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Reports the current size (number of vectors) of the index.
@@ -2659,7 +2659,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native long usearch_size(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                           @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Reports the current capacity (number of vectors) of the index.
@@ -2669,7 +2669,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native long usearch_capacity(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                               @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Reports the current dimensions of the vectors in the index.
@@ -2679,7 +2679,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native long usearch_dimensions(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                 @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Reports the current connectivity of the index.
@@ -2689,7 +2689,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native long usearch_connectivity(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                   @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Reserves memory for a specified number of incoming vectors.
@@ -2700,7 +2700,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                 stored, if an error occurs.
      */
     public static native void usearch_reserve(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long _capacity, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                              @Cast("size_t") long _capacity, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Retrieves the expansion value used during index creation.
@@ -2711,7 +2711,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The expansion value used during index creation.
      */
     public static native long usearch_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                    @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Retrieves the expansion value used during search.
@@ -2722,7 +2722,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The expansion value used during search.
      */
     public static native long usearch_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                       @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Updates the expansion value used during index creation. Rarely used.
@@ -2733,7 +2733,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                  stored, if an error occurs.
      */
     public static native void usearch_change_expansion_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long expansion, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                           @Cast("size_t") long expansion, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Updates the expansion value used during search. Rarely used.
@@ -2744,7 +2744,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                  stored, if an error occurs.
      */
     public static native void usearch_change_expansion_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long expansion, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                              @Cast("size_t") long expansion, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Updates the number of threads that would be used to construct the
@@ -2756,7 +2756,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                stored, if an error occurs.
      */
     public static native void usearch_change_threads_add(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long threads, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                         @Cast("size_t") long threads, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Updates the number of threads that will be performing concurrent
@@ -2768,7 +2768,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                stored, if an error occurs.
      */
     public static native void usearch_change_threads_search(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("size_t") long threads, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                            @Cast("size_t") long threads, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Updates the metric kind used for distance calculation between vectors.
@@ -2780,8 +2780,8 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              stored, if an error occurs.
      */
     public static native void usearch_change_metric_kind(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_metric_kind_t") int kind,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                         @Cast("usearch_metric_kind_t") int kind,
+                                                         @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Updates the custom metric function used for distance calculation
@@ -2798,8 +2798,8 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *               stored, if an error occurs.
      */
     public static native void usearch_change_metric(@Cast("usearch_index_t") usearch_index_t index,
-            usearch_metric_t metric, Pointer state,
-            @Cast("usearch_metric_kind_t") int kind, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                    usearch_metric_t metric, Pointer state,
+                                                    @Cast("usearch_metric_kind_t") int kind, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Adds a vector with a key to the index.
@@ -2811,10 +2811,9 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @param error       [out] Pointer to a string where the error message will be
      *                    stored, if an error occurs.
      */
-    public static native void usearch_add(
-            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
-            @Cast("void const*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+    public static native void usearch_add(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key,
+                                          @Cast("void const*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
+                                          @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Checks if the index contains a vector with a specific key.
@@ -2827,7 +2826,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *         {@code false} otherwise.
      */
     public static native boolean usearch_contains(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                  @Cast("usearch_key_t") long key, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Counts the number of entries in the index under a specific key.
@@ -2839,7 +2838,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return Number of vectors found under that key.
      */
     public static native long usearch_count(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                            @Cast("usearch_key_t") long key, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Performs k-Approximate Nearest Neighbors (kANN) Search for closest
@@ -2858,12 +2857,11 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                     stored, if an error occurs.
      * @return Number of found matches.
      */
-    public static native long usearch_search(
-            @Cast("usearch_index_t") usearch_index_t index,
-            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind,
-            @Cast("size_t") long count,
-            @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+    public static native long usearch_search(@Cast("usearch_index_t") usearch_index_t index,
+                                             @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind,
+                                             @Cast("size_t") long count,
+                                             @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances,
+                                             @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Performs k-Approximate Nearest Neighbors (kANN) Search for closest
@@ -2907,13 +2905,12 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
         public native int call(@Cast("usearch_key_t") long key, Pointer filter_state);
     }
 
-    public static native long usearch_filtered_search(
-            @Cast("usearch_index_t") usearch_index_t index,
-            @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind,
-            @Cast("size_t") long count,
-            usearch_filter filter, Pointer filter_state,
-            @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+    public static native long usearch_filtered_search(@Cast("usearch_index_t") usearch_index_t index,
+                                                      @Cast("void const*") Pointer query_vector, @Cast("usearch_scalar_kind_t") int query_kind,
+                                                      @Cast("size_t") long count,
+                                                      usearch_filter filter, Pointer filter_state,
+                                                      @Cast("usearch_key_t*") LongPointer keys, @Cast("usearch_distance_t*") FloatPointer distances,
+                                                      @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Retrieves the vector associated with the given key from the index.
@@ -2930,10 +2927,9 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return Number of vectors found under that name and exported to
      *         {@code vector}.
      */
-    public static native long usearch_get(
-            @Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
-            @Cast("void*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+    public static native long usearch_get(@Cast("usearch_index_t") usearch_index_t index, @Cast("usearch_key_t") long key, @Cast("size_t") long count,
+                                          @Cast("void*") Pointer vector, @Cast("usearch_scalar_kind_t") int vector_kind,
+                                          @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Removes the vector associated with the given key from the index.
@@ -2945,7 +2941,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return Number of vectors found under that name and dropped from the index.
      */
     public static native long usearch_remove(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long key, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                             @Cast("usearch_key_t") long key, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Renames the vector to map to a different key.
@@ -2958,8 +2954,8 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return Number of vectors found under that name and renamed.
      */
     public static native long usearch_rename(@Cast("usearch_index_t") usearch_index_t index,
-            @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                             @Cast("usearch_key_t") long from, @Cast("usearch_key_t") long to,
+                                             @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Computes the distance between two equi-dimensional vectors.
@@ -2974,11 +2970,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                      be stored, if an error occurs.
      * @return Distance between given vectors.
      */
-    public static native float usearch_distance(
-            @Cast("void const*") Pointer vector_first,
-            @Cast("void const*") Pointer vector_second,
-            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+    public static native float usearch_distance(@Cast("void const*") Pointer vector_first,
+                                                @Cast("void const*") Pointer vector_second,
+                                                @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+                                                @Cast("usearch_metric_kind_t") int metric_kind, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
      * \brief Multi-threaded many-to-many exact nearest neighbors search for
@@ -3018,14 +3013,14 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *                         will be stored, if an error occurs.
      */
     public static native void usearch_exact_search(@Cast("void const*") Pointer dataset,
-            @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
-            @Cast("void const*") Pointer queries, @Cast("size_t") long queries_size,
-            @Cast("size_t") long queries_stride,
-            @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
-            @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
-            @Cast("usearch_key_t*") LongPointer keys, @Cast("size_t") long keys_stride,
-            @Cast("usearch_distance_t*") FloatPointer distances, @Cast("size_t") long distances_stride,
-            @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+                                                   @Cast("size_t") long dataset_size, @Cast("size_t") long dataset_stride,
+                                                   @Cast("void const*") Pointer queries, @Cast("size_t") long queries_size,
+                                                   @Cast("size_t") long queries_stride,
+                                                   @Cast("usearch_scalar_kind_t") int scalar_kind, @Cast("size_t") long dimensions,
+                                                   @Cast("usearch_metric_kind_t") int metric_kind, @Cast("size_t") long count, @Cast("size_t") long threads,
+                                                   @Cast("usearch_key_t*") LongPointer keys, @Cast("size_t") long keys_stride,
+                                                   @Cast("usearch_distance_t*") FloatPointer distances, @Cast("size_t") long distances_stride,
+                                                   @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     // #ifdef __cplusplus
     // #endif
@@ -3104,14 +3099,14 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return A non-zero error value on failure and 0 on success.
      */
     public static native int dtlv_key_iter_create(@Cast("dtlv_key_iter**") PointerPointer iter,
-            MDB_cursor cur, MDB_val key, MDB_val val,
-            int forward, int start, int end,
-            MDB_val start_key, MDB_val end_key);
+                                                  MDB_cursor cur, MDB_val key, MDB_val val,
+                                                  int forward, int start, int end,
+                                                  MDB_val start_key, MDB_val end_key);
 
     public static native int dtlv_key_iter_create(@ByPtrPtr dtlv_key_iter iter,
-            MDB_cursor cur, MDB_val key, MDB_val val,
-            int forward, int start, int end,
-            MDB_val start_key, MDB_val end_key);
+                                                  MDB_cursor cur, MDB_val key, MDB_val val,
+                                                  int forward, int start, int end,
+                                                  MDB_val start_key, MDB_val end_key);
 
     /**
      * A function to indicate if the key iterator has the next item. If it does,
@@ -3167,18 +3162,18 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return A non-zero error value on failure and 0 on success.
      */
     public static native int dtlv_list_iter_create(@Cast("dtlv_list_iter**") PointerPointer iter,
-            MDB_cursor cur, MDB_val key, MDB_val val,
-            int kforward, int kstart, int kend,
-            MDB_val start_key, MDB_val end_key,
-            int vforward, int vstart, int vend,
-            MDB_val start_val, MDB_val end_val);
+                                                   MDB_cursor cur, MDB_val key, MDB_val val,
+                                                   int kforward, int kstart, int kend,
+                                                   MDB_val start_key, MDB_val end_key,
+                                                   int vforward, int vstart, int vend,
+                                                   MDB_val start_val, MDB_val end_val);
 
     public static native int dtlv_list_iter_create(@ByPtrPtr dtlv_list_iter iter,
-            MDB_cursor cur, MDB_val key, MDB_val val,
-            int kforward, int kstart, int kend,
-            MDB_val start_key, MDB_val end_key,
-            int vforward, int vstart, int vend,
-            MDB_val start_val, MDB_val end_val);
+                                                   MDB_cursor cur, MDB_val key, MDB_val val,
+                                                   int kforward, int kstart, int kend,
+                                                   MDB_val start_key, MDB_val end_key,
+                                                   int vforward, int vstart, int vend,
+                                                   MDB_val start_val, MDB_val end_val);
 
     /**
      * A function to indicate if the list iterator has the next item. If it
@@ -3228,14 +3223,14 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return A non-zero error value on failure and 0 on success.
      */
     public static native int dtlv_list_val_iter_create(@Cast("dtlv_list_val_iter**") PointerPointer iter,
-            MDB_cursor cur, MDB_val key, MDB_val val,
-            int vstart, int vend,
-            MDB_val start_val, MDB_val end_val);
+                                                       MDB_cursor cur, MDB_val key, MDB_val val,
+                                                       int vstart, int vend,
+                                                       MDB_val start_val, MDB_val end_val);
 
     public static native int dtlv_list_val_iter_create(@ByPtrPtr dtlv_list_val_iter iter,
-            MDB_cursor cur, MDB_val key, MDB_val val,
-            int vstart, int vend,
-            MDB_val start_val, MDB_val end_val);
+                                                       MDB_cursor cur, MDB_val key, MDB_val val,
+                                                       int vstart, int vend,
+                                                       MDB_val start_val, MDB_val end_val);
 
     /**
      * A function to seek to a key.
@@ -3289,12 +3284,12 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return A non-zero error value on failure and 0 on success.
      */
     public static native int dtlv_list_val_full_iter_create(@Cast("dtlv_list_val_full_iter**") PointerPointer iter,
-            MDB_cursor cur,
-            MDB_val key, MDB_val val);
+                                                            MDB_cursor cur,
+                                                            MDB_val key, MDB_val val);
 
     public static native int dtlv_list_val_full_iter_create(@ByPtrPtr dtlv_list_val_full_iter iter,
-            MDB_cursor cur,
-            MDB_val key, MDB_val val);
+                                                            MDB_cursor cur,
+                                                            MDB_val key, MDB_val val);
 
     /**
      * A function to seek to a key.
@@ -3351,11 +3346,11 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The count
      */
     public static native @Cast("size_t") long dtlv_list_range_count(MDB_cursor cur,
-            MDB_val key, MDB_val val,
-            int kforward, int kstart, int kend,
-            MDB_val start_key, MDB_val end_key,
-            int vforward, int vstart, int vend,
-            MDB_val start_val, MDB_val end_val);
+                                                                    MDB_val key, MDB_val val,
+                                                                    int kforward, int kstart, int kend,
+                                                                    MDB_val start_key, MDB_val end_key,
+                                                                    int vforward, int vstart, int vend,
+                                                                    MDB_val start_val, MDB_val end_val);
 
     /**
      * A function to return the number of key-values in the specified value range of
@@ -3379,11 +3374,11 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The count
      */
     public static native @Cast("size_t") long dtlv_list_range_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
-            MDB_val key, MDB_val val,
-            int kforward, int kstart, int kend,
-            MDB_val start_key, MDB_val end_key,
-            int vforward, int vstart, int vend,
-            MDB_val start_val, MDB_val end_val);
+                                                                        MDB_val key, MDB_val val,
+                                                                        int kforward, int kstart, int kend,
+                                                                        MDB_val start_key, MDB_val end_key,
+                                                                        int vforward, int vstart, int vend,
+                                                                        MDB_val start_val, MDB_val end_val);
 
     /**
      * A function to return the number of keys in a key range.
@@ -3399,9 +3394,9 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The count
      */
     public static native @Cast("size_t") long dtlv_key_range_count(MDB_cursor cur,
-            MDB_val key, MDB_val val,
-            int forward, int start, int end,
-            MDB_val start_key, MDB_val end_key);
+                                                                   MDB_val key, MDB_val val,
+                                                                   int forward, int start, int end,
+                                                                   MDB_val start_key, MDB_val end_key);
 
     /**
      * A function to return the number of keys in a key range. Capped. When cap is
@@ -3419,9 +3414,9 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The count
      */
     public static native @Cast("size_t") long dtlv_key_range_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
-            MDB_val key, MDB_val val,
-            int forward, int start, int end,
-            MDB_val start_key, MDB_val end_key);
+                                                                       MDB_val key, MDB_val val,
+                                                                       int forward, int start, int end,
+                                                                       MDB_val start_key, MDB_val end_key);
 
     /**
      * A function to return the total number of values in a key range, for a
@@ -3438,9 +3433,9 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The count
      */
     public static native @Cast("size_t") long dtlv_key_range_list_count(MDB_cursor cur,
-            MDB_val key, MDB_val val,
-            int forward, int start, int end,
-            MDB_val start_key, MDB_val end_key);
+                                                                        MDB_val key, MDB_val val,
+                                                                        int forward, int start, int end,
+                                                                        MDB_val start_key, MDB_val end_key);
 
     /**
      * A function to return the total number of values in a key range, for a
@@ -3459,9 +3454,9 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return The count
      */
     public static native @Cast("size_t") long dtlv_key_range_list_count_cap(MDB_cursor cur, @Cast("size_t") long cap,
-            MDB_val key, MDB_val val,
-            int forward, int start, int end,
-            MDB_val start_key, MDB_val end_key);
+                                                                            MDB_val key, MDB_val val,
+                                                                            int forward, int start, int end,
+                                                                            MDB_val start_key, MDB_val end_key);
 
     /**
      * Opaque structure for a list sample iterator that return samples
@@ -3502,20 +3497,20 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @return A non-zero error value on failure and 0 on success.
      */
     public static native int dtlv_list_sample_iter_create(@Cast("dtlv_list_sample_iter**") PointerPointer iter,
-            @Cast("size_t*") SizeTPointer indices, int samples,
-            MDB_cursor cur, MDB_val key, MDB_val val,
-            int kforward, int kstart, int kend,
-            MDB_val start_key, MDB_val end_key,
-            int vforward, int vstart, int vend,
-            MDB_val start_val, MDB_val end_val);
+                                                          @Cast("size_t*") SizeTPointer indices, int samples,
+                                                          MDB_cursor cur, MDB_val key, MDB_val val,
+                                                          int kforward, int kstart, int kend,
+                                                          MDB_val start_key, MDB_val end_key,
+                                                          int vforward, int vstart, int vend,
+                                                          MDB_val start_val, MDB_val end_val);
 
     public static native int dtlv_list_sample_iter_create(@ByPtrPtr dtlv_list_sample_iter iter,
-            @Cast("size_t*") SizeTPointer indices, int samples,
-            MDB_cursor cur, MDB_val key, MDB_val val,
-            int kforward, int kstart, int kend,
-            MDB_val start_key, MDB_val end_key,
-            int vforward, int vstart, int vend,
-            MDB_val start_val, MDB_val end_val);
+                                                          @Cast("size_t*") SizeTPointer indices, int samples,
+                                                          MDB_cursor cur, MDB_val key, MDB_val val,
+                                                          int kforward, int kstart, int kend,
+                                                          MDB_val start_key, MDB_val end_key,
+                                                          int vforward, int vstart, int vend,
+                                                          MDB_val start_val, MDB_val end_val);
 
     /**
      * A function to indicate if the list sample iterator has next sample. If
