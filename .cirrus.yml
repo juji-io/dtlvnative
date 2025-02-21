@@ -41,8 +41,8 @@ task:
 task:
   macos_instance:
     image: ghcr.io/cirruslabs/macos-runner:sonoma
-  # only_if: $CIRRUS_TAG != ''
-  only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml', 'src/*')"
+  only_if: $CIRRUS_TAG != ''
+  # only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml', 'src/*')"
   script: |
     git submodule init
     git submodule update --init --recursive
@@ -66,4 +66,4 @@ task:
 
     cd macosx-arm64
     lein run
-    # lein deploy clojars
+    lein deploy clojars

@@ -1,11 +1,11 @@
 name: Build
 
-on: push
+# on: push
 
-# on:
-#   release:
-#     types:
-#       - created
+on:
+  release:
+    types:
+      - created
 
 jobs:
   build:
@@ -55,7 +55,7 @@ jobs:
 
             cd macosx-x86_64
             lein run
-            # lein deploy clojars
+            lein deploy clojars
 
           linux: |
             export CC=/usr/bin/gcc-12
@@ -78,4 +78,4 @@ jobs:
 
             cd linux-x86_64
             lein run
-            # lein deploy clojars
+            lein deploy clojars

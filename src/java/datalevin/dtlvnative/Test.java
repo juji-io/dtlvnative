@@ -199,12 +199,19 @@ public class Test {
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
 
+        System.out.println("opts created");
+
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
+
+        System.out.println("about to init");
 
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
         expect(index != null, "Failed to init index");
+        System.out.println("index created");
 
+        System.out.println("about to free");
         DTLV.usearch_free(index, error);
+        System.out.println("about to check free error");
         expectNoError(error, "Fail to free index");
 
         index = DTLV.usearch_init(opts, error);
