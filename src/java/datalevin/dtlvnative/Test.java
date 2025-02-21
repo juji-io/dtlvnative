@@ -203,26 +203,40 @@ public class Test {
 
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
 
+        System.out.println("about to reset error");
+        error.put(0, (BytePointer) null);
+
         System.out.println("about to init");
 
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
         expect(index != null, "Failed to init index");
         System.out.println("index created");
 
+        System.out.println("about to reset error");
+        error.put(0, (BytePointer) null);
+
         System.out.println("about to free");
         DTLV.usearch_free(index, error);
         System.out.println("about to check free error");
         expectNoError(error, "Fail to free index");
 
+        System.out.println("about to reset error");
+        error.put(0, (BytePointer) null);
         index = DTLV.usearch_init(opts, error);
         expect(index != null, "Failed to init index");
 
+        System.out.println("about to reset error");
+        error.put(0, (BytePointer) null);
         long size = DTLV.usearch_size(index, error);
         expect(size == 0, "Failed to get index size");
 
+        System.out.println("about to reset error");
+        error.put(0, (BytePointer) null);
         long capacity = DTLV.usearch_capacity(index, error);
         expect(capacity == 0, "Failed to get index capacity");
 
+        System.out.println("about to reset error");
+        error.put(0, (BytePointer) null);
         long dims = DTLV.usearch_dimensions(index, error);
         expect(dimensions == dims, "Failed to get index dimensions");
 
