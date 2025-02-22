@@ -15,8 +15,6 @@ import java.nio.*;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
-import jdk.jfr.Name;
-
 public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     static {
         Loader.load();
@@ -2362,36 +2360,36 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
 
         /** Default native constructor. */
         public usearch_init_options_t() {
-            super((Pointer) null);
+            // super((Pointer) null);
             allocate();
         }
 
         /** Native array allocator. Access with {@link Pointer#position(long)}. */
-        public usearch_init_options_t(long size) {
-            super((Pointer) null);
-            allocateArray(size);
-        }
+        // public usearch_init_options_t(long size) {
+        //     super((Pointer) null);
+        //     allocateArray(size);
+        // }
 
         /** Pointer cast constructor. Invokes {@link Pointer#Pointer(Pointer)}. */
-        public usearch_init_options_t(Pointer p) {
-            super(p);
-        }
+        // public usearch_init_options_t(Pointer p) {
+        //     super(p);
+        // }
 
         private native void allocate();
 
-        private native void allocateArray(long size);
+        // private native void allocateArray(long size);
 
-        @Override
-        @SuppressWarnings("unchecked")
-        public usearch_init_options_t position(long position) {
-            return (usearch_init_options_t) super.position(position);
-        }
+        // @Override
+        // @SuppressWarnings("unchecked")
+        // public usearch_init_options_t position(long position) {
+        //     return (usearch_init_options_t) super.position(position);
+        // }
 
-        @Override
-        @SuppressWarnings("unchecked")
-        public usearch_init_options_t getPointer(long i) {
-            return new usearch_init_options_t((Pointer) this).offsetAddress(i);
-        }
+        // @Override
+        // @SuppressWarnings("unchecked")
+        // public usearch_init_options_t getPointer(long i) {
+        //     return new usearch_init_options_t((Pointer) this).offsetAddress(i);
+        // }
 
         /**
          * \brief The metric kind used for distance calculation between vectors.
