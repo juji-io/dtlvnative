@@ -207,7 +207,7 @@ public class Test {
 
         error.put(0, (BytePointer) null);
         System.out.println("About to test error");
-        DTLV.dltv_test_error(error);
+        DTLV.dtlv_test_error(error);
         System.out.println("Tested error");
 
         error.put(0, (BytePointer) null);
