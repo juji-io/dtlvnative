@@ -1,14 +1,11 @@
 
 set PWD=%cd%
 
-REM Back up the original file just in case
 copy src\usearch\c\usearch.h src\usearch\c\usearch.h.bak
 
-REM Insert "#pragma pack(push,8)" immediately before the struct definition
-powershell -Command "(Get-Content src\usearch\c\usearch.h) -replace '(USEARCH_EXPORT\s+typedef\s+struct\s+usearch_init_options_t\s+\{)', '#pragma pack(push,8)\r\n$1' | Set-Content src\usearch\c\usearch.h"
+powershell -Command "(Get-Content -Raw 'src\usearch\c\usearch.h') -replace '(?i)(USEARCH_EXPORT\s+typedef\s+struct\s+usearch_init_options_t\s+\{)', '#pragma pack(push,8)' + [Environment]::NewLine + '$1' | Set-Content 'src\usearch\c\usearch.h'"
 
-REM Insert "#pragma pack(pop)" immediately after the struct closing brace
-powershell -Command "(Get-Content src\usearch\c\usearch.h) -replace '(\}\s+usearch_init_options_t;)', '$1\r\n#pragma pack(pop)' | Set-Content src\usearch\c\usearch.h"
+powershell -Command "(Get-Content -Raw 'src\usearch\c\usearch.h') -replace '(\}\s+usearch_init_options_t;)', '$1' + [Environment]::NewLine + '#pragma pack(pop)' | Set-Content 'src\usearch\c\usearch.h'"
 
 type src\usearch\c\usearch.h
 
