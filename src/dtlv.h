@@ -416,6 +416,7 @@ extern "C" {
    */
   void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter *iter);
 
+  void dtlv_test_error(usearch_error_t* error);
 
 #ifdef __cplusplus
 }

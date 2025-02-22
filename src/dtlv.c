@@ -796,3 +796,7 @@ void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter *iter) {
     free(iter);
   }
 }
+
+void dtlv_test_error(usearch_error_t* error) {
+  *error = "Test error";
+}

@@ -206,6 +206,11 @@ public class Test {
         System.out.println("created error pointer");
 
         error.put(0, (BytePointer) null);
+        System.out.println("About to test error");
+        DTLV.dltv_test_error(error);
+        System.out.println("Tested error");
+
+        error.put(0, (BytePointer) null);
         System.out.println("cleared error pointer, about to call init");
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
         System.out.println("called init");
