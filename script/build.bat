@@ -15,6 +15,12 @@ cmake -G "Visual Studio 17 2022" ^
 
 cmake --build build_dtlv --config Release --target install
 
+dir build_dtlv
+
+build_dtlv\test_cpp
+
+build_dtlv\test_c
+
 cd %PWD%
 
 cd %CPATH%
