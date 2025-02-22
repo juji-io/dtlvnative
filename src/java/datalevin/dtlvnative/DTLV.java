@@ -2395,6 +2395,12 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
         @MemberSetter
         public native usearch_init_options_t metric_kind(@Cast("usearch_metric_kind_t") int setter);
 
+        @MemberGetter
+        public native int dummy0();
+
+        @MemberSetter
+        public native usearch_init_options_t dummy0(int value);
+
         /**
          * \brief The \b optional custom distance metric function used for distance
          * calculation between vectors.
@@ -2432,6 +2438,12 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
 
         @MemberSetter
         public native usearch_init_options_t quantization(@Cast("usearch_scalar_kind_t") int setter);
+
+        @MemberGetter
+        public native int dummy1();
+
+        @MemberSetter
+        public native usearch_init_options_t dummy1(int value);
 
         /**
          * \brief The number of dimensions in the vectors to be indexed.
