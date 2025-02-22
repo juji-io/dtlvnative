@@ -8,6 +8,8 @@ import java.nio.file.*;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import datalevin.dtlvnative.DTLV.usearch_metric_t;
+
 public class Test {
 
     static void deleteDirectoryFiles(final String path) {
@@ -167,7 +169,7 @@ public class Test {
     static DTLV.usearch_init_options_t createOpts(final long dimensions) {
         DTLV.usearch_init_options_t opts = new DTLV.usearch_init_options_t();
         opts.metric_kind(DTLV.usearch_metric_ip_k)
-                .metric(null)
+                .metric((usearch_metric_t) null)
                 .quantization(DTLV.usearch_scalar_f32_k)
                 .dimensions(dimensions)
                 .connectivity(3)
@@ -201,6 +203,23 @@ public class Test {
         System.out.println("about to create opts");
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         System.out.println("created opts");
+
+        expect(opts.metric_kind() == DTLV.usearch_metric_ip_k, "fail to get metric_kind");
+        System.out.println("accessed metric_kind");
+        expect(opts.metric() == null, "fail to get metric");
+        System.out.println("accessed metric");
+        expect(opts.quantization() == DTLV.usearch_scalar_f32_k, "fail to get quantization");
+        System.out.println("accessed quantization");
+        expect(opts.connectivity() == 3, "fail to get connectivity");
+        System.out.println("accessed quantization");
+        expect(opts.dimensions() == dimensions, "fail to get dimensions");
+        System.out.println("accessed dimensions");
+        expect(opts.expansion_add() == 40, "fail to get expansion_add");
+        System.out.println("accessed expansion_add");
+        expect(opts.expansion_search() == 16, "fail to get expansion_search");
+        System.out.println("accessed expansion_search");
+        expect(opts.multi() == false, "fail to get multi");
+        System.out.println("accessed multi");
 
         System.out.println("about to create error pointer");
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
