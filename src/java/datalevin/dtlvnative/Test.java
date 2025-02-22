@@ -197,16 +197,25 @@ public class Test {
 
     static void testUsearchInit(int collSize, int dimensions) {
 
+        System.out.println("about to create opts");
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
+        System.out.println("created opts");
 
+        System.out.println("about to create error pointer");
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
+        System.out.println("created error pointer");
 
         error.put(0, (BytePointer) null);
+        System.out.println("cleared error pointer, about to call init");
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        System.out.println("called init");
         expect(index != null, "Failed to init index");
 
+        System.out.println("about to clear error ptr");
         error.put(0, (BytePointer) null);
+        System.out.println("about to free index");
         DTLV.usearch_free(index, error);
+        System.out.println("about to check free error");
         expectNoError(error, "Fail to free index");
 
         error.put(0, (BytePointer) null);
