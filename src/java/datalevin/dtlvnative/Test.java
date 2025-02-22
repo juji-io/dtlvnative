@@ -166,13 +166,13 @@ public class Test {
 
     static DTLV.usearch_init_options_t createOpts(final long dimensions) {
         DTLV.usearch_init_options_t opts = new DTLV.usearch_init_options_t();
-        opts.metric(null)
-                .connectivity(3)
+        opts.metric_kind(DTLV.usearch_metric_ip_k)
+                .metric(null)
+                .quantization(DTLV.usearch_scalar_f32_k)
                 .dimensions(dimensions)
+                .connectivity(3)
                 .expansion_add(40)
                 .expansion_search(16)
-                .metric_kind(DTLV.usearch_metric_ip_k)
-                .quantization(DTLV.usearch_scalar_f32_k)
                 .multi(false);
         return opts;
     }

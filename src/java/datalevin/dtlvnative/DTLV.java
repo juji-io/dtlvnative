@@ -15,6 +15,8 @@ import java.nio.*;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
+import jdk.jfr.Name;
+
 public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     static {
         Loader.load();
@@ -2305,6 +2307,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      */
     // USEARCH_EXPORT typedef usearch_distance_t (*usearch_metric_t)(void const*,
     // void const*);
+    @Name("usearch_metric_t")
     public static class usearch_metric_t extends FunctionPointer {
         static {
             Loader.load();
@@ -2350,6 +2353,8 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
         usearch_scalar_i8_k = 4,
         usearch_scalar_b1_k = 5;
 
+    @Platform(include = "usearch.h")
+    @Name("usearch_init_options_t")
     public static class usearch_init_options_t extends Pointer {
         static {
             Loader.load();
@@ -2391,8 +2396,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
         /**
          * \brief The metric kind used for distance calculation between vectors.
          */
+        @MemberGetter
         public native @Cast("usearch_metric_kind_t") int metric_kind();
 
+        @MemberSetter
         public native usearch_init_options_t metric_kind(int setter);
 
         /**
@@ -2401,8 +2408,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
          * If the {@code metric_kind} is set to {@code usearch_metric_unknown_k}, this
          * function pointer mustn't be {@code NULL}.
          */
+        @MemberGetter
         public native usearch_metric_t metric();
 
+        @MemberSetter
         public native usearch_init_options_t metric(usearch_metric_t setter);
 
         /**
@@ -2425,8 +2434,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
          * zero are set to {@code true}, and the
          * rest to {@code false}.
          */
+        @MemberGetter
         public native @Cast("usearch_scalar_kind_t") int quantization();
 
+        @MemberSetter
         public native usearch_init_options_t quantization(int setter);
 
         /**
@@ -2434,39 +2445,49 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
          * Must be defined for most metrics, but can be avoided for
          * {@code usearch_metric_haversine_k}.
          */
+        @MemberGetter
         public native @Cast("size_t") long dimensions();
 
+        @MemberSetter
         public native usearch_init_options_t dimensions(long setter);
 
         /**
          * \brief The \b optional connectivity parameter that limits
          * connections-per-node in graph.
          */
+        @MemberGetter
         public native @Cast("size_t") long connectivity();
 
+        @MemberSetter
         public native usearch_init_options_t connectivity(long setter);
 
         /**
          * \brief The \b optional expansion factor used for index construction when
          * adding vectors.
          */
+        @MemberGetter
         public native @Cast("size_t") long expansion_add();
 
+        @MemberSetter
         public native usearch_init_options_t expansion_add(long setter);
 
         /**
          * \brief The \b optional expansion factor used for index construction during
          * search operations.
          */
+        @MemberGetter
         public native @Cast("size_t") long expansion_search();
 
+        @MemberSetter
         public native usearch_init_options_t expansion_search(long setter);
 
         /**
          * \brief When set allows multiple vectors to map to the same key.
          */
+        @MemberGetter
         public native @Cast("bool") boolean multi();
 
+        @MemberSetter
         public native usearch_init_options_t multi(boolean setter);
     }
 
