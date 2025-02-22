@@ -3,7 +3,7 @@ set PWD=%cd%
 
 copy src\usearch\c\usearch.h src\usearch\c\usearch.h.bak
 
-powershell -Command "$regex='(?i)(USEARCH_EXPORT\s+typedef\s+struct\s+usearch_init_options_t\s*\{)'; $replacement='#pragma pack(push,8)' + [Environment]::NewLine + '$1'; (Get-Content -Raw 'src\usearch\c\usearch.h') -replace $regex, $replacement | Set-Content 'src\usearch\c\usearch.h'"
+powershell -Command "$regex='(?i)(USEARCH_EXPORT\s+typedef\s+struct\s+usearch_init_options_t\s*\{)'; $replacement='#pragma pack(push,4)' + [Environment]::NewLine + '$1'; (Get-Content -Raw 'src\usearch\c\usearch.h') -replace $regex, $replacement | Set-Content 'src\usearch\c\usearch.h'"
 
 powershell -Command "$regex='(\}\s*usearch_init_options_t;)'; $replacement='$1' + [Environment]::NewLine + '#pragma pack(pop)'; (Get-Content -Raw 'src\usearch\c\usearch.h') -replace $regex, $replacement | Set-Content 'src\usearch\c\usearch.h'"
 
