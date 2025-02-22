@@ -166,7 +166,8 @@ public class Test {
 
     static DTLV.usearch_init_options_t createOpts(final long dimensions) {
         DTLV.usearch_init_options_t opts = new DTLV.usearch_init_options_t();
-        opts.connectivity(3)
+        opts.metric(null)
+                .connectivity(3)
                 .dimensions(dimensions)
                 .expansion_add(40)
                 .expansion_search(16)
@@ -204,11 +205,6 @@ public class Test {
         System.out.println("about to create error pointer");
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
         System.out.println("created error pointer");
-
-        error.put(0, (BytePointer) null);
-        System.out.println("About to test error");
-        DTLV.dtlv_test_error(error);
-        System.out.println("Tested error");
 
         error.put(0, (BytePointer) null);
         System.out.println("cleared error pointer, about to call init");

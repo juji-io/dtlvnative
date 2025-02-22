@@ -3529,7 +3529,6 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      */
     public static native void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter iter);
 
-    public static native void dtlv_test_error(@ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     // #ifdef __cplusplus
     // #endif
