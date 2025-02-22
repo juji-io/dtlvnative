@@ -199,75 +199,69 @@ public class Test {
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
 
-        System.out.println("opts created");
-
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
 
-        System.out.println("about to reset error");
         error.put(0, (BytePointer) null);
-
-        System.out.println("about to init");
-
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
         expect(index != null, "Failed to init index");
-        System.out.println("index created");
 
-        System.out.println("about to reset error");
         error.put(0, (BytePointer) null);
-
-        System.out.println("about to free");
         DTLV.usearch_free(index, error);
-        System.out.println("about to check free error");
         expectNoError(error, "Fail to free index");
 
-        System.out.println("about to reset error");
         error.put(0, (BytePointer) null);
         index = DTLV.usearch_init(opts, error);
         expect(index != null, "Failed to init index");
 
-        System.out.println("about to reset error");
         error.put(0, (BytePointer) null);
         long size = DTLV.usearch_size(index, error);
         expect(size == 0, "Failed to get index size");
 
-        System.out.println("about to reset error");
         error.put(0, (BytePointer) null);
         long capacity = DTLV.usearch_capacity(index, error);
         expect(capacity == 0, "Failed to get index capacity");
 
-        System.out.println("about to reset error");
         error.put(0, (BytePointer) null);
         long dims = DTLV.usearch_dimensions(index, error);
         expect(dimensions == dims, "Failed to get index dimensions");
 
+        error.put(0, (BytePointer) null);
         long connectivity = DTLV.usearch_connectivity(index, error);
         expect(connectivity == opts.connectivity(),
                 "Failed to get index connectivity");
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
         expectNoError(error, "Fail to reserve");
 
+        error.put(0, (BytePointer) null);
         size = DTLV.usearch_size(index, error);
         expect(size == 0, "Failed to get index size");
 
+        error.put(0, (BytePointer) null);
         capacity = DTLV.usearch_capacity(index, error);
         expect(capacity >= collSize, "Failed to get index capacity");
 
+        error.put(0, (BytePointer) null);
         dims = DTLV.usearch_dimensions(index, error);
         expect(dimensions == dims, "Failed to get index dimensions");
 
+        error.put(0, (BytePointer) null);
         connectivity = DTLV.usearch_connectivity(index, error);
         expect(connectivity == opts.connectivity(),
                 "Failed to get index connectivity");
 
+        error.put(0, (BytePointer) null);
         BytePointer hardware = DTLV.usearch_hardware_acceleration(index, error);
         expectNoError(error, "Fail to get hardware");
         System.out.println("SIMD Hardware ISA Name is: " + hardware.getString());
 
+        error.put(0, (BytePointer) null);
         long memory = DTLV.usearch_memory_usage(index, error);
         expect(memory > 0, "Failed to get memory usage");
         System.out.println("Memory Usage is: " + memory);
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
         expectNoError(error, "Fail to free index");
 
@@ -280,31 +274,39 @@ public class Test {
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
         float[][] data = randomVectors(collSize, dimensions);
 
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
+            error.put(0, (BytePointer) null);
             DTLV.usearch_add(index, (long)i, vecPtr, DTLV.usearch_scalar_f32_k, error);
             expectNoError(error, "Fail to add vector");
         }
 
+        error.put(0, (BytePointer) null);
         long size = DTLV.usearch_size(index, error);
         expect(size == collSize, "Failed to get index size");
 
+        error.put(0, (BytePointer) null);
         long capacity = DTLV.usearch_capacity(index, error);
         expect(capacity >= collSize, "Failed to get index capacity");
 
         for (int i = 0; i < collSize; i++) {
+            error.put(0, (BytePointer) null);
             expect(DTLV.usearch_contains(index, (long) i, error),
                     "Failed to find key in index");
         }
+        error.put(0, (BytePointer) null);
         expect(!DTLV.usearch_contains(index, (long) -1, error),
                 "Found non existing key in index");
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
         System.out.println("Passed add.");
     }
@@ -314,13 +316,16 @@ public class Test {
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
         float[][] data = randomVectors(collSize, dimensions);
 
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
+            error.put(0, (BytePointer) null);
             DTLV.usearch_add(index, (long) i, vecPtr, DTLV.usearch_scalar_f32_k, error);
             expectNoError(error, "Fail to add vector");
         }
@@ -330,12 +335,14 @@ public class Test {
 
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
+            error.put(0, (BytePointer) null);
             long found = DTLV.usearch_search(index, vecPtr, DTLV.usearch_scalar_f32_k,
                                              (long)collSize, keys, distances, error);
             expectNoError(error, "Fail to search");
             expect(found >= 1 && found <= collSize, "Vector cannot be found");
         }
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
         System.out.println("Passed find.");
     }
@@ -346,7 +353,9 @@ public class Test {
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         opts.multi(true);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
         float[][] data = randomVectors(collSize, dimensions);
@@ -354,17 +363,20 @@ public class Test {
         long key = 1;
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
+            error.put(0, (BytePointer) null);
             DTLV.usearch_add(index, key, vecPtr, DTLV.usearch_scalar_f32_k, error);
             expectNoError(error, "Fail to add vector");
         }
 
         float[] vectors = new float[collSize * dimensions];
         FloatPointer vPtr= new FloatPointer(vectors);
+        error.put(0, (BytePointer) null);
         long found = DTLV.usearch_get(index, key, (long) collSize, vPtr,
                                       DTLV.usearch_scalar_f32_k, error);
         expectNoError(error, "Fail to get");
         expect(found == collSize, "Key is missing");
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
 
         System.out.println("Passed get.");
@@ -375,22 +387,27 @@ public class Test {
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
         float[][] data = randomVectors(collSize, dimensions);
 
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
+            error.put(0, (BytePointer) null);
             DTLV.usearch_add(index, (long)i, vecPtr, DTLV.usearch_scalar_f32_k, error);
             expectNoError(error, "Fail to add");
         }
 
         for (int i = 0; i < collSize; i++) {
+            error.put(0, (BytePointer) null);
             DTLV.usearch_remove(index, (long) i, error);
             expectNoError(error, "Fail to remove");
         }
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
         System.out.println("Passed remove.");
     }
@@ -405,40 +422,52 @@ public class Test {
                 .expansion_search(19)
                 .metric_kind(DTLV.usearch_metric_pearson_k)
                 .quantization(DTLV.usearch_scalar_f64_k);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_index_t index = DTLV.usearch_init(weird_opts, error);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
         float[][] data = randomVectors(collSize, dimensions);
 
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
+            error.put(0, (BytePointer) null);
             DTLV.usearch_add(index, (long) i, vecPtr, DTLV.usearch_scalar_f32_k, error);
             expectNoError(error, "Fail to add");
         }
 
         String dir = "us";
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_save(index, dir, error);
         expectNoError(error, "Fail to save");
+        error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
 
+        error.put(0, (BytePointer) null);
         index = DTLV.usearch_init(null, error);
         expectNoError(error, "Fail to init");
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_load(index, "us", error);
         expectNoError(error, "Fail to load");
 
+        error.put(0, (BytePointer) null);
         long size = DTLV.usearch_size(index, error);
         expect(size == collSize, "Failed to get index size");
+        error.put(0, (BytePointer) null);
         long capacity = DTLV.usearch_capacity(index, error);
         expect(capacity == collSize, "Failed to get index capacity");
+        error.put(0, (BytePointer) null);
         long dims = DTLV.usearch_dimensions(index, error);
         expect(dimensions == dims, "Failed to get index dimensions");
+        error.put(0, (BytePointer) null);
         long connectivity = DTLV.usearch_connectivity(index, error);
         expect(connectivity == weird_opts.connectivity(),
                 "Failed to get index connectivity" + weird_opts.connectivity());
 
         for (int i = 0; i < collSize; i++) {
+            error.put(0, (BytePointer) null);
             expect(DTLV.usearch_contains(index, (long)i, error),
                    "Fail to find key in index");
         }
@@ -446,15 +475,18 @@ public class Test {
         LongPointer keys = new LongPointer(new long[collSize]);
         FloatPointer distances = new FloatPointer(new float[collSize]);
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_change_threads_search(index, 1, error);
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
+            error.put(0, (BytePointer) null);
             long found = DTLV.usearch_search(index, vecPtr, DTLV.usearch_scalar_f32_k,
                                              (long)collSize, keys, distances, error);
             expectNoError(error, "Fail to search");
             expect(found >= 1 && found <= collSize, "Vector cannot be found");
         }
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
 
         deleteDirectoryFiles(dir);
@@ -467,28 +499,37 @@ public class Test {
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
         float[][] data = randomVectors(collSize, dimensions);
 
         for (int i = 0; i < collSize; i++) {
             FloatPointer vecPtr = new FloatPointer(data[i]);
+            error.put(0, (BytePointer) null);
             DTLV.usearch_add(index, (long)i, vecPtr, DTLV.usearch_scalar_f32_k, error);
             expectNoError(error, "Fail to add");
         }
 
         String dir = "us";
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_save(index, dir, error);
         expectNoError(error, "Fail to save");
+
+        error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
 
+        error.put(0, (BytePointer) null);
         index = DTLV.usearch_init(opts, error);
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_view(index, dir, error);
         expectNoError(error, "Fail to view");
 
+        error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
 
         deleteDirectoryFiles(dir);
