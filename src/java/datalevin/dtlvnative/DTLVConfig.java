@@ -28,5 +28,6 @@ import org.bytedeco.javacpp.tools.*;
 
 public class DTLVConfig {
     public void map(InfoMap infoMap) {
+        infoMap.put(new Info("USEARCH_EXPORT").cppTypes().annotations());
     }
 }
