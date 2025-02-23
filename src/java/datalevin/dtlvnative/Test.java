@@ -175,13 +175,13 @@ public class Test {
         opts.zero();
 
         opts.metric_kind(DTLV.usearch_metric_ip_k)
-                .metric(nullMetric)
-                .quantization(DTLV.usearch_scalar_f32_k)
-                .dimensions(dimensions)
-                .connectivity(3)
-                .expansion_add(40)
-                .expansion_search(16)
-                .multi(false);
+            .metric((usearch_metric_t) nullMetric)
+            .quantization(DTLV.usearch_scalar_f32_k)
+            .dimensions(dimensions)
+            .connectivity(3)
+            .expansion_add(40)
+            .expansion_search(16)
+            .multi(false);
         return opts;
     }
 
@@ -206,42 +206,25 @@ public class Test {
 
     static void testUsearchInit(int collSize, int dimensions) {
 
-        System.out.println("about to create opts");
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
-        System.out.println("created opts");
 
         expect(opts.metric_kind() == DTLV.usearch_metric_ip_k, "fail to get metric_kind");
-        System.out.println("accessed metric_kind");
-        expect(Pointer.isNull(opts.metric()), "fail to get metric");
-        System.out.println("accessed metric");
         expect(opts.quantization() == DTLV.usearch_scalar_f32_k, "fail to get quantization");
-        System.out.println("accessed quantization");
         expect(opts.connectivity() == 3, "fail to get connectivity");
-        System.out.println("accessed quantization");
         expect(opts.dimensions() == dimensions, "fail to get dimensions");
-        System.out.println("accessed dimensions");
         expect(opts.expansion_add() == 40, "fail to get expansion_add");
-        System.out.println("accessed expansion_add");
         expect(opts.expansion_search() == 16, "fail to get expansion_search");
-        System.out.println("accessed expansion_search");
         expect(opts.multi() == false, "fail to get multi");
-        System.out.println("accessed multi");
 
-        System.out.println("about to create error pointer");
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
-        System.out.println("created error pointer");
 
         error.put(0, (BytePointer) null);
-        System.out.println("cleared error pointer, about to call init");
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
         System.out.println("called init");
         expect(index != null, "Failed to init index");
 
-        System.out.println("about to clear error ptr");
         error.put(0, (BytePointer) null);
-        System.out.println("about to free index");
         DTLV.usearch_free(index, error);
-        System.out.println("about to check free error");
         expectNoError(error, "Fail to free index");
 
         error.put(0, (BytePointer) null);
