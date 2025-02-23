@@ -2316,7 +2316,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
         }
 
         protected usearch_metric_t() {
+            allocate();
         }
+
+        private native void allocate();
 
         public native @Cast("usearch_distance_t") float call(@Cast("void const*") Pointer vectorA, @Cast("void const*") Pointer vectorB);
     }
