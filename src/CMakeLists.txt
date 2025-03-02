@@ -68,9 +68,6 @@ set_target_properties(usearch_static_c PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
 )
 
-target_link_options(dtlv PRIVATE "/WHOLEARCHIVE:usearch_static_c")
-target_link_libraries(dtlv PRIVATE usearch_static_c)
-
 install(TARGETS usearch_static_c
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
