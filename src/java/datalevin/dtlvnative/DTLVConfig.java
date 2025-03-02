@@ -16,6 +16,9 @@ import org.bytedeco.javacpp.tools.*;
                            ),
                 @Platform( // Windows
                            value = "windows",
+                           define = {"USEARCH_USE_OPENMP 0"},
+                           convention = "stdcall",
+                           catchExceptions = true,
                            link = { "lmdb", "libusearch_static_c", "dtlv", "Advapi32" }
                            ),
                 @Platform( // Unix-like
