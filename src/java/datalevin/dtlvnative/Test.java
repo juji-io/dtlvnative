@@ -219,8 +219,10 @@ public class Test {
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
 
         error.put(0, (BytePointer) null);
+
+        System.out.println("About to call usearch_init");
         DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
-        System.out.println("called init");
+        System.out.println("Successfully called init");
         expect(index != null, "Failed to init index");
 
         error.put(0, (BytePointer) null);
