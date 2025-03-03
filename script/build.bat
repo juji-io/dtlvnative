@@ -29,7 +29,7 @@ dir %CPATH%
 
 cd java
 
-java -Djavacpp.debug=true -Djavacpp.deleteJniFiles=false -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" ^
+java -Djavacpp.debug=true -Djavacpp.deleteJniFiles=false -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" -nodelete ^
     datalevin/dtlvnative/DTLV.java
 
 type C:\projects\dtlvnative\src\java\datalevin\dtlvnative\jniDTLV.cpp
