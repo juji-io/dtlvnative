@@ -2351,6 +2351,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
         usearch_scalar_b1_k = 5;
 
     @Name("usearch_init_options_t")
+    @NoOffset
     public static class usearch_init_options_t extends Pointer {
         static {
             Loader.load();

@@ -204,8 +204,6 @@ public class Test {
     static void testUsearchInit(int collSize, int dimensions) {
         try {
             DTLV.usearch_init_options_t opts = createOpts(dimensions);
-            opts.position(0);
-            opts.limit(opts.capacity());
 
             expect(opts.metric_kind() == DTLV.usearch_metric_ip_k, "fail to get metric_kind");
             expect(opts.quantization() == DTLV.usearch_scalar_f32_k, "fail to get quantization");
@@ -215,17 +213,12 @@ public class Test {
             expect(opts.expansion_search() == 16, "fail to get expansion_search");
             expect(opts.multi() == false, "fail to get multi");
 
-            PointerPointer<BytePointer> error = new PointerPointer<BytePointer>(1);
-            error.put(new BytePointer[] { null });
-
-            System.gc();
-            Thread.sleep(100);
+            PointerPointer<BytePointer> error = new PointerPointer<BytePointer>(1).put((BytePointer)null);
 
             System.out.println("About to call usearch_init");
-            opts.position(0);
             DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
-            System.out.println("Successfully called init");
             expect(index != null, "Failed to init index");
+            System.out.println("Successfully called init");
 
             error.put(0, (BytePointer) null);
             DTLV.usearch_free(index, error);

@@ -11,6 +11,7 @@ cmake -G "Visual Studio 17 2022" ^
       -DCLOSE_WARNING=on ^
       -DBUILD_TEST=off ^
       -DCMAKE_INSTALL_PREFIX=%CPATH% ^
+      -DCMAKE_BUILD_TYPE=Debug ^
       -B build_dtlv
 
 cmake --build build_dtlv --config Release --target install
