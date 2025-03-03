@@ -12,12 +12,10 @@ import org.bytedeco.javacpp.tools.*;
                               "../../src/usearch/c/",
                               "../../src/" },
                            include = { "lmdb.h", "usearch.h", "dtlv.h" },
-                           deleteJniFiles = false,
                            linkpath = { "../../src/" }
                            ),
                 @Platform( // Windows
                            value = "windows",
-                           define = {"USEARCH_USE_OPENMP 0"},
                            link = { "lmdb", "libusearch_static_c", "dtlv", "Advapi32" }
                            ),
                 @Platform( // Unix-like
@@ -25,7 +23,8 @@ import org.bytedeco.javacpp.tools.*;
                            link = { "dtlv" }
                            )
             },
-            target = "datalevin.dtlvnative.DTLV"
+            target = "datalevin.dtlvnative.DTLV",
+            deleteJniFiles = false
             )
 
 public class DTLVConfig {
