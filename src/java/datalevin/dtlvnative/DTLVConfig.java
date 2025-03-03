@@ -23,8 +23,7 @@ import org.bytedeco.javacpp.tools.*;
                            link = { "dtlv" }
                            )
             },
-            target = "datalevin.dtlvnative.DTLV",
-            deleteJniFiles = false
+            target = "datalevin.dtlvnative.DTLV"
             )
 
 public class DTLVConfig {
