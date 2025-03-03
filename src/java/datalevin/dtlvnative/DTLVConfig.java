@@ -17,8 +17,6 @@ import org.bytedeco.javacpp.tools.*;
                 @Platform( // Windows
                            value = "windows",
                            define = {"USEARCH_USE_OPENMP 0"},
-                           convention = "stdcall",
-                           catchExceptions = true,
                            link = { "lmdb", "libusearch_static_c", "dtlv", "Advapi32" }
                            ),
                 @Platform( // Unix-like
@@ -32,5 +30,7 @@ import org.bytedeco.javacpp.tools.*;
 public class DTLVConfig {
     public void map(InfoMap infoMap) {
         infoMap.put(new Info("USEARCH_EXPORT").cppTypes().annotations());
+        infoMap.put(new Info("usearch_init_options_t").pointerTypes("usearch_init_options_t"));
+
     }
 }
