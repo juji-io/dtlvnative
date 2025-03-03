@@ -29,12 +29,12 @@ dir %CPATH%
 
 cd java
 
-set JAVACPP_DELETE_JNI_FILES=false
-
-set JAVACPP_LOG_LEVEL=debug
-
-java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" ^
+java -Djavacpp.debug=true -Djavacpp.deleteJniFiles=false -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" ^
     datalevin/dtlvnative/DTLV.java
+
+type C:\projects\dtlvnative\src\java\datalevin\dtlvnative\jniDTLV.cpp
+
+type C:\projects\dtlvnative\src\java\jnijavacpp.cpp
 
 dir datalevin\dtlvnative\windows-x86_64
 
