@@ -27,6 +27,8 @@ cd %CPATH%
 
 dir %CPATH%
 
+dumpbin /DIRECTIVES usearch_static_c.lib
+
 cd java
 
 java -Djavacpp.debug=true -Djavacpp.deleteJniFiles=false -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.11\javacpp-1.5.11.jar" -nodelete ^

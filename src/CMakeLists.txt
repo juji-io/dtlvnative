@@ -61,6 +61,15 @@ set(USEARCH_BUILD_LIB_C        ON CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_TEST_C       ON CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_TEST_CPP     ON CACHE BOOL "" FORCE)
 
+foreach(config DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+        string(TOUPPER ${config} config_upper)
+        set(CMAKE_C_FLAGS_${config_upper} "${CMAKE_C_FLAGS_${config_upper}} /MD")
+        set(CMAKE_CXX_FLAGS_${config_upper} "${CMAKE_CXX_FLAGS_${config_upper}} /MD")
+endforeach()
+
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MDd")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd")
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
 
 set_target_properties(usearch_static_c PROPERTIES
