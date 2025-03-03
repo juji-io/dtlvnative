@@ -17,7 +17,7 @@ import org.bytedeco.javacpp.tools.*;
                 @Platform( // Windows
                            value = "windows",
                            define = {"USEARCH_USE_OPENMP 0"},
-                           deleteJniFiles = false,
+                           skipJniFiles = false,
                            link = { "lmdb", "libusearch_static_c", "dtlv", "Advapi32" }
                            ),
                 @Platform( // Unix-like
