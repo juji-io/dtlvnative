@@ -34,8 +34,6 @@ java -Djavacpp.debug=true -Djavacpp.deleteJniFiles=false -jar "%USERPROFILE%\.m2
 
 type C:\projects\dtlvnative\src\java\datalevin\dtlvnative\jniDTLV.cpp
 
-type C:\projects\dtlvnative\src\java\jnijavacpp.cpp
-
 dir datalevin\dtlvnative\windows-x86_64
 
 dumpbin /linkermember:2 datalevin\dtlvnative\windows-x86_64\jniDTLV.dll

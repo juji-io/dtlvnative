@@ -172,7 +172,7 @@ public class Test {
         opts.zero();
 
         opts.metric_kind(DTLV.usearch_metric_ip_k)
-            // .metric((usearch_metric_t) nullMetric)
+            .metric((usearch_metric_t) null)
             .quantization(DTLV.usearch_scalar_f32_k)
             .dimensions(dimensions)
             .connectivity(3)
