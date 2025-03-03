@@ -16,7 +16,7 @@ import org.bytedeco.javacpp.tools.*;
                            ),
                 @Platform( // Windows
                            value = "windows",
-                           link = { "lmdb", "libusearch_static_c", "dtlv", "vcomp", "Advapi32" }
+                           link = { "lmdb", "libusearch_static_c", "dtlv", "vcomp", "msvcrt", "libcmt", "Advapi32" }
                            ),
                 @Platform( // Unix-like
                            value = { "linux", "macosx" },
