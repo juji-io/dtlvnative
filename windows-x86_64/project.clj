@@ -10,7 +10,7 @@
   :java-source-paths ["../src/java"]
   :jar-exclusions [#"\.java"]
   :javac-options ["-Xlint:unchecked" "-Xlint:-options" "--release" "11"]
-  :jvm-opts ["-Dorg.bytedeco.javacpp.logger.debug=false" "-Xcheck:jni" "-Dclojure.debug=false"]
+  :jvm-opts ["-Dorg.bytedeco.javacpp.logger.debug=true" "-Xcheck:jni" "-Dclojure.debug=true"]
   :main datalevin.dtlvnative.Test
   :deploy-repositories [["clojars" {:url           "https://repo.clojars.org"
                                     :username      :env/clojars_username
