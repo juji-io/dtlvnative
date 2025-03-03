@@ -27,7 +27,7 @@ cd %CPATH%
 
 dir %CPATH%
 
-dumpbin /DIRECTIVES usearch_static_c.lib
+dumpbin /DIRECTIVES libusearch_static_c.lib
 
 cd java
 
