@@ -72,9 +72,6 @@ endforeach()
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MDd")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd")
 
-find_package(OpenMP REQUIRED)
-target_link_libraries(usearch_static_c PRIVATE OpenMP::OpenMP_CXX)
-
 add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
 
 set_target_properties(usearch_static_c PROPERTIES
