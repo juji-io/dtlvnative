@@ -61,6 +61,8 @@ set(USEARCH_BUILD_LIB_C        ON CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_TEST_C       ON CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_TEST_CPP     ON CACHE BOOL "" FORCE)
 
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+
 foreach(config DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
         string(TOUPPER ${config} config_upper)
         set(CMAKE_C_FLAGS_${config_upper} "${CMAKE_C_FLAGS_${config_upper}} /MD")
@@ -70,8 +72,10 @@ endforeach()
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MDd")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd")
 
+find_package(OpenMP REQUIRED)
+target_link_libraries(usearch_static_c PRIVATE OpenMP::OpenMP_CXX)
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
-target_link_libraries(usearch_static_c PUBLIC ucrt)
 
 set_target_properties(usearch_static_c PROPERTIES
     OUTPUT_NAME usearch_static_c
