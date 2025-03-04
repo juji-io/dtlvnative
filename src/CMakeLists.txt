@@ -71,6 +71,7 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MDd")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd")
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
+target_link_libraries(usearch_static_c PUBLIC ucrt)
 
 set_target_properties(usearch_static_c PROPERTIES
     OUTPUT_NAME usearch_static_c
