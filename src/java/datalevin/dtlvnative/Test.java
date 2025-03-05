@@ -167,12 +167,15 @@ public class Test {
     }
 
     static DTLV.usearch_init_options_t createOpts(final long dimensions) {
+        DTLV.usearch_metric_t nullMetric = new DTLV.usearch_metric_t();
+        nullMetric.zero();
+        nullMetric.setNull();
 
         DTLV.usearch_init_options_t opts = new DTLV.usearch_init_options_t();
         opts.zero();
 
         opts.metric_kind(DTLV.usearch_metric_ip_k)
-            .metric((usearch_metric_t) null)
+            .metric((usearch_metric_t) nullMetric)
             .quantization(DTLV.usearch_scalar_f32_k)
             .dimensions(dimensions)
             .connectivity(3)
@@ -202,87 +205,83 @@ public class Test {
     }
 
     static void testUsearchInit(int collSize, int dimensions) {
-        try {
-            DTLV.usearch_init_options_t opts = createOpts(dimensions);
 
-            expect(opts.metric_kind() == DTLV.usearch_metric_ip_k, "fail to get metric_kind");
-            expect(opts.quantization() == DTLV.usearch_scalar_f32_k, "fail to get quantization");
-            expect(opts.connectivity() == 3, "fail to get connectivity");
-            expect(opts.dimensions() == dimensions, "fail to get dimensions");
-            expect(opts.expansion_add() == 40, "fail to get expansion_add");
-            expect(opts.expansion_search() == 16, "fail to get expansion_search");
-            expect(opts.multi() == false, "fail to get multi");
+        DTLV.usearch_init_options_t opts = createOpts(dimensions);
 
-            PointerPointer<BytePointer> error = new PointerPointer<BytePointer>(1).put((BytePointer)null);
+        expect(opts.metric_kind() == DTLV.usearch_metric_ip_k, "fail to get metric_kind");
+        expect(opts.quantization() == DTLV.usearch_scalar_f32_k, "fail to get quantization");
+        expect(opts.connectivity() == 3, "fail to get connectivity");
+        expect(opts.dimensions() == dimensions, "fail to get dimensions");
+        expect(opts.expansion_add() == 40, "fail to get expansion_add");
+        expect(opts.expansion_search() == 16, "fail to get expansion_search");
+        expect(opts.multi() == false, "fail to get multi");
 
-            System.out.println("About to call usearch_init");
-            DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
-            expect(index != null, "Failed to init index");
-            System.out.println("Successfully called init");
+        PointerPointer<BytePointer> error = new PointerPointer<>(1);
 
-            error.put(0, (BytePointer) null);
-            DTLV.usearch_free(index, error);
-            expectNoError(error, "Fail to free index");
+        error.put(0, (BytePointer) null);
+        DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        System.out.println("called init");
+        expect(index != null, "Failed to init index");
 
-            error.put(0, (BytePointer) null);
-            index = DTLV.usearch_init(opts, error);
-            expect(index != null, "Failed to init index");
+        error.put(0, (BytePointer) null);
+        DTLV.usearch_free(index, error);
+        expectNoError(error, "Fail to free index");
 
-            error.put(0, (BytePointer) null);
-            long size = DTLV.usearch_size(index, error);
-            expect(size == 0, "Failed to get index size");
+        error.put(0, (BytePointer) null);
+        index = DTLV.usearch_init(opts, error);
+        expect(index != null, "Failed to init index");
 
-            error.put(0, (BytePointer) null);
-            long capacity = DTLV.usearch_capacity(index, error);
-            expect(capacity == 0, "Failed to get index capacity");
+        error.put(0, (BytePointer) null);
+        long size = DTLV.usearch_size(index, error);
+        expect(size == 0, "Failed to get index size");
 
-            error.put(0, (BytePointer) null);
-            long dims = DTLV.usearch_dimensions(index, error);
-            expect(dimensions == dims, "Failed to get index dimensions");
+        error.put(0, (BytePointer) null);
+        long capacity = DTLV.usearch_capacity(index, error);
+        expect(capacity == 0, "Failed to get index capacity");
 
-            error.put(0, (BytePointer) null);
-            long connectivity = DTLV.usearch_connectivity(index, error);
-            expect(connectivity == opts.connectivity(),
-                    "Failed to get index connectivity");
+        error.put(0, (BytePointer) null);
+        long dims = DTLV.usearch_dimensions(index, error);
+        expect(dimensions == dims, "Failed to get index dimensions");
 
-            error.put(0, (BytePointer) null);
-            DTLV.usearch_reserve(index, collSize, error);
-            expectNoError(error, "Fail to reserve");
+        error.put(0, (BytePointer) null);
+        long connectivity = DTLV.usearch_connectivity(index, error);
+        expect(connectivity == opts.connectivity(),
+                "Failed to get index connectivity");
 
-            error.put(0, (BytePointer) null);
-            size = DTLV.usearch_size(index, error);
-            expect(size == 0, "Failed to get index size");
+        error.put(0, (BytePointer) null);
+        DTLV.usearch_reserve(index, collSize, error);
+        expectNoError(error, "Fail to reserve");
 
-            error.put(0, (BytePointer) null);
-            capacity = DTLV.usearch_capacity(index, error);
-            expect(capacity >= collSize, "Failed to get index capacity");
+        error.put(0, (BytePointer) null);
+        size = DTLV.usearch_size(index, error);
+        expect(size == 0, "Failed to get index size");
 
-            error.put(0, (BytePointer) null);
-            dims = DTLV.usearch_dimensions(index, error);
-            expect(dimensions == dims, "Failed to get index dimensions");
+        error.put(0, (BytePointer) null);
+        capacity = DTLV.usearch_capacity(index, error);
+        expect(capacity >= collSize, "Failed to get index capacity");
 
-            error.put(0, (BytePointer) null);
-            connectivity = DTLV.usearch_connectivity(index, error);
-            expect(connectivity == opts.connectivity(),
-                    "Failed to get index connectivity");
+        error.put(0, (BytePointer) null);
+        dims = DTLV.usearch_dimensions(index, error);
+        expect(dimensions == dims, "Failed to get index dimensions");
 
-            error.put(0, (BytePointer) null);
-            BytePointer hardware = DTLV.usearch_hardware_acceleration(index, error);
-            expectNoError(error, "Fail to get hardware");
-            System.out.println("SIMD Hardware ISA Name is: " + hardware.getString());
+        error.put(0, (BytePointer) null);
+        connectivity = DTLV.usearch_connectivity(index, error);
+        expect(connectivity == opts.connectivity(),
+                "Failed to get index connectivity");
 
-            error.put(0, (BytePointer) null);
-            long memory = DTLV.usearch_memory_usage(index, error);
-            expect(memory > 0, "Failed to get memory usage");
-            System.out.println("Memory Usage is: " + memory);
+        error.put(0, (BytePointer) null);
+        BytePointer hardware = DTLV.usearch_hardware_acceleration(index, error);
+        expectNoError(error, "Fail to get hardware");
+        System.out.println("SIMD Hardware ISA Name is: " + hardware.getString());
 
-            error.put(0, (BytePointer) null);
-            DTLV.usearch_free(index, error);
-            expectNoError(error, "Fail to free index");
-        } catch (Exception e) {
-            System.out.println("Java exception: " + e.getMessage());
-            e.printStackTrace();
-        }
+        error.put(0, (BytePointer) null);
+        long memory = DTLV.usearch_memory_usage(index, error);
+        expect(memory > 0, "Failed to get memory usage");
+        System.out.println("Memory Usage is: " + memory);
+
+        error.put(0, (BytePointer) null);
+        DTLV.usearch_free(index, error);
+        expectNoError(error, "Fail to free index");
 
         System.out.println("Passed init.");
     }

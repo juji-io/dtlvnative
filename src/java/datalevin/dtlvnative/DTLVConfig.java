@@ -16,8 +16,7 @@ import org.bytedeco.javacpp.tools.*;
                            ),
                 @Platform( // Windows
                            value = "windows",
-                           compiler = {"-D_CRT_SECURE_NO_WARNINGS"},
-                           link = { "lmdb", "vcomp", "Advapi32", "libusearch_static_c", "dtlv" }
+                           link = { "lmdb", "libusearch_static_c", "dtlv", "Advapi32" }
                            ),
                 @Platform( // Unix-like
                            value = { "linux", "macosx" },
@@ -30,7 +29,5 @@ import org.bytedeco.javacpp.tools.*;
 public class DTLVConfig {
     public void map(InfoMap infoMap) {
         infoMap.put(new Info("USEARCH_EXPORT").cppTypes().annotations());
-        infoMap.put(new Info("usearch_init_options_t").pointerTypes("usearch_init_options_t"));
-
     }
 }
