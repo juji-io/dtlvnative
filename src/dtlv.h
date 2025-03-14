@@ -325,30 +325,6 @@ extern "C" {
                                   MDB_val *start_key, MDB_val *end_key);
 
   /**
-   * A function to return the number of keys in a key range. Capped. When cap is
-   * reached, stop counting and return cap; When time budget is reached, stop
-   * counting and return the current count.
-   *
-   * @param cur The cursor.
-   * @param cap The cap.
-   * @param budget The time budget.
-   * @param step Take time measure at every step iterations.
-   * @param key Holder for the key.
-   * @param val Holder for the value.
-   * @param forward iterate keys forward (DTLV_TRUE) or not.
-   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
-   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
-   * @param start_key The start key, could be null
-   * @param end_key The end key, could be null.
-   * @return The count. Return -1 if there's error getting the time.
-   */
-  size_t dtlv_key_range_count_cap_budget(MDB_cursor *cur, size_t cap,
-                                         size_t budget, size_t step,
-                                         MDB_val *key, MDB_val *val,
-                                         int forward, int start, int end,
-                                         MDB_val *start_key, MDB_val *end_key);
-
-  /**
    * A function to return the total number of values in a key range, for a
    * dupsort DBI.
    *
@@ -387,6 +363,30 @@ extern "C" {
                                        MDB_val *key, MDB_val *val,
                                        int forward, int start, int end,
                                        MDB_val *start_key, MDB_val *end_key);
+
+  /**
+   * A function to return the total number of values in a key range, for a
+   * dupsort DBI. Capped. When cap is reached, stop counting and return
+   * cap;
+   *
+   * @param cur The cursor.
+   * @param cap The cap.
+   * @param budget The budget.
+   * @param step The step.
+   * @param key Holder for the key.
+   * @param val Holder for the value.
+   * @param forward iterate keys forward (DTLV_TRUE) or not.
+   * @param start if to include (DTLV_TRUE) or not (DTLV_FALSE) start_key.
+   * @param end if to include (DTLV_TRUE) or not (DTLV_FALSE) end_key.
+   * @param start_key The start key, could be null
+   * @param end_key The end key, could be null.
+   * @return The count
+   */
+  size_t dtlv_key_range_list_count_cap_budget(MDB_cursor *cur, size_t cap,
+                                              size_t budget, size_t step,
+                                              MDB_val *key, MDB_val *val,
+                                              int forward, int start, int end,
+                                              MDB_val *start_key, MDB_val *end_key);
 
   /**
    * Opaque structure for a list sample iterator that return samples
