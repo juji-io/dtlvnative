@@ -1,11 +1,48 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <string.h>
 #include "dtlv.h"
 
 #ifdef _WIN32
+#include <windows.h>
 #include "win32/unistd.h"
+#else
+// For POSIX systems, try to use clock_gettime if available.
+#include <time.h>
+#include <sys/time.h>
 #endif
+
+size_t current_time_millis() {
+#ifdef _WIN32
+  // Windows implementation using GetSystemTimeAsFileTime
+  FILETIME ft;
+  GetSystemTimeAsFileTime(&ft);
+
+  // Convert FILETIME (in 100-nanosecond units since January 1, 1601) to a 64-bit integer
+  size_t tmpres = (((size_t)ft.dwHighDateTime) << 32) | ft.dwLowDateTime;
+
+  // Convert from Windows epoch (1601) to Unix epoch (1970)
+  const size_t EPOCH_DIFF = 116444736000000000ULL;
+  return (size_t)((tmpres - EPOCH_DIFF) / 10000); // 1 millisecond = 10,000 * 100-nanosecond intervals
+#else
+  // On POSIX: try using clock_gettime first.
+#ifdef CLOCK_REALTIME
+  struct timespec ts;
+  if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
+    return (size_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+  }
+#endif
+
+  // Fallback using gettimeofday
+  struct timeval tv;
+  if (gettimeofday(&tv, NULL) != 0) {
+    return -1; // Error: unable to get time
+  }
+  return (size_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+#endif
+}
+
 
 int dtlv_cmp_memn(const MDB_val *a, const MDB_val *b) {
 
@@ -726,6 +763,44 @@ size_t dtlv_key_range_list_count_cap(MDB_cursor *cur, size_t cap,
       rc1 = mdb_cursor_count(cur, &m);
       if (rc1 == MDB_SUCCESS) {
         n += m;
+        if (n >= cap) break;
+      } else break;
+    }
+    dtlv_key_iter_destroy(iter);
+    if (rc == DTLV_FALSE || rc == DTLV_TRUE) {
+      if (rc1 == MDB_SUCCESS) return n;
+      return rc1;
+    }
+    return rc;
+  }
+  return rc;
+}
+
+size_t dtlv_key_range_list_count_cap_budget(MDB_cursor *cur, size_t cap,
+                                            size_t budget, size_t step,
+                                            MDB_val *key, MDB_val *val,
+                                            int forward, int start, int end,
+                                            MDB_val *start_key, MDB_val *end_key) {
+  size_t t = current_time_millis();
+  if (t == -1) {
+    return -1;
+  }
+
+  size_t n = 0;
+  size_t m;
+  size_t i = 0;
+  dtlv_key_iter *iter;
+
+  int rc1;
+  int rc = dtlv_key_iter_create(&iter, cur, key, val, forward, start, end,
+                                start_key, end_key);
+  if (rc == MDB_SUCCESS) {
+    while ((rc = dtlv_key_iter_has_next(iter)) == DTLV_TRUE) {
+      rc1 = mdb_cursor_count(cur, &m);
+      if (rc1 == MDB_SUCCESS) {
+        n += m;
+        i++;
+        if (((i % step) == 0) && ((current_time_millis() - t) > budget)) break;
         if (n >= cap) break;
       } else break;
     }

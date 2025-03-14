@@ -167,21 +167,18 @@ public class Test {
     }
 
     static DTLV.usearch_init_options_t createOpts(final long dimensions) {
-        DTLV.usearch_metric_t nullMetric = new DTLV.usearch_metric_t();
-        nullMetric.zero();
-        nullMetric.setNull();
 
         DTLV.usearch_init_options_t opts = new DTLV.usearch_init_options_t();
-        opts.zero();
 
         opts.metric_kind(DTLV.usearch_metric_ip_k)
-            .metric((usearch_metric_t) nullMetric)
+            .metric((DTLV.usearch_metric_t) null)
             .quantization(DTLV.usearch_scalar_f32_k)
             .dimensions(dimensions)
             .connectivity(3)
             .expansion_add(40)
             .expansion_search(16)
             .multi(false);
+
         return opts;
     }
 
