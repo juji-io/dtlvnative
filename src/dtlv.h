@@ -417,6 +417,7 @@ extern "C" {
    */
   int dtlv_list_sample_iter_create(dtlv_list_sample_iter **iter,
                                    size_t *indices, int samples,
+                                   size_t budget, size_t step,
                                    MDB_cursor *cur, MDB_val *key, MDB_val *val,
                                    int kforward, int kstart, int kend,
                                    MDB_val *start_key, MDB_val *end_key,

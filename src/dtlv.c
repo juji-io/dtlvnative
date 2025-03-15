@@ -820,10 +820,14 @@ struct dtlv_list_sample_iter {
   int samples;
   size_t i;
   size_t j;
+  size_t budget;
+  size_t step;
+  size_t start;
 };
 
 int dtlv_list_sample_iter_create(dtlv_list_sample_iter **iter,
                                  size_t *indices, int samples,
+                                 size_t budget, size_t step,
                                  MDB_cursor *cur, MDB_val *key, MDB_val *val,
                                  int kforward, int kstart, int kend,
                                  MDB_val *start_key, MDB_val *end_key,
@@ -843,6 +847,9 @@ int dtlv_list_sample_iter_create(dtlv_list_sample_iter **iter,
     s->samples = samples;
     s->i = 0;
     s->j = 0;
+    s->budget = budget;
+    s->step = step;
+    s->start = current_time_millis();
 
     *iter = s;
     return MDB_SUCCESS;
@@ -860,6 +867,9 @@ int dtlv_list_sample_iter_has_next(dtlv_list_sample_iter *iter) {
       return DTLV_TRUE;
     }
     iter->j++;
+    if (((iter->j % iter->step) == 0)
+        && ((current_time_millis() - iter->start) > iter->budget))
+      return DTLV_FALSE;
   }
   if (rc == DTLV_FALSE) return DTLV_FALSE;
   return rc;

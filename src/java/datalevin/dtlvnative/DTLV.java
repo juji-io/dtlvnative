@@ -3548,6 +3548,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      */
     public static native int dtlv_list_sample_iter_create(@Cast("dtlv_list_sample_iter**") PointerPointer iter,
             @Cast("size_t*") SizeTPointer indices, int samples,
+            @Cast("size_t") long budget, @Cast("size_t") long step,
             MDB_cursor cur, MDB_val key, MDB_val val,
             int kforward, int kstart, int kend,
             MDB_val start_key, MDB_val end_key,
@@ -3556,6 +3557,7 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
 
     public static native int dtlv_list_sample_iter_create(@ByPtrPtr dtlv_list_sample_iter iter,
             @Cast("size_t*") SizeTPointer indices, int samples,
+            @Cast("size_t") long budget, @Cast("size_t") long step,
             MDB_cursor cur, MDB_val key, MDB_val val,
             int kforward, int kstart, int kend,
             MDB_val start_key, MDB_val end_key,
