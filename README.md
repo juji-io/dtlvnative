@@ -19,8 +19,23 @@ The following platforms are currently supported:
 * linux-arm64
 * linux-x86_64
 * windows-x86_64
+
 The name of the released JAR is `org.clojars.huahaiy/dtlvnative-PLATFORM`, where
 `PLATFORM` is one of the above.
+
+## Additional dependencies
+
+Right now, the included shared libraries dependent on some system libraries.
+
+* `libc`
+* `libomp` or `libgomp`
+* `libmvec`
+
+On systems that these are not available by default, you will have to install
+them yourself. For example, on Ubuntu/Debian, `apt install libgomp1`, or `apt
+install gcc-12 g++-12`; on MacOS, `brew install libomp libllvm`
+
+Building these libraries statically is a future work. PR is always welcome.
 
 ## License
 
