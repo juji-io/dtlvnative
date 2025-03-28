@@ -25,7 +25,7 @@ The name of the released JAR is `org.clojars.huahaiy/dtlvnative-PLATFORM`, where
 
 ## Additional dependencies
 
-Right now, the included shared libraries dependent on some system libraries.
+Right now, the included shared libraries depend on some system libraries.
 
 * `libc`
 * `libomp` or `libgomp`
@@ -35,7 +35,7 @@ On systems that these are not available by default, you will have to install
 them yourself. For example, on Ubuntu/Debian, `apt install libgomp1`, or `apt
 install gcc-12 g++-12`; on MacOS, `brew install libomp libllvm`
 
-Building these libraries statically is a future work. PR is always welcome.
+Building these into our jars statically is a future work. PR is always welcome.
 
 ## License
 
