@@ -477,8 +477,20 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static final int MDB_INTEGERDUP = 0x20;
     /** with #MDB_DUPSORT, use reverse string dups */
     public static final int MDB_REVERSEDUP = 0x40;
+    /** enable counted branch nodes for fast range counts */
+    public static final int MDB_COUNTED = 0x80;
+    /** enable prefix compression for leaf keys */
+    public static final int MDB_PREFIX_COMPRESSION = 0x100;
     /** create DB if not already existing */
     public static final int MDB_CREATE = 0x40000;
+    /** \} */
+
+    /**
+     * \defgroup mdb_count Range Count Flags
+     * \{
+     */
+    public static final int MDB_COUNT_LOWER_INCL = 0x02;
+    public static final int MDB_COUNT_UPPER_INCL = 0x04;
     /** \} */
 
     /**
@@ -1694,6 +1706,70 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native int mdb_dbi_flags(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("unsigned int*") int[] flags);
 
     /**
+     * \brief Return the total number of elements in a counted database.
+     *
+     * Works with plain and dupsort DBIs opened with #MDB_COUNTED. For dupsort databases the total counts all key/value
+     * pairs, including duplicates. The \b flags parameter accepts range count modifiers such as
+     * #MDB_COUNT_LOWER_INCL and #MDB_COUNT_UPPER_INCL.
+     *
+     * @param txn   [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi   [in] A database handle returned by #mdb_dbi_open()
+     * @param flags [in] Count options. Must be 0 or a combination of #mdb_count flags.
+     * @param out   [out] Destination for the computed total.
+     */
+    public static native int mdb_count_all(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("unsigned int") int flags,
+            @Cast("uint64_t*") LongPointer out);
+
+    public static native int mdb_count_all(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("unsigned int") int flags,
+            @Cast("uint64_t*") LongBuffer out);
+
+    public static native int mdb_count_all(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("unsigned int") int flags,
+            @Cast("uint64_t*") long[] out);
+
+    /**
+     * \brief Count elements within a key range in a counted database.
+     *
+     * Counts all elements between \b low and \b high across plain and dupsort DBIs opened with #MDB_COUNTED.
+     * The inclusive/exclusive semantics are controlled by \b flags.
+     *
+     * @param txn   [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi   [in] A database handle returned by #mdb_dbi_open()
+     * @param low   [in] Lower bound key; may be NULL to begin from the first element.
+     * @param high  [in] Upper bound key; may be NULL to count through the end.
+     * @param flags [in] Bound modifiers using #mdb_count flags.
+     * @param out   [out] Destination for the computed count.
+     */
+    public static native int mdb_count_range(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val low,
+            @Const MDB_val high, @Cast("unsigned int") int flags, @Cast("uint64_t*") LongPointer out);
+
+    public static native int mdb_count_range(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val low,
+            @Const MDB_val high, @Cast("unsigned int") int flags, @Cast("uint64_t*") LongBuffer out);
+
+    public static native int mdb_count_range(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val low,
+            @Const MDB_val high, @Cast("unsigned int") int flags, @Cast("uint64_t*") long[] out);
+
+    /**
+     * \brief Count values for a key range in a counted dupsort database.
+     *
+     * Limits counting to the subset of keys in [\b key_low, \b key_high], applying #mdb_count flags via \b key_flags.
+     *
+     * @param txn       [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi       [in] A database handle returned by #mdb_dbi_open()
+     * @param key_low   [in] Inclusive/exclusive lower key bound, depending on \b key_flags.
+     * @param key_high  [in] Inclusive/exclusive upper key bound, depending on \b key_flags.
+     * @param key_flags [in] Bound modifiers using #mdb_count flags.
+     * @param out       [out] Destination for the computed count.
+     */
+    public static native int mdb_range_count_values(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val key_low,
+            @Const MDB_val key_high, @Cast("unsigned int") int key_flags, @Cast("uint64_t*") LongPointer out);
+
+    public static native int mdb_range_count_values(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val key_low,
+            @Const MDB_val key_high, @Cast("unsigned int") int key_flags, @Cast("uint64_t*") LongBuffer out);
+
+    public static native int mdb_range_count_values(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val key_low,
+            @Const MDB_val key_high, @Cast("unsigned int") int key_flags, @Cast("uint64_t*") long[] out);
+
+    /**
      * \brief Close a database handle. Normally unnecessary. Use with care:
      *
      * This call is not mutex protected. Handles should only be closed by
@@ -2160,6 +2236,63 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *         </ul>
      */
     public static native int mdb_cursor_count(MDB_cursor cursor, @Cast("size_t*") SizeTPointer countp);
+
+    /**
+     * \brief Retrieve the element at a given rank in a counted database.
+     *
+     * Positions \b cursor at the element identified by \b rank, optionally returning the key and data stored there.
+     * The database referenced by the cursor must have been opened with #MDB_COUNTED.
+     *
+     * @param cursor [in,out] Cursor to reposition; must reference a counted DBI.
+     * @param rank   [in] Zero-based element index to retrieve.
+     * @param key    [out] Optional destination for the key; may be null.
+     * @param data   [out] Optional destination for the data; may be null.
+     * @param flags  [in] Reserved for future use; must currently be 0.
+     */
+    public static native int mdb_cursor_get_rank(MDB_cursor cursor, @Cast("uint64_t") long rank, MDB_val key,
+            MDB_val data, @Cast("unsigned int") int flags);
+
+    /**
+     * \brief Convenience wrapper around #mdb_cursor_get_rank().
+     *
+     * Uses a temporary cursor on the provided transaction/database pair to fetch the key/value at \b rank.
+     */
+    public static native int mdb_get_rank(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Cast("uint64_t") long rank,
+            MDB_val key, MDB_val data);
+
+    /**
+     * \brief Determine the rank for a key (and optional data) in a counted database.
+     *
+     * Computes the zero-based position that \b key (and \b data for dupsort DBs) occupies within the sorted order.
+     *
+     * @param cursor [in] Cursor referencing the counted database.
+     * @param key    [in] Key whose rank should be computed; must not be null.
+     * @param data   [in] Optional duplicate selector when the DB uses #MDB_DUPSORT; may be null for plain DBs.
+     * @param flags  [in] Reserved for future use; must currently be 0.
+     * @param rank   [out] Destination for the computed zero-based rank.
+     */
+    public static native int mdb_cursor_key_rank(MDB_cursor cursor, @Const MDB_val key, @Const MDB_val data,
+            @Cast("unsigned int") int flags, @Cast("uint64_t*") LongPointer rank);
+
+    public static native int mdb_cursor_key_rank(MDB_cursor cursor, @Const MDB_val key, @Const MDB_val data,
+            @Cast("unsigned int") int flags, @Cast("uint64_t*") LongBuffer rank);
+
+    public static native int mdb_cursor_key_rank(MDB_cursor cursor, @Const MDB_val key, @Const MDB_val data,
+            @Cast("unsigned int") int flags, @Cast("uint64_t*") long[] rank);
+
+    /**
+     * \brief Convenience wrapper around #mdb_cursor_key_rank().
+     *
+     * Computes the rank for \b key (and optional \b data) using a temporary cursor.
+     */
+    public static native int mdb_get_key_rank(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val key,
+            @Const MDB_val data, @Cast("uint64_t*") LongPointer rank);
+
+    public static native int mdb_get_key_rank(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val key,
+            @Const MDB_val data, @Cast("uint64_t*") LongBuffer rank);
+
+    public static native int mdb_get_key_rank(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val key,
+            @Const MDB_val data, @Cast("uint64_t*") long[] rank);
 
     /**
      * \brief Compare two data items according to a particular database.

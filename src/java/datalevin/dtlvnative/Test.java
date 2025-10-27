@@ -152,7 +152,192 @@ public class Test {
 
         deleteDirectoryFiles(dir);
 
+        testLMDBCountedPrefix();
+
         System.out.println("Passed LMDB tests.");
+    }
+
+    static void testLMDBCountedPrefix() {
+
+        System.err.println("Testing counted/prefix compressed LMDB ...");
+
+        String dir = "db-counted";
+
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        IntPointer dbi = null;
+        DTLV.MDB_txn txn = null;
+        DTLV.MDB_txn rtxn = null;
+        boolean writeTxnActive = false;
+        boolean readTxnActive = false;
+        boolean envCreated = false;
+
+        List<BytePointer> keyPointers = new ArrayList<>();
+        List<IntPointer> valuePointers = new ArrayList<>();
+
+        try {
+            int result = DTLV.mdb_env_create(env);
+            if (result != 0) {
+                System.err.println("Failed to create counted/prefix environment: " + result);
+                return;
+            }
+            envCreated = true;
+
+            result = DTLV.mdb_env_set_maxdbs(env, 5);
+            if (result != 0) {
+                System.err.println("Failed to set max dbs for counted/prefix env: " + result);
+                return;
+            }
+
+            try {
+                Files.createDirectories(Paths.get(dir));
+            } catch (IOException e) {
+                System.err.println("Failed to create directory: " + dir);
+                e.printStackTrace();
+                return;
+            }
+
+            result = DTLV.mdb_env_open(env, dir, 0, 0664);
+            if (result != 0) {
+                System.err.println("Failed to open counted/prefix environment: " + result);
+                return;
+            }
+
+            txn = new DTLV.MDB_txn();
+            result = DTLV.mdb_txn_begin(env, null, 0, txn);
+            if (result != 0) {
+                System.err.println("Failed to begin counted/prefix write txn: " + result);
+                return;
+            }
+            writeTxnActive = true;
+
+            dbi = new IntPointer(1);
+            String dbiName = "counted_prefix";
+            result = DTLV.mdb_dbi_open(txn, dbiName,
+                                       DTLV.MDB_CREATE | DTLV.MDB_COUNTED | DTLV.MDB_PREFIX_COMPRESSION,
+                                       dbi);
+            if (result != 0) {
+                System.err.println("Failed to open counted/prefix dbi: " + result);
+                return;
+            }
+
+            result = DTLV.dtlv_set_comparator(txn, dbi.get());
+            if (result != 0) {
+                System.err.println("Failed to set comparator for counted/prefix db: " + result);
+                return;
+            }
+
+            String[] keys = { "alpha:001", "alpha:002", "alpha:010" };
+            int[] values = { 101, 202, 303 };
+            int[] keySizes = new int[keys.length];
+
+            for (int i = 0; i < keys.length; i++) {
+                byte[] keyBytes = keys[i].getBytes();
+                keySizes[i] = keyBytes.length;
+
+                BytePointer keyPtr = new BytePointer(keyBytes.length);
+                ByteBuffer keyBuffer = keyPtr.position(0).limit(keyBytes.length).asByteBuffer();
+                keyBuffer.put(keyBytes);
+                keyPtr.position(0);
+
+                IntPointer valuePtr = new IntPointer(1);
+                ByteBuffer valueBuffer = valuePtr.position(0).limit(1).asByteBuffer();
+                valueBuffer.putInt(values[i]);
+                valuePtr.position(0);
+
+                DTLV.MDB_val kval = new DTLV.MDB_val();
+                kval.mv_size(keySizes[i]);
+                kval.mv_data(keyPtr);
+
+                DTLV.MDB_val vval = new DTLV.MDB_val();
+                vval.mv_size(4);
+                vval.mv_data(valuePtr);
+
+                result = DTLV.mdb_put(txn, dbi.get(), kval, vval, 0);
+                if (result != 0) {
+                    System.err.println("Failed to put key/value into counted/prefix db: " + result);
+                    return;
+                }
+
+                keyPointers.add(keyPtr);
+                valuePointers.add(valuePtr);
+            }
+
+            result = DTLV.mdb_txn_commit(txn);
+            writeTxnActive = false;
+            if (result != 0) {
+                System.err.println("Failed to commit counted/prefix txn: " + result);
+                return;
+            }
+
+            result = DTLV.mdb_env_sync(env, 1);
+            if (result != 0) {
+                System.err.println("Failed to sync counted/prefix env: " + result);
+                return;
+            }
+
+            for (IntPointer vp : valuePointers)
+                vp.close();
+            valuePointers.clear();
+
+            rtxn = new DTLV.MDB_txn();
+            result = DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, rtxn);
+            if (result != 0) {
+                System.err.println("Failed to begin counted/prefix read txn: " + result);
+                return;
+            }
+            readTxnActive = true;
+
+            for (int i = 0; i < keys.length; i++) {
+                BytePointer keyPtr = keyPointers.get(i);
+                keyPtr.position(0);
+
+                DTLV.MDB_val kval = new DTLV.MDB_val();
+                kval.mv_size(keySizes[i]);
+                kval.mv_data(keyPtr);
+
+                DTLV.MDB_val rval = new DTLV.MDB_val();
+
+                result = DTLV.mdb_get(rtxn, dbi.get(), kval, rval);
+                if (result != 0) {
+                    System.err.println("Failed to get value for key " + keys[i] + ": " + result);
+                    return;
+                }
+
+                ByteBuffer data = rval.mv_data().position(0).limit(rval.mv_size()).asByteBuffer();
+                int readValue = data.getInt(0);
+                expect(readValue == values[i], "Counted/prefix db read mismatch for key " + keys[i]);
+            }
+
+            long[] total = new long[1];
+            result = DTLV.mdb_count_all(rtxn, dbi.get(), 0, total);
+            if (result != 0) {
+                System.err.println("Failed to count entries in counted/prefix db: " + result);
+                return;
+            }
+            expect(total[0] == keys.length, "Counted/prefix db total mismatch");
+
+            DTLV.mdb_txn_abort(rtxn);
+            readTxnActive = false;
+
+            System.out.println("Passed counted/prefix LMDB test.");
+        } finally {
+            if (readTxnActive && rtxn != null)
+                DTLV.mdb_txn_abort(rtxn);
+            if (writeTxnActive && txn != null)
+                DTLV.mdb_txn_abort(txn);
+
+            for (IntPointer vp : valuePointers)
+                vp.close();
+            for (BytePointer kp : keyPointers)
+                kp.close();
+
+            if (dbi != null)
+                dbi.close();
+
+            if (envCreated)
+                DTLV.mdb_env_close(env);
+            deleteDirectoryFiles(dir);
+        }
     }
 
     static float[][] randomVectors(final int n, final int dimensions) {
