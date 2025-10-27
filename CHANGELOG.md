@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.13.0
+### Changed
+- Switch to use DLMDB
+
 ## 0.11.4
 ### Changed
 - Use JavaCPP. Removed static compilation as we don't use GraalVM specific
