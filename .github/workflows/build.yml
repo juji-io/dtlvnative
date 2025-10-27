@@ -28,7 +28,6 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'maven'
 
       - name: Install Lein
         uses: knicknic/os-specific-run@v1.0.3
