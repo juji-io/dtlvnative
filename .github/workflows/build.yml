@@ -15,7 +15,7 @@ jobs:
       CLOJARS_PASSWORD: ${{secrets.CLOJARSPASSWORD}}
     strategy:
       matrix:
-        os: [ubuntu-22.04]
+        os: [macos-14, ubuntu-22.04]
         # os: [macos-15-intel, ubuntu-22.04]
 
     steps:
@@ -33,7 +33,7 @@ jobs:
       - name: Install Lein
         uses: knicknic/os-specific-run@v1.0.3
         with:
-          # macos: brew install leiningen
+          macos: brew install leiningen
           linux: |
             curl -O https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
             chmod a+x lein
@@ -42,27 +42,27 @@ jobs:
       - name: Build and deploy shared libraries
         uses: knicknic/os-specific-run@v1.0.3
         with:
-          # macos: |
-          #   mkdir -p src/java/datalevin/dtlvnative/macosx-x86_64
-          #   mkdir -p macosx-x86_64/resources/datalevin/dtlvnative/macosx-x86_64
+          macos: |
+            mkdir -p src/java/datalevin/dtlvnative/macosx-arm64
+            mkdir -p macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64
 
-          #   brew install libomp llvm
+            brew install libomp llvm
 
-          #   script/build-macos
-          #   cp src/*.dylib macosx-x86_64/resources/datalevin/dtlvnative/macosx-x86_64/
+            script/build-macos
+            cp src/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
 
-          #   cd macosx-x86_64
-          #   lein deps
+            cd macosx-arm64
+            lein deps
 
-          #   cd ../src/java
-          #   java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.12/javacpp-1.5.12.jar datalevin/dtlvnative/DTLV.java
+            cd ../src/java
+            java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.12/javacpp-1.5.12.jar datalevin/dtlvnative/DTLV.java
 
-          #   cd ../..
-          #   cp src/java/datalevin/dtlvnative/macosx-x86_64/*.dylib macosx-x86_64/resources/datalevin/dtlvnative/macosx-x86_64/
+            cd ../..
+            cp src/java/datalevin/dtlvnative/macosx-arm64/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
 
-          #   cd macosx-x86_64
-          #   lein run
-          #   lein deploy clojars
+            cd macosx-arm64
+            lein run
+            lein deploy clojars
 
           linux: |
             export CC=/usr/bin/gcc-12
