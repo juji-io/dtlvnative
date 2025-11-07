@@ -3211,21 +3211,6 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static final int DTLV_FALSE = 256;
 
     /**
-     * The main comparator that compare bytes in order.
-     */
-    public static native int dtlv_cmp_memn(@Const MDB_val a, @Const MDB_val b);
-
-    /**
-     * Set the comparator for a DBI to the main comparator.
-     */
-    public static native int dtlv_set_comparator(MDB_txn txn, int dbi);
-
-    /**
-     * Set the comparator for a list DBI to the main comparator.
-     */
-    public static native int dtlv_set_dupsort_comparator(MDB_txn txn, int dbi);
-
-    /**
      * Opaque structure for a iterator that iterates by keys only.
      */
     @Opaque

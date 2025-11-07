@@ -25,21 +25,6 @@ extern "C" {
 #define DTLV_FALSE	256
 
   /**
-   * The main comparator that compare bytes in order.
-   */
-  int dtlv_cmp_memn(const MDB_val *a, const MDB_val *b);
-
-  /**
-   * Set the comparator for a DBI to the main comparator.
-   */
-  int dtlv_set_comparator(MDB_txn *txn, int dbi);
-
-  /**
-   * Set the comparator for a list DBI to the main comparator.
-   */
-  int dtlv_set_dupsort_comparator(MDB_txn *txn, int dbi);
-
-  /**
    * Opaque structure for a iterator that iterates by keys only.
    */
   typedef struct dtlv_key_iter dtlv_key_iter;

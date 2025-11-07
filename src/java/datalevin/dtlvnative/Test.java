@@ -69,12 +69,6 @@ public class Test {
             return;
         }
 
-        result = DTLV.dtlv_set_comparator(txn, dbi.get());
-        if (result != 0) {
-            System.err.println("Failed to set comparator for db: " + result);
-            return;
-        }
-
         String keyword = "Meaning of life?";
         int klen = keyword.getBytes().length;
 
@@ -217,12 +211,6 @@ public class Test {
                                        dbi);
             if (result != 0) {
                 System.err.println("Failed to open counted/prefix dbi: " + result);
-                return;
-            }
-
-            result = DTLV.dtlv_set_comparator(txn, dbi.get());
-            if (result != 0) {
-                System.err.println("Failed to set comparator for counted/prefix db: " + result);
                 return;
             }
 
