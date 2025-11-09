@@ -62,8 +62,48 @@ extern "C" {
    * A function to release memory of the iterator.
    *
    * @param iter The iterator handle.
-   */
+  */
   void dtlv_key_iter_destroy(dtlv_key_iter *iter);
+
+  /**
+   * Opaque structure for a rank based key sample iterator (plain DB).
+   */
+  typedef struct dtlv_key_rank_sample_iter dtlv_key_rank_sample_iter;
+
+  /**
+   * Create a rank based key sample iterator. Iteration is forward only with
+   * inclusive start/end key boundaries.
+   *
+   * @param iter The address where the iterator will be stored.
+   * @param indices The array of sample indices relative to the range start.
+   * @param samples The number of indices.
+   * @param cur The cursor.
+   * @param key Holder for the key.
+   * @param val Holder for the value.
+   * @param start_key Optional inclusive start key, may be NULL.
+   * @param end_key Optional inclusive end key, may be NULL.
+   * @return A non-zero error value on failure and 0 on success.
+   */
+  int dtlv_key_rank_sample_iter_create(dtlv_key_rank_sample_iter **iter,
+                                       size_t *indices, int samples,
+                                       MDB_cursor *cur, MDB_val *key,
+                                       MDB_val *val, MDB_val *start_key,
+                                       MDB_val *end_key);
+
+  /**
+   * Advance the rank based key sample iterator.
+   *
+   * @param iter The iterator handle.
+   * @return DTLV_TRUE when a sample has been materialized into key/val.
+   */
+  int dtlv_key_rank_sample_iter_has_next(dtlv_key_rank_sample_iter *iter);
+
+  /**
+   * Destroy the rank based key sample iterator.
+   *
+   * @param iter The iterator handle.
+   */
+  void dtlv_key_rank_sample_iter_destroy(dtlv_key_rank_sample_iter *iter);
 
   /**
    * Opaque structure for a list iterator that iterates both key and values (list)
@@ -425,6 +465,51 @@ extern "C" {
    * @param iter The iterator handle.
    */
   void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter *iter);
+
+  /**
+   * Opaque structure for a rank based list sample iterator.
+   */
+  typedef struct dtlv_list_rank_sample_iter dtlv_list_rank_sample_iter;
+
+  /**
+   * Create a rank based list sample iterator. This iterator assumes forward
+   * iteration with inclusive start/end boundaries and leverages cursor ranks.
+   *
+   * @param iter The address where the iterator will be stored.
+   * @param indices The array of sample indices relative to the range start.
+   * @param samples The number of sample indices.
+   * @param cur The cursor.
+   * @param key Holder for the key.
+   * @param val Holder for the value.
+   * @param start_key Optional inclusive start key.
+   * @param end_key Optional inclusive end key.
+   * @param start_val Optional inclusive start value (only used when
+   *                  start_key is provided).
+   * @param end_val Optional inclusive end value (only used when end_key is
+   *                provided).
+   * @return A non-zero error value on failure and 0 on success.
+   */
+  int dtlv_list_rank_sample_iter_create(dtlv_list_rank_sample_iter **iter,
+                                        size_t *indices, int samples,
+                                        MDB_cursor *cur, MDB_val *key,
+                                        MDB_val *val, MDB_val *start_key,
+                                        MDB_val *end_key, MDB_val *start_val,
+                                        MDB_val *end_val);
+
+  /**
+   * Advance the rank based sample iterator.
+   *
+   * @param iter The iterator handle.
+   * @return DTLV_TRUE when a sample has been materialized into key/val.
+   */
+  int dtlv_list_rank_sample_iter_has_next(dtlv_list_rank_sample_iter *iter);
+
+  /**
+   * Destroy the rank based sample iterator.
+   *
+   * @param iter The iterator handle.
+   */
+  void dtlv_list_rank_sample_iter_destroy(dtlv_list_rank_sample_iter *iter);
 
 
 #ifdef __cplusplus

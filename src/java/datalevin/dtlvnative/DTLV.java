@@ -3268,6 +3268,41 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native void dtlv_key_iter_destroy(dtlv_key_iter iter);
 
     /**
+     * Opaque structure for a rank based key sample iterator.
+     */
+    @Opaque
+    public static class dtlv_key_rank_sample_iter extends Pointer {
+        public dtlv_key_rank_sample_iter() {
+            super((Pointer) null);
+        }
+
+        public dtlv_key_rank_sample_iter(Pointer p) {
+            super(p);
+        }
+    }
+
+    /**
+     * Create a rank based key sample iterator (forward, inclusive bounds).
+     */
+    public static native int dtlv_key_rank_sample_iter_create(
+            @Cast("dtlv_key_rank_sample_iter**") PointerPointer iter,
+            @Cast("size_t*") SizeTPointer indices, int samples,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            MDB_val start_key, MDB_val end_key);
+
+    public static native int dtlv_key_rank_sample_iter_create(
+            @ByPtrPtr dtlv_key_rank_sample_iter iter,
+            @Cast("size_t*") SizeTPointer indices, int samples,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            MDB_val start_key, MDB_val end_key);
+
+    public static native int dtlv_key_rank_sample_iter_has_next(
+            dtlv_key_rank_sample_iter iter);
+
+    public static native void dtlv_key_rank_sample_iter_destroy(
+            dtlv_key_rank_sample_iter iter);
+
+    /**
      * Opaque structure for a list iterator that iterates both key and values (list)
      * for a dupsort DBI.
      */
@@ -3698,6 +3733,44 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @param iter The iterator handle.
      */
     public static native void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter iter);
+
+    /**
+     * Opaque structure for a rank based list sample iterator.
+     */
+    @Opaque
+    public static class dtlv_list_rank_sample_iter extends Pointer {
+        public dtlv_list_rank_sample_iter() {
+            super((Pointer) null);
+        }
+
+        public dtlv_list_rank_sample_iter(Pointer p) {
+            super(p);
+        }
+    }
+
+    /**
+     * Create a rank based list sample iterator. Iteration is forward only with
+     * inclusive boundaries.
+     */
+    public static native int dtlv_list_rank_sample_iter_create(
+            @Cast("dtlv_list_rank_sample_iter**") PointerPointer iter,
+            @Cast("size_t*") SizeTPointer indices, int samples,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            MDB_val start_key, MDB_val end_key,
+            MDB_val start_val, MDB_val end_val);
+
+    public static native int dtlv_list_rank_sample_iter_create(
+            @ByPtrPtr dtlv_list_rank_sample_iter iter,
+            @Cast("size_t*") SizeTPointer indices, int samples,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            MDB_val start_key, MDB_val end_key,
+            MDB_val start_val, MDB_val end_val);
+
+    public static native int dtlv_list_rank_sample_iter_has_next(
+            dtlv_list_rank_sample_iter iter);
+
+    public static native void dtlv_list_rank_sample_iter_destroy(
+            dtlv_list_rank_sample_iter iter);
 
     // #ifdef __cplusplus
     // #endif

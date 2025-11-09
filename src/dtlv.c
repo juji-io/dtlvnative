@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <stdint.h>
 #include "dtlv.h"
 
 #ifdef _WIN32
@@ -796,6 +797,144 @@ size_t dtlv_key_range_list_count_cap_budget(MDB_cursor *cur, size_t cap,
   return rc;
 }
 
+struct dtlv_key_rank_sample_iter {
+  MDB_cursor *cur;
+  MDB_txn *txn;
+  MDB_dbi dbi;
+  MDB_val *key;
+  MDB_val *val;
+  size_t *indices;
+  int samples;
+  int current;
+  uint64_t lower_rank;
+  uint64_t upper_rank;
+  int range_empty;
+};
+
+static int dtlv_key_rank_sample_iter_within_end(
+    dtlv_key_rank_sample_iter *iter, MDB_val *end_key) {
+  if (!end_key) return DTLV_TRUE;
+  int cmp = mdb_cmp(iter->txn, iter->dbi, iter->key, end_key);
+  if (cmp > 0) return DTLV_FALSE;
+  return DTLV_TRUE;
+}
+
+static int dtlv_key_rank_sample_iter_seek_start(
+    dtlv_key_rank_sample_iter *iter, MDB_val *start_key) {
+  int rc;
+  if (start_key) {
+    val_in(iter->key, start_key);
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
+  } else {
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_FIRST);
+  }
+
+  if (rc == MDB_NOTFOUND) return DTLV_FALSE;
+  if (rc != MDB_SUCCESS) return rc;
+  return DTLV_TRUE;
+}
+
+static int dtlv_key_rank_sample_iter_compute_lower(
+    dtlv_key_rank_sample_iter *iter, MDB_val *start_key, MDB_val *end_key,
+    uint64_t *rank_out) {
+  int rc = dtlv_key_rank_sample_iter_seek_start(iter, start_key);
+  if (rc == DTLV_FALSE) return DTLV_FALSE;
+  if (rc != DTLV_TRUE) return rc;
+  if (dtlv_key_rank_sample_iter_within_end(iter, end_key) == DTLV_FALSE)
+    return DTLV_FALSE;
+
+  uint64_t rank = 0;
+  rc = mdb_cursor_key_rank(iter->cur, iter->key, NULL, 0, &rank);
+  if (rc != MDB_SUCCESS) return rc;
+  *rank_out = rank;
+  return MDB_SUCCESS;
+}
+
+static int dtlv_key_rank_sample_iter_compute_upper(
+    dtlv_key_rank_sample_iter *iter, MDB_val *end_key, uint64_t *rank_out) {
+  if (!end_key) return mdb_count_all(iter->txn, iter->dbi, 0, rank_out);
+
+  val_in(iter->key, end_key);
+  int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
+  if (rc == MDB_NOTFOUND) return mdb_count_all(iter->txn, iter->dbi, 0, rank_out);
+  if (rc != MDB_SUCCESS) return rc;
+
+  int cmp = mdb_cmp(iter->txn, iter->dbi, iter->key, end_key);
+  if (cmp > 0)
+    return mdb_cursor_key_rank(iter->cur, iter->key, NULL, 0, rank_out);
+
+  /* cmp == 0: step past the inclusive upper bound. */
+  rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_NEXT);
+  if (rc == MDB_NOTFOUND) return mdb_count_all(iter->txn, iter->dbi, 0, rank_out);
+  if (rc != MDB_SUCCESS) return rc;
+  return mdb_cursor_key_rank(iter->cur, iter->key, NULL, 0, rank_out);
+}
+
+int dtlv_key_rank_sample_iter_create(dtlv_key_rank_sample_iter **iter,
+                                     size_t *indices, int samples,
+                                     MDB_cursor *cur, MDB_val *key,
+                                     MDB_val *val, MDB_val *start_key,
+                                     MDB_val *end_key) {
+  dtlv_key_rank_sample_iter *s;
+  s = calloc(1, sizeof(struct dtlv_key_rank_sample_iter));
+  if (!s) return ENOMEM;
+
+  s->cur = cur;
+  s->txn = mdb_cursor_txn(cur);
+  s->dbi = mdb_cursor_dbi(cur);
+  s->key = key;
+  s->val = val;
+  s->indices = indices;
+  s->samples = samples;
+  s->current = 0;
+  s->lower_rank = 0;
+  s->upper_rank = 0;
+  s->range_empty = DTLV_FALSE;
+
+  uint64_t lower = 0;
+  int rc = dtlv_key_rank_sample_iter_compute_lower(s, start_key, end_key, &lower);
+  if (rc == DTLV_FALSE) {
+    s->range_empty = DTLV_TRUE;
+  } else if (rc != MDB_SUCCESS) {
+    free(s);
+    return rc;
+  } else {
+    s->lower_rank = lower;
+    uint64_t upper = 0;
+    rc = dtlv_key_rank_sample_iter_compute_upper(s, end_key, &upper);
+    if (rc != MDB_SUCCESS) {
+      free(s);
+      return rc;
+    }
+    s->upper_rank = upper;
+    if (s->lower_rank >= s->upper_rank) s->range_empty = DTLV_TRUE;
+  }
+
+  *iter = s;
+  return MDB_SUCCESS;
+}
+
+int dtlv_key_rank_sample_iter_has_next(dtlv_key_rank_sample_iter *iter) {
+  if (!iter) return EINVAL;
+  if (iter->range_empty == DTLV_TRUE) return DTLV_FALSE;
+  if (iter->current == iter->samples) return DTLV_FALSE;
+
+  uint64_t offset = (uint64_t)iter->indices[iter->current];
+  uint64_t target = iter->lower_rank + offset;
+  if (target >= iter->upper_rank) return DTLV_FALSE;
+
+  int rc = mdb_cursor_get_rank(iter->cur, target, iter->key, iter->val, 0);
+  if (rc == MDB_SUCCESS) {
+    iter->current++;
+    return DTLV_TRUE;
+  }
+  return rc;
+}
+
+void dtlv_key_rank_sample_iter_destroy(dtlv_key_rank_sample_iter *iter) {
+  if (iter) free(iter);
+}
+
 struct dtlv_list_sample_iter {
   dtlv_list_iter *base_iter;
   size_t *indices;
@@ -862,4 +1001,212 @@ void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter *iter) {
     dtlv_list_iter_destroy(iter->base_iter);
     free(iter);
   }
+}
+
+struct dtlv_list_rank_sample_iter {
+  MDB_cursor *cur;
+  MDB_txn *txn;
+  MDB_dbi dbi;
+  MDB_val *key;
+  MDB_val *val;
+  size_t *indices;
+  int samples;
+  int current;
+  uint64_t lower_rank;
+  uint64_t upper_rank;
+  int range_empty;
+};
+
+static int dtlv_list_rank_sample_iter_within_end(
+    dtlv_list_rank_sample_iter *iter, MDB_val *end_key, MDB_val *end_val) {
+  if (!end_key) return DTLV_TRUE;
+  int rc = mdb_cmp(iter->txn, iter->dbi, iter->key, end_key);
+  if (rc > 0) return DTLV_FALSE;
+  if ((rc == 0) && end_val) {
+    int vr = mdb_cmp(iter->txn, iter->dbi, iter->val, end_val);
+    if (vr > 0) return DTLV_FALSE;
+  }
+  return DTLV_TRUE;
+}
+
+static int dtlv_list_rank_sample_iter_seek_start(
+    dtlv_list_rank_sample_iter *iter, MDB_val *start_key,
+    MDB_val *start_val) {
+  int rc;
+  if (start_key) {
+    val_in(iter->key, start_key);
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
+  } else {
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_FIRST);
+  }
+  if (rc == MDB_NOTFOUND) return DTLV_FALSE;
+  if (rc != MDB_SUCCESS) return rc;
+
+  if (start_key && start_val) {
+    int cmp = mdb_cmp(iter->txn, iter->dbi, iter->key, start_key);
+    if ((cmp == 0) && start_val) {
+      MDB_val seek = *start_val;
+      rc = mdb_cursor_get(iter->cur, iter->key, &seek, MDB_GET_BOTH_RANGE);
+      if (rc == MDB_NOTFOUND) {
+        rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_NEXT_NODUP);
+        if (rc == MDB_NOTFOUND) return DTLV_FALSE;
+        if (rc != MDB_SUCCESS) return rc;
+        return DTLV_TRUE;
+      }
+      if (rc != MDB_SUCCESS) return rc;
+      iter->val->mv_size = seek.mv_size;
+      iter->val->mv_data = seek.mv_data;
+    }
+  }
+  return DTLV_TRUE;
+}
+
+static int dtlv_list_rank_sample_iter_seek_after_end(
+    dtlv_list_rank_sample_iter *iter, MDB_val *end_key, MDB_val *end_val) {
+  if (!end_key) return DTLV_FALSE;
+  val_in(iter->key, end_key);
+  int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
+  if (rc == MDB_NOTFOUND) return DTLV_FALSE;
+  if (rc != MDB_SUCCESS) return rc;
+
+  int cmp = mdb_cmp(iter->txn, iter->dbi, iter->key, end_key);
+  if (cmp > 0) return DTLV_TRUE;
+
+  if (!end_val) {
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_NEXT_NODUP);
+    if (rc == MDB_NOTFOUND) return DTLV_FALSE;
+    if (rc != MDB_SUCCESS) return rc;
+    return DTLV_TRUE;
+  }
+
+  MDB_val seek = *end_val;
+  rc = mdb_cursor_get(iter->cur, iter->key, &seek, MDB_GET_BOTH_RANGE);
+  if (rc == MDB_NOTFOUND) {
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_NEXT_NODUP);
+    if (rc == MDB_NOTFOUND) return DTLV_FALSE;
+    if (rc != MDB_SUCCESS) return rc;
+    return DTLV_TRUE;
+  }
+  if (rc != MDB_SUCCESS) return rc;
+
+  iter->val->mv_size = seek.mv_size;
+  iter->val->mv_data = seek.mv_data;
+
+  int vcmp = mdb_cmp(iter->txn, iter->dbi, iter->val, end_val);
+  if (vcmp > 0) return DTLV_TRUE;
+
+  while (1) {
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_NEXT_DUP);
+    if (rc == MDB_NOTFOUND) {
+      rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_NEXT_NODUP);
+      if (rc == MDB_NOTFOUND) return DTLV_FALSE;
+      if (rc != MDB_SUCCESS) return rc;
+      return DTLV_TRUE;
+    }
+    if (rc != MDB_SUCCESS) return rc;
+    if (mdb_cmp(iter->txn, iter->dbi, iter->val, end_val) > 0)
+      return DTLV_TRUE;
+  }
+}
+
+static int dtlv_list_rank_sample_iter_compute_lower(
+    dtlv_list_rank_sample_iter *iter, MDB_val *start_key, MDB_val *start_val,
+    MDB_val *end_key, MDB_val *end_val, uint64_t *rank_out) {
+  int rc = dtlv_list_rank_sample_iter_seek_start(iter, start_key, start_val);
+  if (rc == DTLV_FALSE) return DTLV_FALSE;
+  if (rc != DTLV_TRUE) return rc;
+  if (dtlv_list_rank_sample_iter_within_end(iter, end_key, end_val)
+      == DTLV_FALSE) return DTLV_FALSE;
+  uint64_t rank = 0;
+  rc = mdb_cursor_key_rank(iter->cur, iter->key, iter->val, 0, &rank);
+  if (rc != MDB_SUCCESS) return rc;
+  *rank_out = rank;
+  return MDB_SUCCESS;
+}
+
+static int dtlv_list_rank_sample_iter_compute_upper(
+    dtlv_list_rank_sample_iter *iter, MDB_val *end_key, MDB_val *end_val,
+    uint64_t *rank_out) {
+  if (!end_key) return DTLV_FALSE;
+  int rc = dtlv_list_rank_sample_iter_seek_after_end(iter, end_key, end_val);
+  if (rc == DTLV_FALSE) return DTLV_FALSE;
+  if (rc != DTLV_TRUE) return rc;
+  uint64_t rank = 0;
+  rc = mdb_cursor_key_rank(iter->cur, iter->key, iter->val, 0, &rank);
+  if (rc != MDB_SUCCESS) return rc;
+  *rank_out = rank;
+  return MDB_SUCCESS;
+}
+
+int dtlv_list_rank_sample_iter_create(dtlv_list_rank_sample_iter **iter,
+                                      size_t *indices, int samples,
+                                      MDB_cursor *cur, MDB_val *key,
+                                      MDB_val *val, MDB_val *start_key,
+                                      MDB_val *end_key, MDB_val *start_val,
+                                      MDB_val *end_val) {
+  dtlv_list_rank_sample_iter *s;
+  s = calloc(1, sizeof(struct dtlv_list_rank_sample_iter));
+  if (!s) return ENOMEM;
+
+  s->cur = cur;
+  s->txn = mdb_cursor_txn(cur);
+  s->dbi = mdb_cursor_dbi(cur);
+  s->key = key;
+  s->val = val;
+  s->indices = indices;
+  s->samples = samples;
+  s->current = 0;
+  s->lower_rank = 0;
+  s->upper_rank = 0;
+  s->range_empty = DTLV_FALSE;
+
+  uint64_t lower = 0;
+  int rc = dtlv_list_rank_sample_iter_compute_lower(s, start_key, start_val,
+                                                    end_key, end_val, &lower);
+  if (rc == DTLV_FALSE) {
+    s->range_empty = DTLV_TRUE;
+  } else if (rc != MDB_SUCCESS) {
+    free(s);
+    return rc;
+  } else {
+    s->lower_rank = lower;
+    uint64_t upper = 0;
+    rc = dtlv_list_rank_sample_iter_compute_upper(s, end_key, end_val, &upper);
+    if (rc == DTLV_FALSE) {
+      rc = mdb_count_all(s->txn, s->dbi, 0, &upper);
+      if (rc != MDB_SUCCESS) {
+        free(s);
+        return rc;
+      }
+    } else if (rc != MDB_SUCCESS) {
+      free(s);
+      return rc;
+    }
+    s->upper_rank = upper;
+    if (s->lower_rank >= s->upper_rank) s->range_empty = DTLV_TRUE;
+  }
+
+  *iter = s;
+  return MDB_SUCCESS;
+}
+
+int dtlv_list_rank_sample_iter_has_next(dtlv_list_rank_sample_iter *iter) {
+  if (!iter) return EINVAL;
+  if (iter->range_empty == DTLV_TRUE) return DTLV_FALSE;
+  if (iter->current == iter->samples) return DTLV_FALSE;
+
+  uint64_t offset = (uint64_t)iter->indices[iter->current];
+  uint64_t target = iter->lower_rank + offset;
+  if (target >= iter->upper_rank) return DTLV_FALSE;
+
+  int rc = mdb_cursor_get_rank(iter->cur, target, iter->key, iter->val, 0);
+  if (rc == MDB_SUCCESS) {
+    iter->current++;
+    return DTLV_TRUE;
+  }
+  return rc;
+}
+
+void dtlv_list_rank_sample_iter_destroy(dtlv_list_rank_sample_iter *iter) {
+  if (iter) free(iter);
 }

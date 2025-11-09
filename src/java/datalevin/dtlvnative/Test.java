@@ -5,6 +5,7 @@ import java.nio.*;
 import java.util.*;
 import java.util.function.LongPredicate;
 import java.nio.file.*;
+import java.nio.charset.StandardCharsets;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
@@ -48,7 +49,8 @@ public class Test {
             e.printStackTrace();
         }
 
-        result = DTLV.mdb_env_open(env, dir, 0, 0664);
+        int envFlags = DTLV.MDB_NOLOCK;
+        result = DTLV.mdb_env_open(env, dir, envFlags, 0664);
         if (result != 0) {
             System.err.println("Failed to open DTLV environment: " + result);
             return;
@@ -147,6 +149,8 @@ public class Test {
         deleteDirectoryFiles(dir);
 
         testLMDBCountedPrefix();
+        testRankSampleIterator();
+        testKeyRankSampleIterator();
 
         System.out.println("Passed LMDB tests.");
     }
@@ -190,7 +194,8 @@ public class Test {
                 return;
             }
 
-            result = DTLV.mdb_env_open(env, dir, 0, 0664);
+            int envFlags = DTLV.MDB_NOLOCK;
+            result = DTLV.mdb_env_open(env, dir, envFlags, 0664);
             if (result != 0) {
                 System.err.println("Failed to open counted/prefix environment: " + result);
                 return;
@@ -328,6 +333,385 @@ public class Test {
         }
     }
 
+    static void testRankSampleIterator() {
+
+        System.err.println("Testing rank-based list sample iterator ...");
+
+        String dir = "db-rank-sample";
+        List<BytePointer> allocations = new ArrayList<>();
+
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.MDB_txn txn = new DTLV.MDB_txn();
+        DTLV.MDB_txn rtxn = new DTLV.MDB_txn();
+        DTLV.MDB_cursor cursor = new DTLV.MDB_cursor();
+        IntPointer dbi = new IntPointer(1);
+
+        boolean envCreated = false;
+        boolean writeTxnActive = false;
+        boolean readTxnActive = false;
+        boolean cursorOpened = false;
+
+        try {
+            int result = DTLV.mdb_env_create(env);
+            if (result != 0) {
+                System.err.println("Failed to create rank sample env: " + result);
+                return;
+            }
+            envCreated = true;
+
+            result = DTLV.mdb_env_set_maxdbs(env, 5);
+            if (result != 0) {
+                System.err.println("Failed to set max dbs for rank sample env: " + result);
+                return;
+            }
+
+            try {
+                Files.createDirectories(Paths.get(dir));
+            } catch (IOException e) {
+                System.err.println("Failed to create directory: " + dir);
+                e.printStackTrace();
+                return;
+            }
+
+            int envFlags = DTLV.MDB_NOLOCK;
+            result = DTLV.mdb_env_open(env, dir, envFlags, 0664);
+            if (result != 0) {
+                System.err.println("Failed to open rank sample env: " + result);
+                return;
+            }
+
+            result = DTLV.mdb_txn_begin(env, null, 0, txn);
+            if (result != 0) {
+                System.err.println("Failed to begin rank sample write txn: " + result);
+                return;
+            }
+            writeTxnActive = true;
+
+            int flags = DTLV.MDB_CREATE | DTLV.MDB_DUPSORT | DTLV.MDB_COUNTED;
+            result = DTLV.mdb_dbi_open(txn, "rank_sample", flags, dbi);
+            if (result != 0) {
+                System.err.println("Failed to open rank sample dbi: " + result);
+                return;
+            }
+
+            String[][] dataset = {
+                { "alpha", "aa" },
+                { "alpha", "ab" },
+                { "alpha", "ac" },
+                { "bravo", "aa" },
+                { "bravo", "ab" },
+                { "charlie", "aa" }
+            };
+
+            List<String> orderedEntries = new ArrayList<>();
+
+            for (String[] pair : dataset) {
+                DTLV.MDB_val kval = new DTLV.MDB_val();
+                fillValWithString(kval, pair[0], allocations);
+                DTLV.MDB_val vval = new DTLV.MDB_val();
+                fillValWithString(vval, pair[1], allocations);
+                result = DTLV.mdb_put(txn, dbi.get(), kval, vval, 0);
+                if (result != 0) {
+                    System.err.println("Failed to put rank sample kv: " + result);
+                    return;
+                }
+                orderedEntries.add(pair[0] + ":" + pair[1]);
+            }
+
+            result = DTLV.mdb_txn_commit(txn);
+            if (result != 0) {
+                System.err.println("Failed to commit rank sample data: " + result);
+                return;
+            }
+            writeTxnActive = false;
+
+            result = DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, rtxn);
+            if (result != 0) {
+                System.err.println("Failed to begin rank sample read txn: " + result);
+                return;
+            }
+            readTxnActive = true;
+
+            result = DTLV.mdb_cursor_open(rtxn, dbi.get(), cursor);
+            if (result != 0) {
+                System.err.println("Failed to open rank sample cursor: " + result);
+                return;
+            }
+            cursorOpened = true;
+
+            DTLV.MDB_val keyHolder = new DTLV.MDB_val();
+            DTLV.MDB_val valHolder = new DTLV.MDB_val();
+
+            long[] baseSample = { 0L, 3L, 5L };
+            SizeTPointer indices = new SizeTPointer(baseSample.length);
+            for (int i = 0; i < baseSample.length; i++) {
+                indices.put(i, baseSample[i]);
+            }
+
+            DTLV.dtlv_list_rank_sample_iter iter =
+                new DTLV.dtlv_list_rank_sample_iter();
+            result = DTLV.dtlv_list_rank_sample_iter_create(
+                iter, indices, baseSample.length,
+                cursor, keyHolder, valHolder,
+                null, null, null, null);
+            if (result != 0) {
+                System.err.println("Failed to create full-range rank iterator: " + result);
+                indices.close();
+                return;
+            }
+            for (int i = 0; i < baseSample.length; i++) {
+                int hasNext = DTLV.dtlv_list_rank_sample_iter_has_next(iter);
+                expect(hasNext == DTLV.DTLV_TRUE, "Rank iterator missing expected sample");
+                String actual = mdbValToString(keyHolder) + ":" + mdbValToString(valHolder);
+                expect(actual.equals(orderedEntries.get((int) baseSample[i])),
+                       "Rank iterator produced unexpected entry");
+            }
+            expect(DTLV.dtlv_list_rank_sample_iter_has_next(iter) == DTLV.DTLV_FALSE,
+                   "Rank iterator should be exhausted");
+            DTLV.dtlv_list_rank_sample_iter_destroy(iter);
+            indices.close();
+
+            SizeTPointer bounded = new SizeTPointer(2);
+            bounded.put(0, 0);
+            bounded.put(1, 1);
+
+            DTLV.MDB_val startKey = new DTLV.MDB_val();
+            fillValWithString(startKey, "bravo", allocations);
+            DTLV.MDB_val endKey = new DTLV.MDB_val();
+            fillValWithString(endKey, "bravo", allocations);
+            DTLV.MDB_val startVal = new DTLV.MDB_val();
+            fillValWithString(startVal, "aa", allocations);
+            DTLV.MDB_val endVal = new DTLV.MDB_val();
+            fillValWithString(endVal, "ab", allocations);
+
+            DTLV.dtlv_list_rank_sample_iter boundedIter =
+                new DTLV.dtlv_list_rank_sample_iter();
+            result = DTLV.dtlv_list_rank_sample_iter_create(
+                boundedIter, bounded, 2, cursor, keyHolder, valHolder,
+                startKey, endKey, startVal, endVal);
+            if (result != 0) {
+                System.err.println("Failed to create bounded rank iterator: " + result);
+                bounded.close();
+                return;
+            }
+
+            String[] expectedBounded = { "bravo:aa", "bravo:ab" };
+            for (String expected : expectedBounded) {
+                int hasNext = DTLV.dtlv_list_rank_sample_iter_has_next(boundedIter);
+                expect(hasNext == DTLV.DTLV_TRUE, "Bounded iterator missing expected sample");
+                String actual = mdbValToString(keyHolder) + ":" + mdbValToString(valHolder);
+                expect(actual.equals(expected),
+                       "Bounded iterator produced unexpected entry");
+            }
+            expect(DTLV.dtlv_list_rank_sample_iter_has_next(boundedIter) == DTLV.DTLV_FALSE,
+                   "Bounded iterator should be exhausted");
+            DTLV.dtlv_list_rank_sample_iter_destroy(boundedIter);
+            bounded.close();
+
+            System.out.println("Passed rank-based list sample iterator test.");
+        } finally {
+            if (cursorOpened)
+                DTLV.mdb_cursor_close(cursor);
+            if (readTxnActive)
+                DTLV.mdb_txn_abort(rtxn);
+            if (writeTxnActive)
+                DTLV.mdb_txn_abort(txn);
+            dbi.close();
+            for (BytePointer ptr : allocations)
+                ptr.close();
+            if (envCreated)
+                DTLV.mdb_env_close(env);
+            deleteDirectoryFiles(dir);
+        }
+    }
+
+    static void testKeyRankSampleIterator() {
+
+        System.err.println("Testing key rank sample iterator ...");
+
+        String dir = "db-key-rank-sample";
+        List<BytePointer> allocations = new ArrayList<>();
+
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.MDB_txn txn = new DTLV.MDB_txn();
+        DTLV.MDB_txn rtxn = new DTLV.MDB_txn();
+        DTLV.MDB_cursor cursor = new DTLV.MDB_cursor();
+        IntPointer dbi = new IntPointer(1);
+
+        boolean envCreated = false;
+        boolean writeTxnActive = false;
+        boolean readTxnActive = false;
+        boolean cursorOpened = false;
+
+        try {
+            int result = DTLV.mdb_env_create(env);
+            if (result != 0) {
+                System.err.println("Failed to create key rank sample env: " + result);
+                return;
+            }
+            envCreated = true;
+
+            result = DTLV.mdb_env_set_maxdbs(env, 5);
+            if (result != 0) {
+                System.err.println("Failed to set max dbs for key rank sample env: " + result);
+                return;
+            }
+
+            try {
+                Files.createDirectories(Paths.get(dir));
+            } catch (IOException e) {
+                System.err.println("Failed to create directory: " + dir);
+                e.printStackTrace();
+                return;
+            }
+
+            int envFlags = DTLV.MDB_NOLOCK;
+            result = DTLV.mdb_env_open(env, dir, envFlags, 0664);
+            if (result != 0) {
+                System.err.println("Failed to open key rank sample env: " + result);
+                return;
+            }
+
+            result = DTLV.mdb_txn_begin(env, null, 0, txn);
+            if (result != 0) {
+                System.err.println("Failed to begin key rank sample write txn: " + result);
+                return;
+            }
+            writeTxnActive = true;
+
+            int flags = DTLV.MDB_CREATE | DTLV.MDB_COUNTED;
+            result = DTLV.mdb_dbi_open(txn, "key_rank_sample", flags, dbi);
+            if (result != 0) {
+                System.err.println("Failed to open key rank sample dbi: " + result);
+                return;
+            }
+
+            String[][] dataset = {
+                { "alpha", "v1" },
+                { "bravo", "v2" },
+                { "charlie", "v3" },
+                { "delta", "v4" },
+                { "echo", "v5" }
+            };
+
+            List<String> orderedKeys = new ArrayList<>();
+
+            for (String[] pair : dataset) {
+                DTLV.MDB_val kval = new DTLV.MDB_val();
+                fillValWithString(kval, pair[0], allocations);
+                DTLV.MDB_val vval = new DTLV.MDB_val();
+                fillValWithString(vval, pair[1], allocations);
+                result = DTLV.mdb_put(txn, dbi.get(), kval, vval, 0);
+                if (result != 0) {
+                    System.err.println("Failed to put key rank sample kv: " + result);
+                    return;
+                }
+                orderedKeys.add(pair[0]);
+            }
+
+            result = DTLV.mdb_txn_commit(txn);
+            if (result != 0) {
+                System.err.println("Failed to commit key rank sample data: " + result);
+                return;
+            }
+            writeTxnActive = false;
+
+            result = DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, rtxn);
+            if (result != 0) {
+                System.err.println("Failed to begin key rank sample read txn: " + result);
+                return;
+            }
+            readTxnActive = true;
+
+            result = DTLV.mdb_cursor_open(rtxn, dbi.get(), cursor);
+            if (result != 0) {
+                System.err.println("Failed to open key rank sample cursor: " + result);
+                return;
+            }
+            cursorOpened = true;
+
+            DTLV.MDB_val keyHolder = new DTLV.MDB_val();
+            DTLV.MDB_val valHolder = new DTLV.MDB_val();
+
+            long[] baseSample = { 0L, 2L, 4L };
+            SizeTPointer indices = new SizeTPointer(baseSample.length);
+            for (int i = 0; i < baseSample.length; i++) {
+                indices.put(i, baseSample[i]);
+            }
+
+            DTLV.dtlv_key_rank_sample_iter iter =
+                new DTLV.dtlv_key_rank_sample_iter();
+            result = DTLV.dtlv_key_rank_sample_iter_create(
+                iter, indices, baseSample.length,
+                cursor, keyHolder, valHolder,
+                null, null);
+            if (result != 0) {
+                System.err.println("Failed to create full-range key rank iterator: " + result);
+                indices.close();
+                return;
+            }
+            for (int i = 0; i < baseSample.length; i++) {
+                int hasNext = DTLV.dtlv_key_rank_sample_iter_has_next(iter);
+                expect(hasNext == DTLV.DTLV_TRUE, "Key rank iterator missing expected sample");
+                String actual = mdbValToString(keyHolder);
+                expect(actual.equals(orderedKeys.get((int) baseSample[i])),
+                       "Key rank iterator produced unexpected entry");
+            }
+            expect(DTLV.dtlv_key_rank_sample_iter_has_next(iter) == DTLV.DTLV_FALSE,
+                   "Key rank iterator should be exhausted");
+            DTLV.dtlv_key_rank_sample_iter_destroy(iter);
+            indices.close();
+
+            SizeTPointer bounded = new SizeTPointer(2);
+            bounded.put(0, 0);
+            bounded.put(1, 2);
+
+            DTLV.MDB_val startKey = new DTLV.MDB_val();
+            fillValWithString(startKey, "bravo", allocations);
+            DTLV.MDB_val endKey = new DTLV.MDB_val();
+            fillValWithString(endKey, "delta", allocations);
+
+            DTLV.dtlv_key_rank_sample_iter boundedIter =
+                new DTLV.dtlv_key_rank_sample_iter();
+            result = DTLV.dtlv_key_rank_sample_iter_create(
+                boundedIter, bounded, 2, cursor, keyHolder, valHolder,
+                startKey, endKey);
+            if (result != 0) {
+                System.err.println("Failed to create bounded key rank iterator: " + result);
+                bounded.close();
+                return;
+            }
+
+            String[] expectedBounded = { "bravo", "delta" };
+            for (String expected : expectedBounded) {
+                int hasNext = DTLV.dtlv_key_rank_sample_iter_has_next(boundedIter);
+                expect(hasNext == DTLV.DTLV_TRUE, "Bounded key iterator missing expected sample");
+                String actual = mdbValToString(keyHolder);
+                expect(actual.equals(expected),
+                       "Bounded key iterator produced unexpected entry");
+            }
+            expect(DTLV.dtlv_key_rank_sample_iter_has_next(boundedIter) == DTLV.DTLV_FALSE,
+                   "Bounded key iterator should be exhausted");
+            DTLV.dtlv_key_rank_sample_iter_destroy(boundedIter);
+            bounded.close();
+
+            System.out.println("Passed key rank sample iterator test.");
+        } finally {
+            if (cursorOpened)
+                DTLV.mdb_cursor_close(cursor);
+            if (readTxnActive)
+                DTLV.mdb_txn_abort(rtxn);
+            if (writeTxnActive)
+                DTLV.mdb_txn_abort(txn);
+            dbi.close();
+            for (BytePointer ptr : allocations)
+                ptr.close();
+            if (envCreated)
+                DTLV.mdb_env_close(env);
+            deleteDirectoryFiles(dir);
+        }
+    }
+
     static float[][] randomVectors(final int n, final int dimensions) {
         Random rand = new Random();
         float[][] data = new float[n][dimensions];
@@ -372,6 +756,29 @@ public class Test {
             System.out.println(message + ": " + msg);
             System.exit(-1);
         }
+    }
+
+    static void fillValWithString(DTLV.MDB_val target, String value,
+                                  List<BytePointer> arena) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        BytePointer ptr = new BytePointer(bytes.length);
+        ByteBuffer buffer = ptr.position(0).limit(bytes.length).asByteBuffer();
+        buffer.put(bytes);
+        ptr.position(0);
+        target.mv_size(bytes.length);
+        target.mv_data(ptr);
+        arena.add(ptr);
+    }
+
+    static String mdbValToString(DTLV.MDB_val val) {
+        if (val == null || val.mv_data() == null || val.mv_size() == 0) {
+            return "";
+        }
+        ByteBuffer buffer =
+            val.mv_data().position(0).limit((int) val.mv_size()).asByteBuffer();
+        byte[] bytes = new byte[buffer.remaining()];
+        buffer.get(bytes);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     static void testUsearchInit(int collSize, int dimensions) {
