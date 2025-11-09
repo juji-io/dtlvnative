@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.13.20
+### Added
+- Sample iterators based on fast rank API of DLMDB
+
 ## 0.13.0
 ### Changed
 - Switch to use DLMDB
