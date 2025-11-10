@@ -37,33 +37,3 @@ task:
     cd linux-arm64
     lein run
     lein deploy clojars
-
-# task:
-#   macos_instance:
-#     image: ghcr.io/cirruslabs/macos-runner:sonoma
-#   only_if: $CIRRUS_TAG != ''
-#   # only_if: "changesInclude('macosx-arm64/*', '.cirrus.yml', 'src/*')"
-#   script: |
-#     git submodule init
-#     git submodule update --init --recursive
-
-#     mkdir -p src/java/datalevin/dtlvnative/macosx-arm64
-#     mkdir -p macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64
-
-#     brew install leiningen libomp llvm
-
-#     script/build-macos
-#     cp src/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
-
-#     cd macosx-arm64
-#     lein deps
-
-#     cd ../src/java
-#     java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.12/javacpp-1.5.12.jar datalevin/dtlvnative/DTLV.java
-
-#     cd ../..
-#     cp src/java/datalevin/dtlvnative/macosx-arm64/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
-
-#     cd macosx-arm64
-#     lein run
-#     lein deploy clojars

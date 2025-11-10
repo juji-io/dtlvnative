@@ -1,5 +1,11 @@
 # Change Log
 
+## WIP
+### Added
+- Add the missing key only sampler
+### Changed
+- Drop Intel macOS build
+
 ## 0.13.20
 ### Added
 - Sample iterators based on fast rank API of DLMDB
