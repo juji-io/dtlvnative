@@ -387,7 +387,7 @@ public class Test {
             }
             writeTxnActive = true;
 
-            int flags = DTLV.MDB_CREATE | DTLV.MDB_DUPSORT | DTLV.MDB_COUNTED;
+            int flags = DTLV.MDB_CREATE | DTLV.MDB_DUPSORT | DTLV.MDB_COUNTED | DTLV.MDB_PREFIX_COMPRESSION;
             result = DTLV.mdb_dbi_open(txn, "rank_sample", flags, dbi);
             if (result != 0) {
                 System.err.println("Failed to open rank sample dbi: " + result);
@@ -441,12 +441,12 @@ public class Test {
 
             DTLV.MDB_val keyHolder = new DTLV.MDB_val();
             DTLV.MDB_val valHolder = new DTLV.MDB_val();
+            final long unlimitedBudget = 1_000_000L;
+            final long budgetStep = 1L;
 
             long[] baseSample = { 0L, 3L, 5L };
-            SizeTPointer indices = new SizeTPointer(baseSample.length);
-            for (int i = 0; i < baseSample.length; i++) {
-                indices.put(i, baseSample[i]);
-            }
+            SizeTPointer indices = toSizeTPointer(baseSample);
+            List<String> fullRankSamples = new ArrayList<>();
 
             DTLV.dtlv_list_rank_sample_iter iter =
                 new DTLV.dtlv_list_rank_sample_iter();
@@ -465,15 +465,48 @@ public class Test {
                 String actual = mdbValToString(keyHolder) + ":" + mdbValToString(valHolder);
                 expect(actual.equals(orderedEntries.get((int) baseSample[i])),
                        "Rank iterator produced unexpected entry");
+                fullRankSamples.add(actual);
             }
             expect(DTLV.dtlv_list_rank_sample_iter_has_next(iter) == DTLV.DTLV_FALSE,
                    "Rank iterator should be exhausted");
             DTLV.dtlv_list_rank_sample_iter_destroy(iter);
             indices.close();
 
-            SizeTPointer bounded = new SizeTPointer(2);
-            bounded.put(0, 0);
-            bounded.put(1, 1);
+            SizeTPointer listIndices = toSizeTPointer(baseSample);
+            DTLV.dtlv_list_sample_iter listIter =
+                new DTLV.dtlv_list_sample_iter();
+            result = DTLV.dtlv_list_sample_iter_create(
+                listIter, listIndices, baseSample.length,
+                unlimitedBudget, budgetStep,
+                cursor, keyHolder, valHolder,
+                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
+                null, null,
+                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
+                null, null);
+            if (result != 0) {
+                System.err.println("Failed to create list iterator: " + result);
+                listIndices.close();
+                return;
+            }
+            List<String> fullListSamples = new ArrayList<>();
+            for (int i = 0; i < baseSample.length; i++) {
+                int hasNext = DTLV.dtlv_list_sample_iter_has_next(listIter);
+                expect(hasNext == DTLV.DTLV_TRUE, "List iterator missing expected sample");
+                String actual = mdbValToString(keyHolder) + ":" + mdbValToString(valHolder);
+                expect(actual.equals(orderedEntries.get((int) baseSample[i])),
+                       "List iterator produced unexpected entry");
+                fullListSamples.add(actual);
+            }
+            expect(DTLV.dtlv_list_sample_iter_has_next(listIter) == DTLV.DTLV_FALSE,
+                   "List iterator should be exhausted");
+            DTLV.dtlv_list_sample_iter_destroy(listIter);
+            listIndices.close();
+
+            expect(fullRankSamples.equals(fullListSamples),
+                   "Rank and list iterators differ on full-range samples");
+
+            long[] boundedSample = { 0L, 1L };
+            SizeTPointer bounded = toSizeTPointer(boundedSample);
 
             DTLV.MDB_val startKey = new DTLV.MDB_val();
             fillValWithString(startKey, "bravo", allocations);
@@ -496,16 +529,49 @@ public class Test {
             }
 
             String[] expectedBounded = { "bravo:aa", "bravo:ab" };
+            List<String> boundedRankSamples = new ArrayList<>();
             for (String expected : expectedBounded) {
                 int hasNext = DTLV.dtlv_list_rank_sample_iter_has_next(boundedIter);
                 expect(hasNext == DTLV.DTLV_TRUE, "Bounded iterator missing expected sample");
                 String actual = mdbValToString(keyHolder) + ":" + mdbValToString(valHolder);
                 expect(actual.equals(expected),
                        "Bounded iterator produced unexpected entry");
+                boundedRankSamples.add(actual);
             }
             expect(DTLV.dtlv_list_rank_sample_iter_has_next(boundedIter) == DTLV.DTLV_FALSE,
                    "Bounded iterator should be exhausted");
             DTLV.dtlv_list_rank_sample_iter_destroy(boundedIter);
+
+            DTLV.dtlv_list_sample_iter boundedListIter =
+                new DTLV.dtlv_list_sample_iter();
+            result = DTLV.dtlv_list_sample_iter_create(
+                boundedListIter, bounded, 2,
+                unlimitedBudget, budgetStep,
+                cursor, keyHolder, valHolder,
+                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
+                startKey, endKey,
+                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
+                startVal, endVal);
+            if (result != 0) {
+                System.err.println("Failed to create bounded list iterator: " + result);
+                bounded.close();
+                return;
+            }
+            List<String> boundedListSamples = new ArrayList<>();
+            for (String expected : expectedBounded) {
+                int hasNext = DTLV.dtlv_list_sample_iter_has_next(boundedListIter);
+                expect(hasNext == DTLV.DTLV_TRUE, "Bounded list iterator missing expected sample");
+                String actual = mdbValToString(keyHolder) + ":" + mdbValToString(valHolder);
+                expect(actual.equals(expected),
+                       "Bounded list iterator produced unexpected entry");
+                boundedListSamples.add(actual);
+            }
+            expect(DTLV.dtlv_list_sample_iter_has_next(boundedListIter) == DTLV.DTLV_FALSE,
+                   "Bounded list iterator should be exhausted");
+            DTLV.dtlv_list_sample_iter_destroy(boundedListIter);
+
+            expect(boundedRankSamples.equals(boundedListSamples),
+                   "Rank and list iterators differ on bounded samples");
             bounded.close();
 
             System.out.println("Passed rank-based list sample iterator test.");
@@ -632,12 +698,12 @@ public class Test {
 
             DTLV.MDB_val keyHolder = new DTLV.MDB_val();
             DTLV.MDB_val valHolder = new DTLV.MDB_val();
+            final long unlimitedBudget = 1_000_000L;
+            final long budgetStep = 1L;
 
             long[] baseSample = { 0L, 2L, 4L };
-            SizeTPointer indices = new SizeTPointer(baseSample.length);
-            for (int i = 0; i < baseSample.length; i++) {
-                indices.put(i, baseSample[i]);
-            }
+            SizeTPointer indices = toSizeTPointer(baseSample);
+            List<String> fullRankSamples = new ArrayList<>();
 
             DTLV.dtlv_key_rank_sample_iter iter =
                 new DTLV.dtlv_key_rank_sample_iter();
@@ -656,15 +722,46 @@ public class Test {
                 String actual = mdbValToString(keyHolder);
                 expect(actual.equals(orderedKeys.get((int) baseSample[i])),
                        "Key rank iterator produced unexpected entry");
+                fullRankSamples.add(actual);
             }
             expect(DTLV.dtlv_key_rank_sample_iter_has_next(iter) == DTLV.DTLV_FALSE,
                    "Key rank iterator should be exhausted");
             DTLV.dtlv_key_rank_sample_iter_destroy(iter);
             indices.close();
 
-            SizeTPointer bounded = new SizeTPointer(2);
-            bounded.put(0, 0);
-            bounded.put(1, 2);
+            SizeTPointer keySampleIndices = toSizeTPointer(baseSample);
+            DTLV.dtlv_key_sample_iter keySampleIter =
+                new DTLV.dtlv_key_sample_iter();
+            result = DTLV.dtlv_key_sample_iter_create(
+                keySampleIter, keySampleIndices, baseSample.length,
+                unlimitedBudget, budgetStep,
+                cursor, keyHolder, valHolder,
+                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
+                null, null);
+            if (result != 0) {
+                System.err.println("Failed to create key sample iterator: " + result);
+                keySampleIndices.close();
+                return;
+            }
+            List<String> fullKeySamples = new ArrayList<>();
+            for (int i = 0; i < baseSample.length; i++) {
+                int hasNext = DTLV.dtlv_key_sample_iter_has_next(keySampleIter);
+                expect(hasNext == DTLV.DTLV_TRUE, "Key sample iterator missing expected sample");
+                String actual = mdbValToString(keyHolder);
+                expect(actual.equals(orderedKeys.get((int) baseSample[i])),
+                       "Key sample iterator produced unexpected entry");
+                fullKeySamples.add(actual);
+            }
+            expect(DTLV.dtlv_key_sample_iter_has_next(keySampleIter) == DTLV.DTLV_FALSE,
+                   "Key sample iterator should be exhausted");
+            DTLV.dtlv_key_sample_iter_destroy(keySampleIter);
+            keySampleIndices.close();
+
+            expect(fullRankSamples.equals(fullKeySamples),
+                   "Key rank and list iterators differ on full-range samples");
+
+            long[] boundedSample = { 0L, 2L };
+            SizeTPointer bounded = toSizeTPointer(boundedSample);
 
             DTLV.MDB_val startKey = new DTLV.MDB_val();
             fillValWithString(startKey, "bravo", allocations);
@@ -683,16 +780,47 @@ public class Test {
             }
 
             String[] expectedBounded = { "bravo", "delta" };
+            List<String> boundedRankSamples = new ArrayList<>();
             for (String expected : expectedBounded) {
                 int hasNext = DTLV.dtlv_key_rank_sample_iter_has_next(boundedIter);
                 expect(hasNext == DTLV.DTLV_TRUE, "Bounded key iterator missing expected sample");
                 String actual = mdbValToString(keyHolder);
                 expect(actual.equals(expected),
                        "Bounded key iterator produced unexpected entry");
+                boundedRankSamples.add(actual);
             }
             expect(DTLV.dtlv_key_rank_sample_iter_has_next(boundedIter) == DTLV.DTLV_FALSE,
                    "Bounded key iterator should be exhausted");
             DTLV.dtlv_key_rank_sample_iter_destroy(boundedIter);
+
+            DTLV.dtlv_key_sample_iter boundedKeyIter =
+                new DTLV.dtlv_key_sample_iter();
+            result = DTLV.dtlv_key_sample_iter_create(
+                boundedKeyIter, bounded, 2,
+                unlimitedBudget, budgetStep,
+                cursor, keyHolder, valHolder,
+                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
+                startKey, endKey);
+            if (result != 0) {
+                System.err.println("Failed to create bounded key sample iterator: " + result);
+                bounded.close();
+                return;
+            }
+            List<String> boundedKeySamples = new ArrayList<>();
+            for (String expected : expectedBounded) {
+                int hasNext = DTLV.dtlv_key_sample_iter_has_next(boundedKeyIter);
+                expect(hasNext == DTLV.DTLV_TRUE, "Bounded key sample iterator missing expected sample");
+                String actual = mdbValToString(keyHolder);
+                expect(actual.equals(expected),
+                       "Bounded key sample iterator produced unexpected entry");
+                boundedKeySamples.add(actual);
+            }
+            expect(DTLV.dtlv_key_sample_iter_has_next(boundedKeyIter) == DTLV.DTLV_FALSE,
+                   "Bounded key sample iterator should be exhausted");
+            DTLV.dtlv_key_sample_iter_destroy(boundedKeyIter);
+
+            expect(boundedRankSamples.equals(boundedKeySamples),
+                   "Key rank and list iterators differ on bounded samples");
             bounded.close();
 
             System.out.println("Passed key rank sample iterator test.");
@@ -768,6 +896,14 @@ public class Test {
         target.mv_size(bytes.length);
         target.mv_data(ptr);
         arena.add(ptr);
+    }
+
+    static SizeTPointer toSizeTPointer(long[] values) {
+        SizeTPointer pointer = new SizeTPointer(values.length);
+        for (int i = 0; i < values.length; i++) {
+            pointer.put(i, values[i]);
+        }
+        return pointer;
     }
 
     static String mdbValToString(DTLV.MDB_val val) {

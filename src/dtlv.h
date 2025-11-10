@@ -467,6 +467,52 @@ extern "C" {
   void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter *iter);
 
   /**
+   * Opaque structure for a key sample iterator that returns sampled keys
+   * within a key range.
+   */
+  typedef struct dtlv_key_sample_iter dtlv_key_sample_iter;
+
+  /**
+   * Create a key sample iterator.
+   *
+   * @param iter The address where the iterator will be stored.
+   * @param indices The array of sample indices.
+   * @param samples The number of samples.
+   * @param budget Time budget for sampling.
+   * @param step Iteration step used for checking the budget.
+   * @param cur The cursor.
+   * @param key Holder for the key.
+   * @param val Holder for the value.
+   * @param forward iterate keys forward (DTLV_TRUE) or not.
+   * @param start if to include (DTLV_TRUE) or not the start_key.
+   * @param end if to include (DTLV_TRUE) or not the end_key.
+   * @param start_key The start key, could be null.
+   * @param end_key The end key, could be null.
+   * @return A non-zero error value on failure and 0 on success.
+   */
+  int dtlv_key_sample_iter_create(dtlv_key_sample_iter **iter,
+                                  size_t *indices, int samples,
+                                  size_t budget, size_t step,
+                                  MDB_cursor *cur, MDB_val *key, MDB_val *val,
+                                  int forward, int start, int end,
+                                  MDB_val *start_key, MDB_val *end_key);
+
+  /**
+   * Advance the key sample iterator.
+   *
+   * @param iter The iterator handle.
+   * @return DTLV_TRUE on true and DTLV_FALSE on false.
+   */
+  int dtlv_key_sample_iter_has_next(dtlv_key_sample_iter *iter);
+
+  /**
+   * Destroy the key sample iterator.
+   *
+   * @param iter The iterator handle.
+   */
+  void dtlv_key_sample_iter_destroy(dtlv_key_sample_iter *iter);
+
+  /**
    * Opaque structure for a rank based list sample iterator.
    */
   typedef struct dtlv_list_rank_sample_iter dtlv_list_rank_sample_iter;

@@ -1003,6 +1003,73 @@ void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter *iter) {
   }
 }
 
+struct dtlv_key_sample_iter {
+  dtlv_key_iter *base_iter;
+  size_t *indices;
+  int samples;
+  size_t i;
+  size_t j;
+  size_t budget;
+  size_t step;
+  size_t start;
+};
+
+int dtlv_key_sample_iter_create(dtlv_key_sample_iter **iter,
+                                size_t *indices, int samples,
+                                size_t budget, size_t step,
+                                MDB_cursor *cur, MDB_val *key, MDB_val *val,
+                                int forward, int start, int end,
+                                MDB_val *start_key, MDB_val *end_key) {
+  dtlv_key_sample_iter *s;
+  s = calloc(1, sizeof(struct dtlv_key_sample_iter));
+  if (!s) return ENOMEM;
+
+  dtlv_key_iter *base_iter;
+  int rc = dtlv_key_iter_create(&base_iter, cur, key, val,
+                                forward, start, end, start_key, end_key);
+  if (rc != MDB_SUCCESS) {
+    free(s);
+    return rc;
+  }
+
+  s->base_iter = base_iter;
+  s->indices = indices;
+  s->samples = samples;
+  s->i = 0;
+  s->j = 0;
+  s->budget = budget;
+  s->step = step;
+  s->start = current_time_millis();
+
+  *iter = s;
+  return MDB_SUCCESS;
+}
+
+int dtlv_key_sample_iter_has_next(dtlv_key_sample_iter *iter) {
+  int rc;
+  while ((rc = dtlv_key_iter_has_next(iter->base_iter)) == DTLV_TRUE) {
+    if (iter->i == iter->samples) return DTLV_FALSE;
+    if (iter->j == iter->indices[iter->i]) {
+      iter->i++;
+      iter->j++;
+      return DTLV_TRUE;
+    }
+    iter->j++;
+    if (((iter->j % iter->step) == 0)
+        && ((current_time_millis() - iter->start) > iter->budget))
+      return DTLV_FALSE;
+  }
+  if (rc == DTLV_FALSE) return DTLV_FALSE;
+  return rc;
+}
+
+void dtlv_key_sample_iter_destroy(dtlv_key_sample_iter *iter) {
+  if (iter) {
+    dtlv_key_iter_destroy(iter->base_iter);
+    free(iter);
+  }
+}
+
 struct dtlv_list_rank_sample_iter {
   MDB_cursor *cur;
   MDB_txn *txn;

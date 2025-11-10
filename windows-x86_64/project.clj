@@ -12,6 +12,10 @@
   :javac-options ["-Xlint:unchecked" "-Xlint:-options" "--release" "17"]
   :jvm-opts ["-Dorg.bytedeco.javacpp.logger.debug=false" "-Xcheck:jni" "-Dclojure.debug=false"]
   :main datalevin.dtlvnative.Test
+  :jvm-opts ["-XX:+IgnoreUnrecognizedVMOptions"
+             "--enable-native-access=ALL-UNNAMED"
+             "--add-opens=java.base/java.nio=ALL-UNNAMED"
+             "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]
   :deploy-repositories [["clojars" {:url           "https://repo.clojars.org"
                                     :username      :env/clojars_username
                                     :password      :env/clojars_password

@@ -3735,6 +3735,49 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter iter);
 
     /**
+     * Opaque structure for a key sample iterator.
+     */
+    @Opaque
+    public static class dtlv_key_sample_iter extends Pointer {
+        public dtlv_key_sample_iter() {
+            super((Pointer) null);
+        }
+
+        public dtlv_key_sample_iter(Pointer p) {
+            super(p);
+        }
+    }
+
+    /**
+     * Create a key sample iterator.
+     */
+    public static native int dtlv_key_sample_iter_create(
+            @Cast("dtlv_key_sample_iter**") PointerPointer iter,
+            @Cast("size_t*") SizeTPointer indices, int samples,
+            @Cast("size_t") long budget, @Cast("size_t") long step,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int forward, int start, int end,
+            MDB_val start_key, MDB_val end_key);
+
+    public static native int dtlv_key_sample_iter_create(
+            @ByPtrPtr dtlv_key_sample_iter iter,
+            @Cast("size_t*") SizeTPointer indices, int samples,
+            @Cast("size_t") long budget, @Cast("size_t") long step,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int forward, int start, int end,
+            MDB_val start_key, MDB_val end_key);
+
+    /**
+     * Advance the key sample iterator.
+     */
+    public static native int dtlv_key_sample_iter_has_next(dtlv_key_sample_iter iter);
+
+    /**
+     * Destroy the key sample iterator.
+     */
+    public static native void dtlv_key_sample_iter_destroy(dtlv_key_sample_iter iter);
+
+    /**
      * Opaque structure for a rank based list sample iterator.
      */
     @Opaque
