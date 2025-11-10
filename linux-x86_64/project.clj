@@ -8,7 +8,6 @@
   :java-source-paths ["../src/java"]
   :jar-exclusions [#"\.java"]
   :javac-options ["-Xlint:unchecked" "-Xlint:-options" "--release" "17"]
-  :jvm-opts ["-Dorg.bytedeco.javacpp.logger.debug=false"]
   :main datalevin.dtlvnative.Test
   :jvm-opts ["-XX:+IgnoreUnrecognizedVMOptions"
              "--enable-native-access=ALL-UNNAMED"
