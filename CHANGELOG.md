@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.13.23
 ### Added
 - Key range full value iterator
 ### Changed
