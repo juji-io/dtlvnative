@@ -1,5 +1,11 @@
 # Change Log
 
+## WIP
+### Added
+- Key range full value iterator
+### Changed
+- Simplify list sampler
+
 ## 0.13.21
 ### Added
 - Add the missing key only sampler

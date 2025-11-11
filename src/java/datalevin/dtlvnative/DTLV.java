@@ -3687,35 +3687,21 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @param cur       The cursor.
      * @param key       Holder for the key.
      * @param val       Holder for the value.
-     * @param kforward  iterate keys forward (DTLV_TRUE) or not.
-     * @param kstart    if to include (DTLV_TRUE) or not the start_key.
-     * @param kend      if to include (DTLV_TRUE) or not the end_key.
-     * @param start_key The start key.
-     * @param end_key   The end key..
-     * @param vforward  iterate vals forward (DTLV_TRUE) or not.
-     * @param vstart    if to include (DTLV_TRUE) or not the start_val.
-     * @param vend      if to include (DTLV_TRUE) or not the end_val.
-     * @param start_val The start value.
-     * @param end_val   The end value.
+     * @param start_key Optional inclusive start key.
+     * @param end_key   Optional inclusive end key.
      * @return A non-zero error value on failure and 0 on success.
      */
     public static native int dtlv_list_sample_iter_create(@Cast("dtlv_list_sample_iter**") PointerPointer iter,
             @Cast("size_t*") SizeTPointer indices, int samples,
             @Cast("size_t") long budget, @Cast("size_t") long step,
             MDB_cursor cur, MDB_val key, MDB_val val,
-            int kforward, int kstart, int kend,
-            MDB_val start_key, MDB_val end_key,
-            int vforward, int vstart, int vend,
-            MDB_val start_val, MDB_val end_val);
+            MDB_val start_key, MDB_val end_key);
 
     public static native int dtlv_list_sample_iter_create(@ByPtrPtr dtlv_list_sample_iter iter,
             @Cast("size_t*") SizeTPointer indices, int samples,
             @Cast("size_t") long budget, @Cast("size_t") long step,
             MDB_cursor cur, MDB_val key, MDB_val val,
-            int kforward, int kstart, int kend,
-            MDB_val start_key, MDB_val end_key,
-            int vforward, int vstart, int vend,
-            MDB_val start_val, MDB_val end_val);
+            MDB_val start_key, MDB_val end_key);
 
     /**
      * A function to indicate if the list sample iterator has next sample. If
@@ -3733,6 +3719,39 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @param iter The iterator handle.
      */
     public static native void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter iter);
+
+    /**
+     * Opaque iterator that walks a key range and yields every duplicate value
+     * for each key.
+     */
+    @Opaque
+    public static class dtlv_list_key_range_full_val_iter extends Pointer {
+        public dtlv_list_key_range_full_val_iter() {
+            super((Pointer) null);
+        }
+
+        public dtlv_list_key_range_full_val_iter(Pointer p) {
+            super(p);
+        }
+    }
+
+    public static native int dtlv_list_key_range_full_val_iter_create(
+            @Cast("dtlv_list_key_range_full_val_iter**") PointerPointer iter,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int kstart, int kend,
+            MDB_val start_key, MDB_val end_key);
+
+    public static native int dtlv_list_key_range_full_val_iter_create(
+            @ByPtrPtr dtlv_list_key_range_full_val_iter iter,
+            MDB_cursor cur, MDB_val key, MDB_val val,
+            int kstart, int kend,
+            MDB_val start_key, MDB_val end_key);
+
+    public static native int dtlv_list_key_range_full_val_iter_has_next(
+            dtlv_list_key_range_full_val_iter iter);
+
+    public static native void dtlv_list_key_range_full_val_iter_destroy(
+            dtlv_list_key_range_full_val_iter iter);
 
     /**
      * Opaque structure for a key sample iterator.
@@ -3799,15 +3818,13 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
             @Cast("dtlv_list_rank_sample_iter**") PointerPointer iter,
             @Cast("size_t*") SizeTPointer indices, int samples,
             MDB_cursor cur, MDB_val key, MDB_val val,
-            MDB_val start_key, MDB_val end_key,
-            MDB_val start_val, MDB_val end_val);
+            MDB_val start_key, MDB_val end_key);
 
     public static native int dtlv_list_rank_sample_iter_create(
             @ByPtrPtr dtlv_list_rank_sample_iter iter,
             @Cast("size_t*") SizeTPointer indices, int samples,
             MDB_cursor cur, MDB_val key, MDB_val val,
-            MDB_val start_key, MDB_val end_key,
-            MDB_val start_val, MDB_val end_val);
+            MDB_val start_key, MDB_val end_key);
 
     public static native int dtlv_list_rank_sample_iter_has_next(
             dtlv_list_rank_sample_iter iter);

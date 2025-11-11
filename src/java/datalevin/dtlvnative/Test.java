@@ -453,7 +453,7 @@ public class Test {
             result = DTLV.dtlv_list_rank_sample_iter_create(
                 iter, indices, baseSample.length,
                 cursor, keyHolder, valHolder,
-                null, null, null, null);
+                null, null);
             if (result != 0) {
                 System.err.println("Failed to create full-range rank iterator: " + result);
                 indices.close();
@@ -479,9 +479,6 @@ public class Test {
                 listIter, listIndices, baseSample.length,
                 unlimitedBudget, budgetStep,
                 cursor, keyHolder, valHolder,
-                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
-                null, null,
-                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
                 null, null);
             if (result != 0) {
                 System.err.println("Failed to create list iterator: " + result);
@@ -505,6 +502,25 @@ public class Test {
             expect(fullRankSamples.equals(fullListSamples),
                    "Rank and list iterators differ on full-range samples");
 
+            DTLV.dtlv_list_key_range_full_val_iter fullValIter =
+                new DTLV.dtlv_list_key_range_full_val_iter();
+            result = DTLV.dtlv_list_key_range_full_val_iter_create(
+                fullValIter, cursor, keyHolder, valHolder,
+                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
+                null, null);
+            if (result != 0) {
+                System.err.println("Failed to create full value iterator: " + result);
+                return;
+            }
+            List<String> viaFullIter = new ArrayList<>();
+            while (DTLV.dtlv_list_key_range_full_val_iter_has_next(fullValIter)
+                   == DTLV.DTLV_TRUE) {
+                viaFullIter.add(mdbValToString(keyHolder) + ":" + mdbValToString(valHolder));
+            }
+            expect(viaFullIter.equals(orderedEntries),
+                   "Full value iterator produced unexpected results");
+            DTLV.dtlv_list_key_range_full_val_iter_destroy(fullValIter);
+
             long[] boundedSample = { 0L, 1L };
             SizeTPointer bounded = toSizeTPointer(boundedSample);
 
@@ -512,16 +528,12 @@ public class Test {
             fillValWithString(startKey, "bravo", allocations);
             DTLV.MDB_val endKey = new DTLV.MDB_val();
             fillValWithString(endKey, "bravo", allocations);
-            DTLV.MDB_val startVal = new DTLV.MDB_val();
-            fillValWithString(startVal, "aa", allocations);
-            DTLV.MDB_val endVal = new DTLV.MDB_val();
-            fillValWithString(endVal, "ab", allocations);
 
             DTLV.dtlv_list_rank_sample_iter boundedIter =
                 new DTLV.dtlv_list_rank_sample_iter();
             result = DTLV.dtlv_list_rank_sample_iter_create(
                 boundedIter, bounded, 2, cursor, keyHolder, valHolder,
-                startKey, endKey, startVal, endVal);
+                startKey, endKey);
             if (result != 0) {
                 System.err.println("Failed to create bounded rank iterator: " + result);
                 bounded.close();
@@ -548,10 +560,7 @@ public class Test {
                 boundedListIter, bounded, 2,
                 unlimitedBudget, budgetStep,
                 cursor, keyHolder, valHolder,
-                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
-                startKey, endKey,
-                DTLV.DTLV_TRUE, DTLV.DTLV_TRUE, DTLV.DTLV_TRUE,
-                startVal, endVal);
+                startKey, endKey);
             if (result != 0) {
                 System.err.println("Failed to create bounded list iterator: " + result);
                 bounded.close();

@@ -16,6 +16,7 @@
 
 #include "lmdb/libraries/liblmdb/lmdb.h"
 #include "usearch/c/usearch.h"
+#include "dtlv_usearch.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -433,21 +434,13 @@ extern "C" {
    * @param kend if to include (DTLV_TRUE) or not the end_key.
    * @param start_key The start key.
    * @param end_key The end key..
-   * @param vforward iterate vals forward (DTLV_TRUE) or not.
-   * @param vstart if to include (DTLV_TRUE) or not the start_val.
-   * @param vend if to include (DTLV_TRUE) or not the end_val.
-   * @param start_val The start value.
-   * @param end_val The end value.
    * @return A non-zero error value on failure and 0 on success.
    */
   int dtlv_list_sample_iter_create(dtlv_list_sample_iter **iter,
                                    size_t *indices, int samples,
                                    size_t budget, size_t step,
                                    MDB_cursor *cur, MDB_val *key, MDB_val *val,
-                                   int kforward, int kstart, int kend,
-                                   MDB_val *start_key, MDB_val *end_key,
-                                   int vforward, int vstart, int vend,
-                                   MDB_val *start_val, MDB_val *end_val);
+                                   MDB_val *start_key, MDB_val *end_key);
 
   /**
    * A function to indicate if the list sample iterator has next sample. If
@@ -513,6 +506,50 @@ extern "C" {
   void dtlv_key_sample_iter_destroy(dtlv_key_sample_iter *iter);
 
   /**
+   * Opaque structure for iterating a key range while visiting every value per
+   * key using full duplicate spans.
+   */
+  typedef struct dtlv_list_key_range_full_val_iter
+      dtlv_list_key_range_full_val_iter;
+
+  /**
+   * Create a key-range iterator that walks all values for each key without
+   * performing value range checks.
+   *
+   * @param iter The address where the iterator will be stored.
+   * @param cur The cursor.
+   * @param key Holder for the key.
+   * @param val Holder for the value.
+   * @param kforward iterate keys forward (must be DTLV_TRUE).
+   * @param kstart if to include (DTLV_TRUE) or not the start_key.
+   * @param kend if to include (DTLV_TRUE) or not the end_key.
+   * @param start_key Optional start key.
+   * @param end_key Optional end key.
+   * @return MDB_SUCCESS or an error code.
+   */
+  int dtlv_list_key_range_full_val_iter_create(
+      dtlv_list_key_range_full_val_iter **iter, MDB_cursor *cur,
+      MDB_val *key, MDB_val *val, int kstart, int kend,
+      MDB_val *start_key, MDB_val *end_key);
+
+  /**
+   * Advance the full-value key range iterator.
+   *
+   * @param iter The iterator handle.
+   * @return DTLV_TRUE when positioned at a new entry, DTLV_FALSE when exhausted.
+   */
+  int dtlv_list_key_range_full_val_iter_has_next(
+      dtlv_list_key_range_full_val_iter *iter);
+
+  /**
+   * Destroy the full-value key range iterator.
+   *
+   * @param iter The iterator handle.
+   */
+  void dtlv_list_key_range_full_val_iter_destroy(
+      dtlv_list_key_range_full_val_iter *iter);
+
+  /**
    * Opaque structure for a rank based list sample iterator.
    */
   typedef struct dtlv_list_rank_sample_iter dtlv_list_rank_sample_iter;
@@ -529,18 +566,13 @@ extern "C" {
    * @param val Holder for the value.
    * @param start_key Optional inclusive start key.
    * @param end_key Optional inclusive end key.
-   * @param start_val Optional inclusive start value (only used when
-   *                  start_key is provided).
-   * @param end_val Optional inclusive end value (only used when end_key is
-   *                provided).
    * @return A non-zero error value on failure and 0 on success.
    */
   int dtlv_list_rank_sample_iter_create(dtlv_list_rank_sample_iter **iter,
                                         size_t *indices, int samples,
                                         MDB_cursor *cur, MDB_val *key,
                                         MDB_val *val, MDB_val *start_key,
-                                        MDB_val *end_key, MDB_val *start_val,
-                                        MDB_val *end_val);
+                                        MDB_val *end_key);
 
   /**
    * Advance the rank based sample iterator.
