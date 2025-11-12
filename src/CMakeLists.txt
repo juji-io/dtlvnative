@@ -36,9 +36,6 @@ install(TARGETS lmdb
 # DTLV static
 add_library(dtlv STATIC
     dtlv.c
-    dtlv_usearch_wal.c
-    dtlv_usearch.c
-    dtlv_crc32c.c
 )
 
 # Link the LMDB static to DTLV
