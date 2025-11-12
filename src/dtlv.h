@@ -76,7 +76,8 @@ extern "C" {
    * inclusive start/end key boundaries.
    *
    * @param iter The address where the iterator will be stored.
-   * @param indices The array of sample indices relative to the range start.
+   * @param indices The array of strictly increasing sample indices relative to
+   *                the range start.
    * @param samples The number of indices.
    * @param cur The cursor.
    * @param key Holder for the key.
@@ -559,7 +560,8 @@ extern "C" {
    * iteration with inclusive start/end boundaries and leverages cursor ranks.
    *
    * @param iter The address where the iterator will be stored.
-   * @param indices The array of sample indices relative to the range start.
+   * @param indices The array of strictly increasing sample indices relative to
+   *                the range start.
    * @param samples The number of sample indices.
    * @param cur The cursor.
    * @param key Holder for the key.
