@@ -49,6 +49,21 @@ void val_in(MDB_val *this, MDB_val *other) {
   this->mv_data = other->mv_data;
 }
 
+static int dtlv_copy_indices(size_t **dst, size_t *src, int samples) {
+  if (!dst) return EINVAL;
+  if (samples < 0) return EINVAL;
+  if (samples == 0) {
+    *dst = NULL;
+    return MDB_SUCCESS;
+  }
+  if (!src) return EINVAL;
+  size_t bytes = (size_t)samples * sizeof(size_t);
+  size_t *copy = malloc(bytes);
+  if (!copy) return ENOMEM;
+  memcpy(copy, src, bytes);
+  *dst = copy;
+  return MDB_SUCCESS;
+}
 struct dtlv_key_iter {
   MDB_cursor *cur;
   MDB_txn *txn;
@@ -879,12 +894,17 @@ int dtlv_key_rank_sample_iter_create(dtlv_key_rank_sample_iter **iter,
   s = calloc(1, sizeof(struct dtlv_key_rank_sample_iter));
   if (!s) return ENOMEM;
 
+  int rc_copy = dtlv_copy_indices(&s->indices, indices, samples);
+  if (rc_copy != MDB_SUCCESS) {
+    free(s);
+    return rc_copy;
+  }
+
   s->cur = cur;
   s->txn = mdb_cursor_txn(cur);
   s->dbi = mdb_cursor_dbi(cur);
   s->key = key;
   s->val = val;
-  s->indices = indices;
   s->samples = samples;
   s->current = 0;
   s->lower_rank = 0;
@@ -896,6 +916,7 @@ int dtlv_key_rank_sample_iter_create(dtlv_key_rank_sample_iter **iter,
   if (rc == DTLV_FALSE) {
     s->range_empty = DTLV_TRUE;
   } else if (rc != MDB_SUCCESS) {
+    free(s->indices);
     free(s);
     return rc;
   } else {
@@ -903,6 +924,7 @@ int dtlv_key_rank_sample_iter_create(dtlv_key_rank_sample_iter **iter,
     uint64_t upper = 0;
     rc = dtlv_key_rank_sample_iter_compute_upper(s, end_key, &upper);
     if (rc != MDB_SUCCESS) {
+      free(s->indices);
       free(s);
       return rc;
     }
@@ -932,7 +954,10 @@ int dtlv_key_rank_sample_iter_has_next(dtlv_key_rank_sample_iter *iter) {
 }
 
 void dtlv_key_rank_sample_iter_destroy(dtlv_key_rank_sample_iter *iter) {
-  if (iter) free(iter);
+  if (iter) {
+    free(iter->indices);
+    free(iter);
+  }
 }
 
 struct dtlv_list_key_range_full_val_iter {
@@ -1079,12 +1104,17 @@ int dtlv_list_sample_iter_create(dtlv_list_sample_iter **iter,
   s = calloc(1, sizeof(struct dtlv_list_sample_iter));
   if (!s) return ENOMEM;
 
+  int rc_copy = dtlv_copy_indices(&s->indices, indices, samples);
+  if (rc_copy != MDB_SUCCESS) {
+    free(s);
+    return rc_copy;
+  }
+
   dtlv_list_key_range_full_val_iter *base_iter;
   int rc = dtlv_list_key_range_full_val_iter_create(
       &base_iter, cur, key, val, DTLV_TRUE, DTLV_TRUE, start_key, end_key);
   if (rc == MDB_SUCCESS) {
     s->base_iter = base_iter;
-    s->indices = indices;
     s->samples = samples;
     s->i = 0;
     s->j = 0;
@@ -1095,6 +1125,8 @@ int dtlv_list_sample_iter_create(dtlv_list_sample_iter **iter,
     *iter = s;
     return MDB_SUCCESS;
   }
+  free(s->indices);
+  free(s);
   return rc;
 }
 
@@ -1119,6 +1151,7 @@ int dtlv_list_sample_iter_has_next(dtlv_list_sample_iter *iter) {
 
 void dtlv_list_sample_iter_destroy(dtlv_list_sample_iter *iter) {
   if (iter) {
+    free(iter->indices);
     dtlv_list_key_range_full_val_iter_destroy(iter->base_iter);
     free(iter);
   }
@@ -1145,16 +1178,22 @@ int dtlv_key_sample_iter_create(dtlv_key_sample_iter **iter,
   s = calloc(1, sizeof(struct dtlv_key_sample_iter));
   if (!s) return ENOMEM;
 
+  int rc_copy = dtlv_copy_indices(&s->indices, indices, samples);
+  if (rc_copy != MDB_SUCCESS) {
+    free(s);
+    return rc_copy;
+  }
+
   dtlv_key_iter *base_iter;
   int rc = dtlv_key_iter_create(&base_iter, cur, key, val,
                                 forward, start, end, start_key, end_key);
   if (rc != MDB_SUCCESS) {
+    free(s->indices);
     free(s);
     return rc;
   }
 
   s->base_iter = base_iter;
-  s->indices = indices;
   s->samples = samples;
   s->i = 0;
   s->j = 0;
@@ -1186,6 +1225,7 @@ int dtlv_key_sample_iter_has_next(dtlv_key_sample_iter *iter) {
 
 void dtlv_key_sample_iter_destroy(dtlv_key_sample_iter *iter) {
   if (iter) {
+    free(iter->indices);
     dtlv_key_iter_destroy(iter->base_iter);
     free(iter);
   }
@@ -1272,6 +1312,22 @@ static int dtlv_list_rank_sample_iter_compute_upper(
   return MDB_SUCCESS;
 }
 
+static int dtlv_list_rank_sample_iter_compute_tail(
+    dtlv_list_rank_sample_iter *iter, uint64_t *rank_out) {
+  int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_LAST);
+  if (rc == MDB_NOTFOUND) {
+    *rank_out = 0;
+    return MDB_SUCCESS;
+  }
+  if (rc != MDB_SUCCESS) return rc;
+
+  uint64_t rank = 0;
+  rc = mdb_cursor_key_rank(iter->cur, iter->key, iter->val, 0, &rank);
+  if (rc != MDB_SUCCESS) return rc;
+  *rank_out = rank + 1;
+  return MDB_SUCCESS;
+}
+
 int dtlv_list_rank_sample_iter_create(dtlv_list_rank_sample_iter **iter,
                                       size_t *indices, int samples,
                                       MDB_cursor *cur, MDB_val *key,
@@ -1281,12 +1337,17 @@ int dtlv_list_rank_sample_iter_create(dtlv_list_rank_sample_iter **iter,
   s = calloc(1, sizeof(struct dtlv_list_rank_sample_iter));
   if (!s) return ENOMEM;
 
+  int rc_copy = dtlv_copy_indices(&s->indices, indices, samples);
+  if (rc_copy != MDB_SUCCESS) {
+    free(s);
+    return rc_copy;
+  }
+
   s->cur = cur;
   s->txn = mdb_cursor_txn(cur);
   s->dbi = mdb_cursor_dbi(cur);
   s->key = key;
   s->val = val;
-  s->indices = indices;
   s->samples = samples;
   s->current = 0;
   s->lower_rank = 0;
@@ -1299,6 +1360,7 @@ int dtlv_list_rank_sample_iter_create(dtlv_list_rank_sample_iter **iter,
   if (rc == DTLV_FALSE) {
     s->range_empty = DTLV_TRUE;
   } else if (rc != MDB_SUCCESS) {
+    free(s->indices);
     free(s);
     return rc;
   } else {
@@ -1306,12 +1368,14 @@ int dtlv_list_rank_sample_iter_create(dtlv_list_rank_sample_iter **iter,
     uint64_t upper = 0;
     rc = dtlv_list_rank_sample_iter_compute_upper(s, end_key, &upper);
     if (rc == DTLV_FALSE) {
-      rc = mdb_count_all(s->txn, s->dbi, 0, &upper);
+      rc = dtlv_list_rank_sample_iter_compute_tail(s, &upper);
       if (rc != MDB_SUCCESS) {
+        free(s->indices);
         free(s);
         return rc;
       }
     } else if (rc != MDB_SUCCESS) {
+      free(s->indices);
       free(s);
       return rc;
     }
@@ -1341,5 +1405,8 @@ int dtlv_list_rank_sample_iter_has_next(dtlv_list_rank_sample_iter *iter) {
 }
 
 void dtlv_list_rank_sample_iter_destroy(dtlv_list_rank_sample_iter *iter) {
-  if (iter) free(iter);
+  if (iter) {
+    free(iter->indices);
+    free(iter);
+  }
 }
