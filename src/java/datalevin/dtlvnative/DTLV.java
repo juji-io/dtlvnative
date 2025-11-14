@@ -3393,20 +3393,16 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      * @param cur       The cursor.
      * @param key       Holder for the key.
      * @param val       Holder for the value.
-     * @param vstart    if to include (DTLV_TRUE) or not the start_val.
-     * @param vend      if to include (DTLV_TRUE) or not the end_val.
-     * @param start_val The start value..
-     * @param end_val   The end value.
+     * @param start_val Inclusive start value bound (optional).
+     * @param end_val   Inclusive end value bound (optional).
      * @return A non-zero error value on failure and 0 on success.
      */
     public static native int dtlv_list_val_iter_create(@Cast("dtlv_list_val_iter**") PointerPointer iter,
             MDB_cursor cur, MDB_val key, MDB_val val,
-            int vstart, int vend,
             MDB_val start_val, MDB_val end_val);
 
     public static native int dtlv_list_val_iter_create(@ByPtrPtr dtlv_list_val_iter iter,
             MDB_cursor cur, MDB_val key, MDB_val val,
-            int vstart, int vend,
             MDB_val start_val, MDB_val end_val);
 
     /**

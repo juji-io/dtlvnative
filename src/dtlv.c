@@ -474,15 +474,12 @@ struct dtlv_list_val_iter {
   MDB_dbi dbi;
   MDB_val *key;
   MDB_val *val;
-  int vstart;
-  int vend;
   MDB_val *start_val;
   MDB_val *end_val;
 };
 
 int dtlv_list_val_iter_create(dtlv_list_val_iter **iter, MDB_cursor *cur,
                               MDB_val *key, MDB_val *val,
-                              int vstart, int vend,
                               MDB_val *start_val,
                               MDB_val *end_val) {
   dtlv_list_val_iter *i;
@@ -494,8 +491,6 @@ int dtlv_list_val_iter_create(dtlv_list_val_iter **iter, MDB_cursor *cur,
   i->dbi = mdb_cursor_dbi(cur);
   i->key = key;
   i->val = val;
-  i->vstart = vstart;
-  i->vend = vend;
   i->start_val = start_val;
   i->end_val = end_val;
 
@@ -511,9 +506,6 @@ int list_val_init_val(dtlv_list_val_iter *iter) {
     val_in(iter->val, iter->start_val);
     int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_GET_BOTH_RANGE);
     if (rc == MDB_SUCCESS) {
-      if ((iter->vstart == DTLV_FALSE)
-          && (mdb_cmp(iter->txn, iter->dbi, iter->val, iter->start_val) == 0))
-        return list_val_check_val(iter, MDB_NEXT_DUP);
       return list_val_val_continue(iter);
     }
     if (rc == MDB_NOTFOUND) return DTLV_FALSE;
@@ -529,10 +521,6 @@ int list_val_init_val(dtlv_list_val_iter *iter) {
 int list_val_val_continue(dtlv_list_val_iter *iter) {
   if (iter->end_val) {
     int r = mdb_cmp(iter->txn, iter->dbi, iter->val, iter->end_val);
-    if (r == 0) {
-      if (iter->vend == DTLV_TRUE) return DTLV_TRUE;
-      return DTLV_FALSE;
-    }
     if (r > 0) return DTLV_FALSE;
     return DTLV_TRUE;
   }
@@ -546,17 +534,13 @@ int list_val_check_val(dtlv_list_val_iter *iter, int op) {
   return rc;
 }
 
-int list_val_advance_val(dtlv_list_val_iter *iter) {
-  return list_val_check_val(iter, MDB_NEXT_DUP);
-}
-
 int dtlv_list_val_iter_seek(dtlv_list_val_iter *iter, MDB_val *k) {
   val_in(iter->key, k);
   return list_val_init_val(iter);
 }
 
 int dtlv_list_val_iter_has_next(dtlv_list_val_iter *iter) {
-  return list_val_advance_val(iter);
+  return list_val_check_val(iter, MDB_NEXT_DUP);
 }
 
 void dtlv_list_val_iter_destroy(dtlv_list_val_iter *iter) {

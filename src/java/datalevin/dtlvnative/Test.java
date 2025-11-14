@@ -151,6 +151,7 @@ public class Test {
         testLMDBCountedPrefix();
         testRankSampleIterator();
         testKeyRankSampleIterator();
+        testListValIteratorBounds();
 
         System.out.println("Passed LMDB tests.");
     }
@@ -329,6 +330,159 @@ public class Test {
 
             if (envCreated)
                 DTLV.mdb_env_close(env);
+            deleteDirectoryFiles(dir);
+        }
+    }
+
+    static void testListValIteratorBounds() {
+
+        System.err.println("Testing list value iterator bounds ...");
+
+        String dir = "db-list-val-iter";
+        List<BytePointer> allocations = new ArrayList<>();
+
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.MDB_txn txn = new DTLV.MDB_txn();
+        DTLV.MDB_txn rtxn = new DTLV.MDB_txn();
+        DTLV.MDB_cursor cursor = new DTLV.MDB_cursor();
+        DTLV.dtlv_list_val_iter iter = null;
+        IntPointer dbi = new IntPointer(1);
+
+        boolean envCreated = false;
+        boolean writeTxnActive = false;
+        boolean readTxnActive = false;
+        boolean cursorOpened = false;
+
+        try {
+            int result = DTLV.mdb_env_create(env);
+            if (result != 0) {
+                System.err.println("Failed to create list value iterator env: " + result);
+                return;
+            }
+            envCreated = true;
+
+            result = DTLV.mdb_env_set_maxdbs(env, 5);
+            if (result != 0) {
+                System.err.println("Failed to set max dbs for list value iterator env: " + result);
+                return;
+            }
+
+            try {
+                Files.createDirectories(Paths.get(dir));
+            } catch (IOException e) {
+                System.err.println("Failed to create directory: " + dir);
+                e.printStackTrace();
+                return;
+            }
+
+            int envFlags = DTLV.MDB_NOLOCK;
+            result = DTLV.mdb_env_open(env, dir, envFlags, 0664);
+            if (result != 0) {
+                System.err.println("Failed to open list value iterator env: " + result);
+                return;
+            }
+
+            result = DTLV.mdb_txn_begin(env, null, 0, txn);
+            if (result != 0) {
+                System.err.println("Failed to begin list value iterator write txn: " + result);
+                return;
+            }
+            writeTxnActive = true;
+
+            int flags = DTLV.MDB_CREATE | DTLV.MDB_DUPSORT;
+            result = DTLV.mdb_dbi_open(txn, "list_values", flags, dbi);
+            if (result != 0) {
+                System.err.println("Failed to open list value iterator dbi: " + result);
+                return;
+            }
+
+            DTLV.MDB_val kval = new DTLV.MDB_val();
+            fillValWithString(kval, "alpha", allocations);
+
+            String[] values = { "aa", "ab", "ac", "ad" };
+            for (String valueText : values) {
+                DTLV.MDB_val vval = new DTLV.MDB_val();
+                fillValWithString(vval, valueText, allocations);
+                result = DTLV.mdb_put(txn, dbi.get(), kval, vval, 0);
+                if (result != 0) {
+                    System.err.println("Failed to put list value iterator data: " + result);
+                    return;
+                }
+            }
+
+            result = DTLV.mdb_txn_commit(txn);
+            if (result != 0) {
+                System.err.println("Failed to commit list value iterator data: " + result);
+                return;
+            }
+            writeTxnActive = false;
+
+            result = DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, rtxn);
+            if (result != 0) {
+                System.err.println("Failed to begin list value iterator read txn: " + result);
+                return;
+            }
+            readTxnActive = true;
+
+            result = DTLV.mdb_cursor_open(rtxn, dbi.get(), cursor);
+            if (result != 0) {
+                System.err.println("Failed to open list value iterator cursor: " + result);
+                return;
+            }
+            cursorOpened = true;
+
+            DTLV.MDB_val keyHolder = new DTLV.MDB_val();
+            DTLV.MDB_val valHolder = new DTLV.MDB_val();
+
+            DTLV.MDB_val startVal = new DTLV.MDB_val();
+            fillValWithString(startVal, "ab", allocations);
+            DTLV.MDB_val endVal = new DTLV.MDB_val();
+            fillValWithString(endVal, "ac", allocations);
+
+            iter = new DTLV.dtlv_list_val_iter();
+            result = DTLV.dtlv_list_val_iter_create(
+                iter, cursor, keyHolder, valHolder, startVal, endVal);
+            if (result != 0) {
+                System.err.println("Failed to create list value iterator: " + result);
+                return;
+            }
+
+            DTLV.MDB_val seekKey = new DTLV.MDB_val();
+            fillValWithString(seekKey, "alpha", allocations);
+
+            int seekResult = DTLV.dtlv_list_val_iter_seek(iter, seekKey);
+            expect(seekResult == DTLV.DTLV_TRUE,
+                   "List value iterator should position on inclusive start value");
+
+            List<String> valuesInRange = new ArrayList<>();
+            valuesInRange.add(mdbValToString(valHolder));
+
+            int iterResult;
+            while ((iterResult = DTLV.dtlv_list_val_iter_has_next(iter)) == DTLV.DTLV_TRUE) {
+                valuesInRange.add(mdbValToString(valHolder));
+            }
+            expect(iterResult == DTLV.DTLV_FALSE,
+                   "List value iterator should stop after inclusive end");
+
+            List<String> expected = Arrays.asList("ab", "ac");
+            expect(valuesInRange.equals(expected),
+                   "List value iterator bounds mismatch: " + valuesInRange);
+
+            System.out.println("Passed list value iterator bounds test.");
+        } finally {
+            if (iter != null)
+                DTLV.dtlv_list_val_iter_destroy(iter);
+            if (cursorOpened)
+                DTLV.mdb_cursor_close(cursor);
+            if (readTxnActive)
+                DTLV.mdb_txn_abort(rtxn);
+            if (writeTxnActive)
+                DTLV.mdb_txn_abort(txn);
+            dbi.close();
+            if (envCreated)
+                DTLV.mdb_env_close(env);
+            for (BytePointer ptr : allocations)
+                ptr.close();
             deleteDirectoryFiles(dir);
         }
     }
