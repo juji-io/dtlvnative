@@ -1339,7 +1339,7 @@ public class Test {
         DTLV.usearch_free(index, error);
 
         error.put(0, (BytePointer) null);
-        index = DTLV.usearch_init(null, error);
+        index = DTLV.usearch_init(weird_opts, error);
         expectNoError(error, "Fail to init");
 
         error.put(0, (BytePointer) null);
