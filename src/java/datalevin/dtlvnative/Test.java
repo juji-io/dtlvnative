@@ -2,6 +2,8 @@ package datalevin.dtlvnative;
 
 import java.io.*;
 import java.nio.*;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.util.*;
 import java.util.function.LongPredicate;
 import java.nio.file.*;
@@ -13,15 +15,40 @@ import datalevin.dtlvnative.DTLV.usearch_metric_t;
 
 public class Test {
 
+    private static final int MULTI_PROCESS_ENV_FLAGS = DTLV.MDB_NOLOCK;
+
     static void deleteDirectoryFiles(final String path) {
+        if (path == null) return;
         File directory = new File(path);
+        if (!directory.exists()) return;
         if (!directory.isDirectory()) {
             directory.delete();
             return;
         }
 
-        for (File f : directory.listFiles()) f.delete();
+        File[] entries = directory.listFiles();
+        if (entries != null) {
+            for (File f : entries) {
+                if (f.isDirectory()) {
+                    deleteDirectoryFiles(f.getAbsolutePath());
+                } else {
+                    f.delete();
+                }
+            }
+        }
         directory.delete();
+    }
+
+    static boolean directoryHasSuffix(final String path, final String suffix) {
+        if (path == null || suffix == null) return false;
+        File directory = new File(path);
+        if (!directory.exists() || !directory.isDirectory()) return false;
+        File[] entries = directory.listFiles();
+        if (entries == null) return false;
+        for (File entry : entries) {
+            if (entry.getName().endsWith(suffix)) return true;
+        }
+        return false;
     }
 
     static void testLMDB() {
@@ -1080,6 +1107,125 @@ public class Test {
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
+    static long readDomainMetaU64(DTLV.MDB_env env, String domainName, String key) {
+        DTLV.MDB_txn txn = new DTLV.MDB_txn();
+        expect(DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, txn) == 0,
+               "Failed to open meta read txn for " + key);
+        IntPointer dbi = new IntPointer(1);
+        String metaName = domainName + "/usearch-meta";
+        expect(DTLV.mdb_dbi_open(txn, metaName, 0, dbi) == 0,
+               "Failed to open usearch-meta DBI for " + domainName);
+        BytePointer keyPtr = new BytePointer(key.length() + 1);
+        keyPtr.putString(key);
+        keyPtr.position(0);
+        DTLV.MDB_val mdbKey = new DTLV.MDB_val();
+        mdbKey.mv_data(keyPtr);
+        mdbKey.mv_size(key.length() + 1);
+        DTLV.MDB_val value = new DTLV.MDB_val();
+        int rc = DTLV.mdb_get(txn, dbi.get(), mdbKey, value);
+        expect(rc == 0, "Failed to read meta key " + key + ": " + rc);
+        ByteBuffer buffer = value.mv_data()
+            .position(0)
+            .limit((int) value.mv_size())
+            .asByteBuffer();
+        buffer.order(ByteOrder.BIG_ENDIAN);
+        long result;
+        if (value.mv_size() == Long.BYTES) {
+            result = buffer.getLong();
+        } else if (value.mv_size() == Integer.BYTES) {
+            result = buffer.getInt() & 0xffffffffL;
+        } else {
+            expect(false, "Unexpected meta size for key " + key);
+            result = 0;
+        }
+        DTLV.mdb_txn_abort(txn);
+        keyPtr.close();
+        dbi.close();
+        return result;
+    }
+
+    static Process spawnJavaWorkerProcess(String role,
+                                          String envPath,
+                                          String fsPath,
+                                          String domainName,
+                                          String key) throws IOException {
+        String javaBin = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
+        String classpath = System.getProperty("java.class.path");
+        ProcessBuilder pb = new ProcessBuilder(javaBin,
+                "-cp",
+                classpath,
+                "datalevin.dtlvnative.Test$MultiProcessWorker",
+                role,
+                envPath,
+                fsPath,
+                domainName,
+                key);
+        pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+        pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+        return pb.start();
+    }
+
+    static void runJavaWorker(String description,
+                              String role,
+                              String envPath,
+                              String fsPath,
+                              String domainName,
+                              String key,
+                              int expectedExit) {
+        try {
+            Process proc = spawnJavaWorkerProcess(role, envPath, fsPath, domainName, key);
+            int exit = proc.waitFor();
+            expect(exit == expectedExit,
+                   description + " expected exit " + expectedExit + " but got " + exit);
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            expect(false, "Failed to run worker " + description + ": " + e.getMessage());
+        }
+    }
+
+    static class WorkerProcess {
+        final Process process;
+        final int expectedExit;
+        final String description;
+
+        WorkerProcess(Process process, int expectedExit, String description) {
+            this.process = process;
+            this.expectedExit = expectedExit;
+            this.description = description;
+        }
+    }
+
+    static WorkerProcess startJavaWorkerAsync(String description,
+                                              String role,
+                                              String envPath,
+                                              String fsPath,
+                                              String domainName,
+                                              String key,
+                                              int expectedExit) {
+        try {
+            Process proc = spawnJavaWorkerProcess(role, envPath, fsPath, domainName, key);
+            return new WorkerProcess(proc, expectedExit, description);
+        } catch (IOException e) {
+            e.printStackTrace();
+            expect(false, "Failed to start worker " + description + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    static void waitForWorkerProcesses(List<WorkerProcess> workers) {
+        for (WorkerProcess worker : workers) {
+            if (worker == null) continue;
+            try {
+                int exit = worker.process.waitFor();
+                expect(exit == worker.expectedExit,
+                       worker.description + " expected exit " + worker.expectedExit + " but got " + exit);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                expect(false, "Interrupted while waiting for worker " + worker.description);
+            }
+        }
+    }
+
     static void testUsearchInit(int collSize, int dimensions) {
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
@@ -1450,12 +1596,968 @@ public class Test {
             }
         }
 
+        testUsearchFormatIntrospection();
         System.out.println("Passed all usearch tests.");
+    }
+
+    static void testUsearchFormatIntrospection() {
+        System.err.println("Testing usearch format-introspection helpers ...");
+
+        String snapshotPath = "usearch-format-introspect.usearch";
+        new File(snapshotPath).delete();
+
+        PointerPointer<BytePointer> error = new PointerPointer<>(1);
+        DTLV.usearch_init_options_t snapshotOpts = createOpts(8);
+        error.put(0, (BytePointer) null);
+        DTLV.usearch_index_t index = DTLV.usearch_init(snapshotOpts, error);
+        expectNoError(error, "Failed to init snapshot index");
+
+        error.put(0, (BytePointer) null);
+        DTLV.usearch_save(index, snapshotPath, error);
+        expectNoError(error, "Failed to save snapshot index");
+
+        error.put(0, (BytePointer) null);
+        DTLV.usearch_free(index, error);
+        expectNoError(error, "Failed to free snapshot index");
+
+        DTLV.dtlv_usearch_format_info snapshotInfo = new DTLV.dtlv_usearch_format_info();
+        expect(DTLV.dtlv_usearch_probe_filesystem(snapshotPath, snapshotInfo) == 0,
+               "Failed to probe filesystem snapshot");
+        expect(snapshotInfo.metric_kind() == snapshotOpts.metric_kind(),
+               "Snapshot metric mismatch");
+        expect(snapshotInfo.scalar_kind() == snapshotOpts.quantization(),
+               "Snapshot scalar mismatch");
+        expect(snapshotInfo.dimensions() == snapshotOpts.dimensions(),
+               "Snapshot dimension mismatch");
+        expect(!snapshotInfo.multi(), "Snapshot multi flag mismatch");
+        // Connectivity is not persisted by usearch_metadata, so it currently reports zero.
+        expect(snapshotInfo.connectivity() == 0,
+               "Snapshot connectivity should be zero");
+
+        new File(snapshotPath).delete();
+
+        String root = "usearch-format-domain";
+        String envPath = root + "/env";
+        String fsPath = root + "/fs";
+        deleteDirectoryFiles(root);
+        try {
+            Files.createDirectories(Paths.get(envPath));
+            Files.createDirectories(Paths.get(fsPath));
+        } catch (IOException e) {
+            System.err.println("Failed to create paths for format introspection: " + e.getMessage());
+            return;
+        }
+
+        final String domainName = "vectors";
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.dtlv_usearch_domain domain = new DTLV.dtlv_usearch_domain();
+        boolean envCreated = false;
+        try {
+            expect(DTLV.mdb_env_create(env) == 0, "Failed to create format env");
+            envCreated = true;
+            expect(DTLV.mdb_env_set_maxdbs(env, 16) == 0, "Failed to set maxdbs for format env");
+            expect(DTLV.mdb_env_open(env, envPath, DTLV.MDB_NOLOCK, 0664) == 0,
+                   "Failed to open format env");
+
+            expect(DTLV.dtlv_usearch_domain_open(env, "format-domain", fsPath, domain) == 0,
+                   "Failed to open format domain");
+
+            DTLV.usearch_init_options_t domainOpts = createOpts(16);
+            DTLV.MDB_txn txn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0,
+                   "Failed to begin format init txn");
+            expect(DTLV.dtlv_usearch_store_init_options(domain, txn, domainOpts) == 0,
+                   "Failed to store format init options");
+            expect(DTLV.mdb_txn_commit(txn) == 0, "Failed to commit format init txn");
+
+            DTLV.dtlv_usearch_format_info domainInfo = new DTLV.dtlv_usearch_format_info();
+            expect(DTLV.dtlv_usearch_inspect_domain(domain, null, domainInfo) == 0,
+                   "Failed to inspect usearch domain");
+            expect(domainInfo.metric_kind() == domainOpts.metric_kind(),
+                   "Domain metric mismatch");
+            expect(domainInfo.scalar_kind() == domainOpts.quantization(),
+                   "Domain scalar mismatch");
+            expect(domainInfo.dimensions() == domainOpts.dimensions(),
+                   "Domain dimension mismatch");
+            expect(domainInfo.connectivity() == domainOpts.connectivity(),
+                   "Domain connectivity mismatch");
+            expect(!domainInfo.multi(), "Domain multi mismatch");
+
+        } finally {
+            if (domain != null && !domain.isNull()) {
+                DTLV.dtlv_usearch_domain_close(domain);
+            }
+            if (envCreated) {
+                DTLV.mdb_env_close(env);
+            }
+            deleteDirectoryFiles(fsPath);
+            deleteDirectoryFiles(envPath);
+            deleteDirectoryFiles(root);
+        }
+
+        System.out.println("Passed format-introspection tests.");
+    }
+
+    static void testUsearchLMDBIntegration() {
+        System.err.println("Testing usearch LMDB integration ...");
+        String root = "usearch-lmdb-domain";
+        String envPath = root + "/env";
+        String fsPath = root + "/fs";
+        final String domainName = "vectors";
+        deleteDirectoryFiles(root);
+        try {
+            Files.createDirectories(Paths.get(envPath));
+            Files.createDirectories(Paths.get(fsPath));
+        } catch (IOException e) {
+            System.err.println("Failed to create directories for usearch LMDB test: " + e.getMessage());
+            return;
+        }
+
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.dtlv_usearch_domain domain = new DTLV.dtlv_usearch_domain();
+        DTLV.dtlv_usearch_handle handle = null;
+        DTLV.dtlv_usearch_handle secondaryHandle = null;
+        boolean envCreated = false;
+        try {
+            expect(DTLV.mdb_env_create(env) == 0, "Failed to create LMDB env");
+            envCreated = true;
+            expect(DTLV.mdb_env_set_maxdbs(env, 64) == 0, "Failed to set max DBs");
+            expect(DTLV.mdb_env_open(env, envPath, DTLV.MDB_NOLOCK, 0664) == 0, "Failed to open LMDB env");
+
+            expect(DTLV.dtlv_usearch_domain_open(env, domainName, fsPath, domain) == 0,
+                    "Failed to open usearch domain");
+
+            final int dimensions = 4;
+            DTLV.usearch_init_options_t opts = createOpts(dimensions);
+            DTLV.MDB_txn txn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0, "Failed to begin init txn");
+            expect(DTLV.dtlv_usearch_store_init_options(domain, txn, opts) == 0,
+                    "Failed to store init options");
+            expect(DTLV.mdb_txn_commit(txn) == 0, "Failed to commit init txn");
+
+            DTLV.MDB_txn verifyTxn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, verifyTxn) == 0,
+                    "Failed to begin verify txn");
+            DTLV.usearch_init_options_t loadedOpts = new DTLV.usearch_init_options_t();
+            IntPointer initFound = new IntPointer(1);
+            expect(DTLV.dtlv_usearch_load_init_options(domain, verifyTxn, loadedOpts, initFound) == 0,
+                    "Failed to load init options");
+            expect(initFound.get(0) == 1, "Init options not stored");
+            expect(loadedOpts.metric_kind() == opts.metric_kind(), "Metric mismatch");
+            expect(loadedOpts.quantization() == opts.quantization(), "Scalar mismatch");
+            expect(loadedOpts.dimensions() == opts.dimensions(), "Dimensions mismatch");
+            expect(loadedOpts.connectivity() == opts.connectivity(), "Connectivity mismatch");
+            expect(loadedOpts.expansion_add() == opts.expansion_add(), "Expansion-add mismatch");
+            expect(loadedOpts.expansion_search() == opts.expansion_search(), "Expansion-search mismatch");
+            expect(loadedOpts.multi() == opts.multi(), "Multi flag mismatch");
+            DTLV.mdb_txn_abort(verifyTxn);
+
+            DTLV.dtlv_usearch_handle coldHandle = new DTLV.dtlv_usearch_handle();
+            int coldRc = DTLV.dtlv_usearch_activate(domain, coldHandle);
+            expect(coldRc == 0, "Failed to activate empty handle");
+            DTLV.dtlv_usearch_deactivate(coldHandle);
+
+            handle = new DTLV.dtlv_usearch_handle();
+            expect(DTLV.dtlv_usearch_activate(domain, handle) == 0, "Failed to activate initial handle");
+            secondaryHandle = new DTLV.dtlv_usearch_handle();
+            expect(DTLV.dtlv_usearch_activate(domain, secondaryHandle) == 0,
+                    "Failed to activate secondary handle");
+
+            float[] vector = new float[] { 0.1f, 0.2f, 0.3f, 0.4f };
+            long vectorKey = 42L;
+
+            txn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0, "Failed to begin update txn");
+
+            DTLV.dtlv_usearch_update update = new DTLV.dtlv_usearch_update();
+            update.op(DTLV.DTLV_USEARCH_OP_ADD);
+            BytePointer keyBytes = new BytePointer(Long.BYTES);
+            ByteBuffer keyBuffer = keyBytes.position(0).limit(Long.BYTES).asByteBuffer();
+            keyBuffer.order(ByteOrder.BIG_ENDIAN);
+            keyBuffer.putLong(vectorKey);
+            keyBytes.position(0);
+            update.key(keyBytes);
+            update.key_len(Long.BYTES);
+            FloatPointer payload = new FloatPointer(dimensions);
+            for (int i = 0; i < dimensions; i++) {
+                payload.put(i, vector[i]);
+            }
+            update.payload(payload);
+            update.payload_len(dimensions * Float.BYTES);
+            update.scalar_kind((byte) DTLV.usearch_scalar_f32_k);
+            update.dimensions((short) dimensions);
+
+            DTLV.dtlv_usearch_txn_ctx txnCtx = new DTLV.dtlv_usearch_txn_ctx();
+            expect(DTLV.dtlv_usearch_stage_update(domain, txn, update, txnCtx) == 0,
+                    "Failed to stage usearch update");
+            expect(DTLV.dtlv_usearch_apply_pending(txnCtx) == 0, "Failed to apply pending updates");
+            expect(DTLV.mdb_txn_commit(txn) == 0, "Failed to commit update txn");
+            expect(DTLV.dtlv_usearch_publish_log(txnCtx, 1) == 0, "Failed to publish log");
+            DTLV.dtlv_usearch_txn_ctx_close(txnCtx);
+            payload.close();
+            keyBytes.close();
+
+            DTLV.MDB_txn refreshTxn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, refreshTxn) == 0,
+                    "Failed to begin refresh txn");
+            expect(DTLV.dtlv_usearch_refresh(handle, refreshTxn) == 0, "Failed to refresh handle");
+            DTLV.mdb_txn_abort(refreshTxn);
+            DTLV.usearch_index_t index = DTLV.dtlv_usearch_handle_index(handle);
+            expect(index != null && !index.isNull(), "Handle did not expose index");
+
+            PointerPointer<BytePointer> error = new PointerPointer<>(1);
+            error.put(0, (BytePointer) null);
+            long indexSize = DTLV.usearch_size(index, error);
+            expectNoError(error, "usearch_size failed");
+            expect(indexSize == 1, "Unexpected index size");
+            boolean contains = DTLV.usearch_contains(index, vectorKey, error);
+            expectNoError(error, "usearch_contains failed");
+            FloatPointer query = new FloatPointer(dimensions);
+            for (int i = 0; i < dimensions; i++) {
+                query.put(i, vector[i]);
+            }
+            LongPointer keys = new LongPointer(1);
+            FloatPointer distances = new FloatPointer(1);
+            error.put(0, (BytePointer) null);
+            long found = DTLV.usearch_search(index, query, DTLV.usearch_scalar_f32_k,
+                    1, keys, distances, error);
+            expectNoError(error, "usearch_search failed");
+            expect(found >= 1, "usearch_search returned no results");
+            expect(keys.get(0) == vectorKey, "usearch_search did not return expected key");
+            expect(contains, "Activated handle missing vector");
+            query.close();
+            keys.close();
+            distances.close();
+            // Multi-handle WAL replay: second vector staged after both handles exist.
+            float[] vectorTwo = new float[] { 0.5f, 0.6f, 0.7f, 0.8f };
+            long vectorKeyTwo = 84L;
+            DTLV.MDB_txn secondTxn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, secondTxn) == 0, "Failed to begin second update txn");
+            DTLV.dtlv_usearch_update secondUpdate = new DTLV.dtlv_usearch_update();
+            secondUpdate.op(DTLV.DTLV_USEARCH_OP_ADD);
+            BytePointer secondKeyBytes = new BytePointer(Long.BYTES);
+            ByteBuffer secondKeyBuffer = secondKeyBytes.position(0).limit(Long.BYTES).asByteBuffer();
+            secondKeyBuffer.order(ByteOrder.BIG_ENDIAN).putLong(vectorKeyTwo);
+            secondKeyBytes.position(0);
+            secondUpdate.key(secondKeyBytes);
+            secondUpdate.key_len(Long.BYTES);
+            FloatPointer secondPayload = new FloatPointer(dimensions);
+            for (int i = 0; i < dimensions; i++) {
+                secondPayload.put(i, vectorTwo[i]);
+            }
+            secondUpdate.payload(secondPayload);
+            secondUpdate.payload_len(dimensions * Float.BYTES);
+            secondUpdate.scalar_kind((byte) DTLV.usearch_scalar_f32_k);
+            secondUpdate.dimensions((short) dimensions);
+            DTLV.dtlv_usearch_txn_ctx secondCtx = new DTLV.dtlv_usearch_txn_ctx();
+            expect(DTLV.dtlv_usearch_stage_update(domain, secondTxn, secondUpdate, secondCtx) == 0,
+                    "Failed to stage multi-handle update");
+            expect(DTLV.dtlv_usearch_apply_pending(secondCtx) == 0, "Failed to apply multi-handle update");
+            expect(DTLV.mdb_txn_commit(secondTxn) == 0, "Failed to commit second update txn");
+            expect(DTLV.dtlv_usearch_publish_log(secondCtx, 1) == 0, "Failed to publish second log");
+            DTLV.dtlv_usearch_txn_ctx_close(secondCtx);
+            secondPayload.close();
+            secondKeyBytes.close();
+
+            error.put(0, (BytePointer) null);
+            DTLV.usearch_index_t primaryIndex = DTLV.dtlv_usearch_handle_index(handle);
+            DTLV.usearch_index_t secondaryIndex = DTLV.dtlv_usearch_handle_index(secondaryHandle);
+            // Publish applies updates to all activated handles eagerly, so both handles
+            // already contain the new vector before refresh. Verify the positive case.
+            expect(DTLV.usearch_contains(primaryIndex, vectorKeyTwo, error),
+                    "Primary handle failed to observe published vector");
+            expectNoError(error, "primary contains check failed");
+            error.put(0, (BytePointer) null);
+            expect(DTLV.usearch_contains(secondaryIndex, vectorKeyTwo, error),
+                    "Secondary handle failed to observe published vector");
+            expectNoError(error, "secondary contains check failed");
+
+            DTLV.MDB_txn refreshTxnPrimary = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, refreshTxnPrimary) == 0,
+                    "Failed to begin primary refresh txn");
+            expect(DTLV.dtlv_usearch_refresh(handle, refreshTxnPrimary) == 0,
+                    "Primary handle refresh failed");
+            DTLV.mdb_txn_abort(refreshTxnPrimary);
+
+            DTLV.MDB_txn refreshTxnSecondary = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, refreshTxnSecondary) == 0,
+                    "Failed to begin secondary refresh txn");
+            expect(DTLV.dtlv_usearch_refresh(secondaryHandle, refreshTxnSecondary) == 0,
+                    "Secondary handle refresh failed");
+            DTLV.mdb_txn_abort(refreshTxnSecondary);
+
+            error.put(0, (BytePointer) null);
+            expect(DTLV.usearch_contains(primaryIndex, vectorKeyTwo, error),
+                    "Primary handle missing refreshed vector");
+            expectNoError(error, "primary post-refresh contains failed");
+            error.put(0, (BytePointer) null);
+            expect(DTLV.usearch_contains(secondaryIndex, vectorKeyTwo, error),
+                    "Secondary handle missing refreshed vector");
+            expectNoError(error, "secondary post-refresh contains failed");
+            FloatPointer refreshQuery = new FloatPointer(dimensions);
+            for (int i = 0; i < dimensions; i++) {
+                refreshQuery.put(i, vectorTwo[i]);
+            }
+            LongPointer refreshKeys = new LongPointer(1);
+            FloatPointer refreshDistances = new FloatPointer(1);
+            error.put(0, (BytePointer) null);
+            long refreshedFound = DTLV.usearch_search(primaryIndex, refreshQuery, DTLV.usearch_scalar_f32_k,
+                    1, refreshKeys, refreshDistances, error);
+            expectNoError(error, "primary refresh search failed");
+            expect(refreshedFound >= 1, "Primary refresh search returned no results");
+            expect(refreshKeys.get(0) == vectorKeyTwo, "Primary refresh search mismatch");
+            error.put(0, (BytePointer) null);
+            long refreshedFoundSecondary = DTLV.usearch_search(secondaryIndex, refreshQuery,
+                    DTLV.usearch_scalar_f32_k, 1, refreshKeys, refreshDistances, error);
+            expectNoError(error, "secondary refresh search failed");
+            expect(refreshedFoundSecondary >= 1, "Secondary refresh search returned no results");
+            expect(refreshKeys.get(0) == vectorKeyTwo, "Secondary refresh search mismatch");
+            refreshQuery.close();
+            refreshKeys.close();
+            refreshDistances.close();
+
+            System.out.println("Passed usearch LMDB integration test.");
+
+        } finally {
+            if (handle != null) {
+                DTLV.dtlv_usearch_deactivate(handle);
+            }
+            if (secondaryHandle != null) {
+                DTLV.dtlv_usearch_deactivate(secondaryHandle);
+            }
+            if (domain != null) {
+                DTLV.dtlv_usearch_domain_close(domain);
+            }
+            if (envCreated) {
+                DTLV.mdb_env_close(env);
+            }
+            deleteDirectoryFiles(fsPath);
+            deleteDirectoryFiles(envPath);
+            deleteDirectoryFiles(root);
+        }
+    }
+
+    static void stageDomainVector(DTLV.MDB_env env,
+                                  DTLV.dtlv_usearch_domain domain,
+                                  long vectorKey,
+                                  float[] vector,
+                                  int dimensions,
+                                  String description) {
+        stageDomainVector(env, domain, vectorKey, vector, dimensions, description, true);
+    }
+
+    static void stageDomainVector(DTLV.MDB_env env,
+                                  DTLV.dtlv_usearch_domain domain,
+                                  long vectorKey,
+                                  float[] vector,
+                                  int dimensions,
+                                  String description,
+                                  boolean publishAfter) {
+        DTLV.MDB_txn txn = new DTLV.MDB_txn();
+        expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0,
+                "Failed to begin " + description + " txn");
+        DTLV.dtlv_usearch_update update = new DTLV.dtlv_usearch_update();
+        update.op(DTLV.DTLV_USEARCH_OP_ADD);
+        BytePointer keyBytes = new BytePointer(Long.BYTES);
+        ByteBuffer keyBuffer = keyBytes.position(0).limit(Long.BYTES).asByteBuffer();
+        keyBuffer.order(ByteOrder.BIG_ENDIAN).putLong(vectorKey);
+        keyBytes.position(0);
+        update.key(keyBytes);
+        update.key_len(Long.BYTES);
+        FloatPointer payload = new FloatPointer(dimensions);
+        for (int i = 0; i < dimensions; i++) {
+            payload.put(i, vector[i]);
+        }
+        update.payload(payload);
+        update.payload_len(dimensions * Float.BYTES);
+        update.scalar_kind((byte) DTLV.usearch_scalar_f32_k);
+        update.dimensions((short) dimensions);
+        DTLV.dtlv_usearch_txn_ctx ctx = new DTLV.dtlv_usearch_txn_ctx();
+        expect(DTLV.dtlv_usearch_stage_update(domain, txn, update, ctx) == 0,
+                "Failed to stage " + description + " update");
+        expect(DTLV.dtlv_usearch_apply_pending(ctx) == 0,
+                "Failed to apply pending " + description + " update");
+        expect(DTLV.mdb_txn_commit(txn) == 0,
+                "Failed to commit " + description + " txn");
+        if (publishAfter) {
+            expect(DTLV.dtlv_usearch_publish_log(ctx, 1) == 0,
+                    "Failed to publish " + description + " log");
+        }
+        DTLV.dtlv_usearch_txn_ctx_close(ctx);
+        payload.close();
+        keyBytes.close();
+    }
+
+    static void refreshUsearchHandle(DTLV.MDB_env env,
+                                     DTLV.dtlv_usearch_domain domain,
+                                     DTLV.dtlv_usearch_handle handle,
+                                     String description) {
+        DTLV.MDB_txn refreshTxn = new DTLV.MDB_txn();
+        expect(DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, refreshTxn) == 0,
+                "Failed to begin " + description);
+        expect(DTLV.dtlv_usearch_refresh(handle, refreshTxn) == 0,
+                "Failed to refresh " + description);
+        DTLV.mdb_txn_abort(refreshTxn);
+    }
+
+    static void testUsearchMultiDomainIntegration() {
+        System.err.println("Testing usearch multi-domain integration ...");
+        String root = "usearch-multidomain";
+        String envPath = root + "/env";
+        String fsPathA = root + "/fsA";
+        String fsPathB = root + "/fsB";
+        deleteDirectoryFiles(root);
+        try {
+            Files.createDirectories(Paths.get(envPath));
+            Files.createDirectories(Paths.get(fsPathA));
+            Files.createDirectories(Paths.get(fsPathB));
+        } catch (IOException e) {
+            System.err.println("Failed to create directories for multi-domain test: " + e.getMessage());
+            return;
+        }
+        final String domainAName = "vectorsA";
+        final String domainBName = "vectorsB";
+        final int dimensions = 4;
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.dtlv_usearch_domain domainA = new DTLV.dtlv_usearch_domain();
+        DTLV.dtlv_usearch_domain domainB = new DTLV.dtlv_usearch_domain();
+        DTLV.dtlv_usearch_handle handleA = null;
+        DTLV.dtlv_usearch_handle handleB = null;
+        boolean envCreated = false;
+        try {
+            expect(DTLV.mdb_env_create(env) == 0, "Failed to create multi-domain env");
+            envCreated = true;
+            expect(DTLV.mdb_env_set_maxdbs(env, 128) == 0, "Failed to set max DBs for multi-domain env");
+            expect(DTLV.mdb_env_open(env, envPath, DTLV.MDB_NOLOCK, 0664) == 0,
+                    "Failed to open multi-domain env");
+            expect(DTLV.dtlv_usearch_domain_open(env, domainAName, fsPathA, domainA) == 0,
+                    "Failed to open domain A");
+            expect(DTLV.dtlv_usearch_domain_open(env, domainBName, fsPathB, domainB) == 0,
+                    "Failed to open domain B");
+            DTLV.usearch_init_options_t opts = createOpts(dimensions);
+            DTLV.MDB_txn txn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0, "Failed to begin domain A init txn");
+            expect(DTLV.dtlv_usearch_store_init_options(domainA, txn, opts) == 0,
+                    "Failed to store domain A opts");
+            expect(DTLV.mdb_txn_commit(txn) == 0, "Failed to commit domain A init txn");
+            txn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0, "Failed to begin domain B init txn");
+            expect(DTLV.dtlv_usearch_store_init_options(domainB, txn, opts) == 0,
+                    "Failed to store domain B opts");
+            expect(DTLV.mdb_txn_commit(txn) == 0, "Failed to commit domain B init txn");
+            handleA = new DTLV.dtlv_usearch_handle();
+            handleB = new DTLV.dtlv_usearch_handle();
+            expect(DTLV.dtlv_usearch_activate(domainA, handleA) == 0, "Failed to activate domain A handle");
+            expect(DTLV.dtlv_usearch_activate(domainB, handleB) == 0, "Failed to activate domain B handle");
+            float[] vecA = new float[] {0.11f, 0.21f, 0.31f, 0.41f};
+            float[] vecB = new float[] {0.52f, 0.62f, 0.72f, 0.82f};
+            long keyA = 101L;
+            long keyB = 202L;
+            stageDomainVector(env, domainA, keyA, vecA, dimensions, "domain A");
+            stageDomainVector(env, domainB, keyB, vecB, dimensions, "domain B");
+            refreshUsearchHandle(env, domainA, handleA, "domain A refresh txn");
+            refreshUsearchHandle(env, domainB, handleB, "domain B refresh txn");
+            PointerPointer<BytePointer> error = new PointerPointer<>(1);
+            error.put(0, (BytePointer) null);
+            DTLV.usearch_index_t indexA = DTLV.dtlv_usearch_handle_index(handleA);
+            DTLV.usearch_index_t indexB = DTLV.dtlv_usearch_handle_index(handleB);
+            expect(indexA != null && !indexA.isNull(), "Domain A index unavailable");
+            expect(indexB != null && !indexB.isNull(), "Domain B index unavailable");
+            boolean containsA = DTLV.usearch_contains(indexA, keyA, error);
+            expectNoError(error, "domain A contains check failed");
+            expect(containsA, "Domain A missing its vector");
+            error.put(0, (BytePointer) null);
+            boolean containsAOther = DTLV.usearch_contains(indexA, keyB, error);
+            expectNoError(error, "domain A foreign contains check failed");
+            expect(!containsAOther, "Domain A unexpectedly contains domain B vector");
+            error.put(0, (BytePointer) null);
+            boolean containsB = DTLV.usearch_contains(indexB, keyB, error);
+            expectNoError(error, "domain B contains check failed");
+            expect(containsB, "Domain B missing its vector");
+            error.put(0, (BytePointer) null);
+            boolean containsBOther = DTLV.usearch_contains(indexB, keyA, error);
+            expectNoError(error, "domain B foreign contains check failed");
+            expect(!containsBOther, "Domain B unexpectedly contains domain A vector");
+            DTLV.dtlv_usearch_deactivate(handleA);
+            DTLV.dtlv_usearch_deactivate(handleB);
+            handleA = null;
+            handleB = null;
+            DTLV.dtlv_usearch_domain_close(domainA);
+            DTLV.dtlv_usearch_domain_close(domainB);
+            domainA = new DTLV.dtlv_usearch_domain();
+            domainB = new DTLV.dtlv_usearch_domain();
+            expect(DTLV.dtlv_usearch_domain_open(env, domainAName, fsPathA, domainA) == 0,
+                    "Failed to reopen domain A");
+            expect(DTLV.dtlv_usearch_domain_open(env, domainBName, fsPathB, domainB) == 0,
+                    "Failed to reopen domain B");
+            DTLV.dtlv_usearch_handle reloadA = new DTLV.dtlv_usearch_handle();
+            DTLV.dtlv_usearch_handle reloadB = new DTLV.dtlv_usearch_handle();
+            expect(DTLV.dtlv_usearch_activate(domainA, reloadA) == 0, "Failed to reactivate domain A");
+            expect(DTLV.dtlv_usearch_activate(domainB, reloadB) == 0, "Failed to reactivate domain B");
+            refreshUsearchHandle(env, domainA, reloadA, "domain A reload refresh");
+            refreshUsearchHandle(env, domainB, reloadB, "domain B reload refresh");
+            error.put(0, (BytePointer) null);
+            DTLV.usearch_index_t reloadIndexA = DTLV.dtlv_usearch_handle_index(reloadA);
+            DTLV.usearch_index_t reloadIndexB = DTLV.dtlv_usearch_handle_index(reloadB);
+            expect(DTLV.usearch_contains(reloadIndexA, keyA, error), "Reloaded domain A missing vector");
+            expectNoError(error, "Reloaded domain A contains failed");
+            error.put(0, (BytePointer) null);
+            expect(!DTLV.usearch_contains(reloadIndexA, keyB, error),
+                    "Reloaded domain A unexpectedly has domain B vector");
+            expectNoError(error, "Reloaded domain A foreign contains failed");
+            error.put(0, (BytePointer) null);
+            expect(DTLV.usearch_contains(reloadIndexB, keyB, error), "Reloaded domain B missing vector");
+            expectNoError(error, "Reloaded domain B contains failed");
+            error.put(0, (BytePointer) null);
+            expect(!DTLV.usearch_contains(reloadIndexB, keyA, error),
+                    "Reloaded domain B unexpectedly has domain A vector");
+            expectNoError(error, "Reloaded domain B foreign contains failed");
+            DTLV.dtlv_usearch_deactivate(reloadA);
+            DTLV.dtlv_usearch_deactivate(reloadB);
+            System.out.println("Passed usearch multi-domain integration test.");
+        } finally {
+            if (handleA != null) {
+                DTLV.dtlv_usearch_deactivate(handleA);
+            }
+            if (handleB != null) {
+                DTLV.dtlv_usearch_deactivate(handleB);
+            }
+            if (domainA != null && !domainA.isNull()) {
+                DTLV.dtlv_usearch_domain_close(domainA);
+            }
+            if (domainB != null && !domainB.isNull()) {
+                DTLV.dtlv_usearch_domain_close(domainB);
+            }
+            if (envCreated) {
+                DTLV.mdb_env_close(env);
+            }
+            deleteDirectoryFiles(fsPathA);
+            deleteDirectoryFiles(fsPathB);
+            deleteDirectoryFiles(envPath);
+            deleteDirectoryFiles(root);
+        }
+    }
+
+    static void testUsearchMultiDomainWalRecovery() {
+        System.err.println("Testing usearch multi-domain WAL recovery ...");
+        String root = "usearch-multidomain-wal";
+        String envPath = root + "/env";
+        String fsPathA = root + "/fsA";
+        String fsPathB = root + "/fsB";
+        deleteDirectoryFiles(root);
+        try {
+            Files.createDirectories(Paths.get(envPath));
+            Files.createDirectories(Paths.get(fsPathA));
+            Files.createDirectories(Paths.get(fsPathB));
+        } catch (IOException e) {
+            System.err.println("Failed to create directories for multi-domain WAL test: " + e.getMessage());
+            return;
+        }
+        final String domainAName = "wal-domain-a";
+        final String domainBName = "wal-domain-b";
+        final int dimensions = 4;
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.dtlv_usearch_domain domainA = new DTLV.dtlv_usearch_domain();
+        DTLV.dtlv_usearch_domain domainB = new DTLV.dtlv_usearch_domain();
+        boolean envCreated = false;
+        try {
+            expect(DTLV.mdb_env_create(env) == 0, "Failed to create WAL recovery env");
+            envCreated = true;
+            expect(DTLV.mdb_env_set_maxdbs(env, 128) == 0, "Failed to set max DBs for WAL recovery env");
+            expect(DTLV.mdb_env_open(env, envPath, DTLV.MDB_NOLOCK, 0664) == 0,
+                    "Failed to open WAL recovery env");
+            expect(DTLV.dtlv_usearch_domain_open(env, domainAName, fsPathA, domainA) == 0,
+                    "Failed to open WAL recovery domain A");
+            expect(DTLV.dtlv_usearch_domain_open(env, domainBName, fsPathB, domainB) == 0,
+                    "Failed to open WAL recovery domain B");
+            DTLV.usearch_init_options_t opts = createOpts(dimensions);
+            DTLV.MDB_txn txn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0, "Failed to begin WAL init txn");
+            expect(DTLV.dtlv_usearch_store_init_options(domainA, txn, opts) == 0,
+                    "Failed to store WAL domain A opts");
+            expect(DTLV.dtlv_usearch_store_init_options(domainB, txn, opts) == 0,
+                    "Failed to store WAL domain B opts");
+            expect(DTLV.mdb_txn_commit(txn) == 0, "Failed to commit WAL init txn");
+            float[] vecA = new float[] {0.15f, 0.25f, 0.35f, 0.45f};
+            float[] vecB = new float[] {1.05f, 1.15f, 1.25f, 1.35f};
+            float[] pendingA = new float[] {0.55f, 0.65f, 0.75f, 0.85f};
+            float[] pendingB = new float[] {1.55f, 1.65f, 1.75f, 1.85f};
+            stageDomainVector(env, domainA, 101L, vecA, dimensions, "wal domain A base", true);
+            stageDomainVector(env, domainB, 303L, vecB, dimensions, "wal domain B base", true);
+            stageDomainVector(env, domainA, 102L, pendingA, dimensions, "wal domain A pending", false);
+            stageDomainVector(env, domainB, 304L, pendingB, dimensions, "wal domain B pending", false);
+        } finally {
+            if (domainA != null && !domainA.isNull()) {
+                DTLV.dtlv_usearch_domain_close(domainA);
+            }
+            if (domainB != null && !domainB.isNull()) {
+                DTLV.dtlv_usearch_domain_close(domainB);
+            }
+            if (envCreated) {
+                DTLV.mdb_env_close(env);
+            }
+        }
+        expect(directoryHasSuffix(fsPathA + "/pending", ".ulog"),
+                "Domain A pending WAL not sealed");
+        expect(directoryHasSuffix(fsPathB + "/pending", ".ulog"),
+                "Domain B pending WAL not sealed");
+
+        DTLV.MDB_env reloadEnv = new DTLV.MDB_env();
+        DTLV.dtlv_usearch_domain reloadA = new DTLV.dtlv_usearch_domain();
+        DTLV.dtlv_usearch_domain reloadB = new DTLV.dtlv_usearch_domain();
+        DTLV.dtlv_usearch_handle handleA = null;
+        DTLV.dtlv_usearch_handle handleB = null;
+        boolean reloadCreated = false;
+        try {
+            expect(DTLV.mdb_env_create(reloadEnv) == 0, "Failed to create WAL reload env");
+            reloadCreated = true;
+            expect(DTLV.mdb_env_set_maxdbs(reloadEnv, 128) == 0, "Failed to set max DBs for WAL reload env");
+            expect(DTLV.mdb_env_open(reloadEnv, envPath, DTLV.MDB_NOLOCK, 0664) == 0,
+                    "Failed to open WAL reload env");
+            expect(DTLV.dtlv_usearch_domain_open(reloadEnv, domainAName, fsPathA, reloadA) == 0,
+                    "Failed to reopen WAL domain A");
+            expect(DTLV.dtlv_usearch_domain_open(reloadEnv, domainBName, fsPathB, reloadB) == 0,
+                    "Failed to reopen WAL domain B");
+            handleA = new DTLV.dtlv_usearch_handle();
+            handleB = new DTLV.dtlv_usearch_handle();
+            expect(DTLV.dtlv_usearch_activate(reloadA, handleA) == 0,
+                    "Failed to activate WAL domain A handle");
+            expect(DTLV.dtlv_usearch_activate(reloadB, handleB) == 0,
+                    "Failed to activate WAL domain B handle");
+            PointerPointer<BytePointer> error = new PointerPointer<>(1);
+            error.put(0, (BytePointer) null);
+            DTLV.usearch_index_t indexA = DTLV.dtlv_usearch_handle_index(handleA);
+            DTLV.usearch_index_t indexB = DTLV.dtlv_usearch_handle_index(handleB);
+            expect(indexA != null && !indexA.isNull(), "Reloaded domain A index unavailable");
+            expect(indexB != null && !indexB.isNull(), "Reloaded domain B index unavailable");
+            expect(DTLV.usearch_contains(indexA, 101L, error),
+                    "Reloaded domain A missing published vector");
+            expectNoError(error, "Reloaded domain A contains failed");
+            error.put(0, (BytePointer) null);
+            expect(DTLV.usearch_contains(indexA, 102L, error),
+                    "Reloaded domain A missing pending vector");
+            expectNoError(error, "Reloaded domain A pending contains failed");
+            error.put(0, (BytePointer) null);
+            expect(!DTLV.usearch_contains(indexA, 303L, error),
+                    "Domain A index leaked domain B vector");
+            expectNoError(error, "Domain A cross-domain contains failed");
+            error.put(0, (BytePointer) null);
+            expect(DTLV.usearch_contains(indexB, 303L, error),
+                    "Reloaded domain B missing published vector");
+            expectNoError(error, "Reloaded domain B contains failed");
+            error.put(0, (BytePointer) null);
+            expect(DTLV.usearch_contains(indexB, 304L, error),
+                    "Reloaded domain B missing pending vector");
+            expectNoError(error, "Reloaded domain B pending contains failed");
+            error.put(0, (BytePointer) null);
+            expect(!DTLV.usearch_contains(indexB, 101L, error),
+                    "Domain B index leaked domain A vector");
+            expectNoError(error, "Domain B cross-domain contains failed");
+        } finally {
+            if (handleA != null) {
+                DTLV.dtlv_usearch_deactivate(handleA);
+            }
+            if (handleB != null) {
+                DTLV.dtlv_usearch_deactivate(handleB);
+            }
+            if (reloadA != null && !reloadA.isNull()) {
+                DTLV.dtlv_usearch_domain_close(reloadA);
+            }
+            if (reloadB != null && !reloadB.isNull()) {
+                DTLV.dtlv_usearch_domain_close(reloadB);
+            }
+            if (reloadCreated) {
+                DTLV.mdb_env_close(reloadEnv);
+            }
+        }
+        expect(!directoryHasSuffix(fsPathA + "/pending", ".ulog"),
+                "Domain A pending WAL not cleared after recovery");
+        expect(!directoryHasSuffix(fsPathA + "/pending", ".ulog.sealed"),
+                "Domain A sealed WAL not cleared after recovery");
+        expect(!directoryHasSuffix(fsPathB + "/pending", ".ulog"),
+                "Domain B pending WAL not cleared after recovery");
+        expect(!directoryHasSuffix(fsPathB + "/pending", ".ulog.sealed"),
+                "Domain B sealed WAL not cleared after recovery");
+        deleteDirectoryFiles(fsPathA);
+        deleteDirectoryFiles(fsPathB);
+        deleteDirectoryFiles(envPath);
+        deleteDirectoryFiles(root);
+        System.out.println("Passed usearch multi-domain WAL recovery test.");
+    }
+
+    static void testUsearchJavaMultiProcessIntegration() {
+        System.err.println("Testing usearch Java multi-process integration ...");
+        String root = "usearch-jvm-mproc";
+        String envPath = root + "/env";
+        String fsPath = root + "/fs";
+        deleteDirectoryFiles(root);
+        try {
+            Files.createDirectories(Paths.get(envPath));
+            Files.createDirectories(Paths.get(fsPath));
+        } catch (IOException e) {
+            System.err.println("Failed to create directories for JVM multi-process test: " + e.getMessage());
+            return;
+        }
+        final String domainName = "vectors-jvm";
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.dtlv_usearch_domain domain = new DTLV.dtlv_usearch_domain();
+        boolean envCreated = false;
+        try {
+            expect(DTLV.mdb_env_create(env) == 0, "Failed to create JVM multi-process env");
+            envCreated = true;
+            expect(DTLV.mdb_env_set_maxdbs(env, 64) == 0, "Failed to set max DBs for JVM multi env");
+            expect(DTLV.mdb_env_open(env, envPath, MULTI_PROCESS_ENV_FLAGS, 0664) == 0,
+                    "Failed to open JVM multi-process env");
+            expect(DTLV.dtlv_usearch_domain_open(env, domainName, fsPath, domain) == 0,
+                    "Failed to open JVM multi-process domain");
+            DTLV.usearch_init_options_t opts = createOpts(4);
+            DTLV.MDB_txn txn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0, "Failed to begin JVM multi init txn");
+            expect(DTLV.dtlv_usearch_store_init_options(domain, txn, opts) == 0,
+                    "Failed to store JVM multi init opts");
+            expect(DTLV.mdb_txn_commit(txn) == 0, "Failed to commit JVM multi init txn");
+        } finally {
+            if (domain != null && !domain.isNull()) {
+                DTLV.dtlv_usearch_domain_close(domain);
+            }
+            if (envCreated) {
+                DTLV.mdb_env_close(env);
+            }
+        }
+        List<WorkerProcess> concurrent = new ArrayList<>();
+        concurrent.add(startJavaWorkerAsync("writer-101", "writer", envPath, fsPath, domainName, "101", 0));
+        concurrent.add(startJavaWorkerAsync("writer-303", "writer", envPath, fsPath, domainName, "303", 0));
+        waitForWorkerProcesses(concurrent);
+        runJavaWorker("reader-101", "reader", envPath, fsPath, domainName, "101", 0);
+        runJavaWorker("reader-303", "reader", envPath, fsPath, domainName, "303", 0);
+        runJavaWorker("crash-writer", "crash-writer", envPath, fsPath, domainName, "202", 42);
+        runJavaWorker("reader-after-crash", "reader", envPath, fsPath, domainName, "202", 0);
+        runJavaWorker("checkpoint-crash", "checkpoint-crash", envPath, fsPath, domainName, "0", 17);
+        DTLV.MDB_env recoverEnv = new DTLV.MDB_env();
+        DTLV.dtlv_usearch_domain recoverDomain = new DTLV.dtlv_usearch_domain();
+        try {
+            expect(DTLV.mdb_env_create(recoverEnv) == 0, "recover env create failed");
+            expect(DTLV.mdb_env_set_maxdbs(recoverEnv, 64) == 0, "recover set maxdbs failed");
+            expect(DTLV.mdb_env_open(recoverEnv, envPath, DTLV.MDB_NOLOCK, 0664) == 0,
+                    "recover env open failed");
+            expect(DTLV.dtlv_usearch_domain_open(recoverEnv, domainName, fsPath, recoverDomain) == 0,
+                    "recover domain open failed");
+            expect(DTLV.dtlv_usearch_checkpoint_recover(recoverDomain) == 0,
+                    "checkpoint recover failed");
+        } finally {
+            if (recoverDomain != null && !recoverDomain.isNull()) {
+                DTLV.dtlv_usearch_domain_close(recoverDomain);
+            }
+            DTLV.mdb_env_close(recoverEnv);
+        }
+        runJavaWorker("reader-after-checkpoint-crash", "reader", envPath, fsPath, domainName, "101", 0);
+        deleteDirectoryFiles(fsPath);
+        deleteDirectoryFiles(envPath);
+        deleteDirectoryFiles(root);
+        System.out.println("Passed usearch Java multi-process integration test.");
     }
 
     public static void main(String[] args) {
         testLMDB();
         System.out.println("----");
         testUsearch();
+        System.out.println("----");
+        testUsearchLMDBIntegration();
+        System.out.println("----");
+        testUsearchMultiDomainIntegration();
+        System.out.println("----");
+        testUsearchMultiDomainWalRecovery();
+        System.out.println("----");
+        testUsearchJavaMultiProcessIntegration();
+    }
+
+    public static class MultiProcessWorker {
+
+        static class WriterLock implements AutoCloseable {
+            private final FileChannel channel;
+            private final FileLock lock;
+
+            private WriterLock(FileChannel channel, FileLock lock) {
+                this.channel = channel;
+                this.lock = lock;
+            }
+
+            static WriterLock acquire(String envPath) {
+                Path lockFile = Paths.get(envPath, "writer.lock");
+                try {
+                    FileChannel channel = FileChannel.open(lockFile,
+                            StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                    FileLock lock = channel.lock();
+                    return new WriterLock(channel, lock);
+                } catch (IOException e) {
+                    expect(false, "Failed to acquire writer lock: " + e.getMessage());
+                    return null;
+                }
+            }
+
+            @Override
+            public void close() {
+                try {
+                    if (lock != null && lock.isValid()) {
+                        lock.release();
+                    }
+                } catch (IOException ignored) {
+                }
+                try {
+                    if (channel != null && channel.isOpen()) {
+                        channel.close();
+                    }
+                } catch (IOException ignored) {
+                }
+            }
+        }
+        static float[] buildVector(long key) {
+            float base = (float) key / 100.0f;
+            return new float[] {base, base + 0.1f, base + 0.2f, base + 0.3f};
+        }
+
+        static void runWriter(String envPath,
+                              String fsPath,
+                              String domainName,
+                              long key,
+                              boolean crashBeforePublish) {
+            try (WriterLock ignored = WriterLock.acquire(envPath)) {
+                DTLV.MDB_env env = new DTLV.MDB_env();
+                expect(DTLV.mdb_env_create(env) == 0, "worker env create failed");
+                expect(DTLV.mdb_env_set_maxdbs(env, 64) == 0, "worker set maxdbs failed");
+                expect(DTLV.mdb_env_open(env, envPath, MULTI_PROCESS_ENV_FLAGS, 0664) == 0,
+                        "worker env open failed");
+                DTLV.dtlv_usearch_domain domain = new DTLV.dtlv_usearch_domain();
+                expect(DTLV.dtlv_usearch_domain_open(env, domainName, fsPath, domain) == 0,
+                        "worker domain open failed");
+                DTLV.MDB_txn txn = new DTLV.MDB_txn();
+                expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0, "worker txn begin failed");
+                DTLV.dtlv_usearch_update update = new DTLV.dtlv_usearch_update();
+                update.op(DTLV.DTLV_USEARCH_OP_ADD);
+                BytePointer keyBytes = new BytePointer(Long.BYTES);
+                ByteBuffer keyBuffer = keyBytes.position(0).limit(Long.BYTES).asByteBuffer();
+                keyBuffer.order(ByteOrder.BIG_ENDIAN).putLong(key);
+                keyBytes.position(0);
+                update.key(keyBytes);
+                update.key_len(Long.BYTES);
+                float[] vector = buildVector(key);
+                FloatPointer payload = new FloatPointer(vector.length);
+                for (int i = 0; i < vector.length; i++) {
+                    payload.put(i, vector[i]);
+                }
+                update.payload(payload);
+                update.payload_len(vector.length * Float.BYTES);
+                update.scalar_kind((byte) DTLV.usearch_scalar_f32_k);
+                update.dimensions((short) vector.length);
+                DTLV.dtlv_usearch_txn_ctx ctx = new DTLV.dtlv_usearch_txn_ctx();
+                expect(DTLV.dtlv_usearch_stage_update(domain, txn, update, ctx) == 0,
+                        "worker stage update failed");
+                expect(DTLV.dtlv_usearch_apply_pending(ctx) == 0,
+                        "worker apply pending failed");
+                expect(DTLV.mdb_txn_commit(txn) == 0, "worker commit failed");
+                if (!crashBeforePublish) {
+                    expect(DTLV.dtlv_usearch_publish_log(ctx, 1) == 0,
+                            "worker publish failed");
+                    DTLV.dtlv_usearch_txn_ctx_close(ctx);
+                    payload.close();
+                    keyBytes.close();
+                    DTLV.dtlv_usearch_domain_close(domain);
+                    DTLV.mdb_env_close(env);
+                    System.exit(0);
+                } else {
+                    System.exit(42);
+                }
+            }
+        }
+
+        static void runCheckpointCrash(String envPath,
+                                       String fsPath,
+                                       String domainName) {
+            try (WriterLock ignored = WriterLock.acquire(envPath)) {
+                DTLV.MDB_env env = new DTLV.MDB_env();
+                expect(DTLV.mdb_env_create(env) == 0, "checkpoint env create failed");
+                expect(DTLV.mdb_env_set_maxdbs(env, 64) == 0, "checkpoint set maxdbs failed");
+                expect(DTLV.mdb_env_open(env, envPath, MULTI_PROCESS_ENV_FLAGS, 0664) == 0,
+                        "checkpoint env open failed");
+                DTLV.dtlv_usearch_domain domain = new DTLV.dtlv_usearch_domain();
+                expect(DTLV.dtlv_usearch_domain_open(env, domainName, fsPath, domain) == 0,
+                        "checkpoint domain open failed");
+                DTLV.dtlv_usearch_handle handle = new DTLV.dtlv_usearch_handle();
+                expect(DTLV.dtlv_usearch_activate(domain, handle) == 0,
+                        "checkpoint activate failed");
+                DTLV.usearch_index_t index = DTLV.dtlv_usearch_handle_index(handle);
+                expect(index != null && !index.isNull(), "checkpoint index missing");
+                long currentSnapshot = readDomainMetaU64(env, domainName, "snapshot_seq");
+                long targetSeq = currentSnapshot + 1;
+                DTLV.dtlv_uuid128 writerUuid = new DTLV.dtlv_uuid128();
+                writerUuid.hi(System.nanoTime());
+                writerUuid.lo(Thread.currentThread().getId());
+                SizeTPointer chunkCount = new SizeTPointer(1);
+                expect(DTLV.dtlv_usearch_checkpoint_write_snapshot(domain,
+                        index,
+                        targetSeq,
+                        writerUuid,
+                        chunkCount) == 0,
+                       "checkpoint write failed");
+                System.exit(17);
+            }
+        }
+
+        static void runReader(String envPath,
+                              String fsPath,
+                              String domainName,
+                              long key) {
+            DTLV.MDB_env env = new DTLV.MDB_env();
+            expect(DTLV.mdb_env_create(env) == 0, "reader env create failed");
+            expect(DTLV.mdb_env_set_maxdbs(env, 64) == 0, "reader set maxdbs failed");
+            expect(DTLV.mdb_env_open(env, envPath, MULTI_PROCESS_ENV_FLAGS, 0664) == 0,
+                    "reader env open failed");
+            DTLV.dtlv_usearch_domain domain = new DTLV.dtlv_usearch_domain();
+            expect(DTLV.dtlv_usearch_domain_open(env, domainName, fsPath, domain) == 0,
+                    "reader domain open failed");
+            DTLV.dtlv_usearch_handle handle = new DTLV.dtlv_usearch_handle();
+            expect(DTLV.dtlv_usearch_activate(domain, handle) == 0,
+                    "reader activate failed");
+            DTLV.usearch_index_t index = DTLV.dtlv_usearch_handle_index(handle);
+            expect(index != null && !index.isNull(), "reader missing index");
+            PointerPointer<BytePointer> error = new PointerPointer<>(1);
+            error.put(0, (BytePointer) null);
+            expect(DTLV.usearch_contains(index, key, error),
+                    "reader missing key " + key);
+            expectNoError(error, "reader contains error");
+            DTLV.dtlv_usearch_deactivate(handle);
+            DTLV.dtlv_usearch_domain_close(domain);
+            DTLV.mdb_env_close(env);
+            System.exit(0);
+        }
+
+        public static void main(String[] args) {
+            if (args.length < 5) {
+                System.err.println("Usage: MultiProcessWorker <role> <envPath> <fsPath> <domain> <key>");
+                System.exit(2);
+            }
+            String role = args[0];
+            String envPath = args[1];
+            String fsPath = args[2];
+            String domainName = args[3];
+            long key = Long.parseLong(args[4]);
+            switch (role) {
+            case "writer":
+                runWriter(envPath, fsPath, domainName, key, false);
+                break;
+            case "crash-writer":
+                runWriter(envPath, fsPath, domainName, key, true);
+                break;
+            case "reader":
+                runReader(envPath, fsPath, domainName, key);
+                break;
+            case "checkpoint-crash":
+                runCheckpointCrash(envPath, fsPath, domainName);
+                break;
+            default:
+                System.err.println("Unknown worker role: " + role);
+                System.exit(3);
+            }
+        }
     }
 }

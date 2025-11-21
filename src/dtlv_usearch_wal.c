@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -32,29 +33,6 @@
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
-
-#define DTLV_ULOG_MAGIC "DTLVULOG"
-#define DTLV_ULOG_VERSION 1
-#define DTLV_ULOG_TOKEN_HEX 32
-
-typedef struct {
-  char magic[8];
-  uint8_t version;
-  uint8_t state;
-  uint16_t header_len;
-  uint64_t snapshot_seq_base;
-  uint64_t log_seq_hint;
-  uint64_t txn_token_hi;
-  uint64_t txn_token_lo;
-  uint32_t frame_count;
-  uint32_t checksum;
-} dtlv_ulog_header_v1;
-
-typedef struct {
-  uint32_t ordinal;
-  uint32_t delta_bytes;
-  uint32_t checksum;
-} dtlv_ulog_frame_prefix_v1;
 
 struct dtlv_usearch_wal_ctx {
   dtlv_uuid128 token;
@@ -79,6 +57,25 @@ static void dtlv_format_token(const dtlv_uuid128 *token, char *out, size_t len) 
   snprintf(out, len, "%016llx%016llx",
            (unsigned long long)token->hi,
            (unsigned long long)token->lo);
+}
+
+static int dtlv_trace_enabled(void) {
+  const char *flag = getenv("DTLV_TRACE_TESTS");
+  return flag && *flag;
+}
+
+static int dtlv_fault_flag_enabled(const char *flag) {
+  if (!flag) return 0;
+  const char *value = getenv(flag);
+  return value && *value && strcmp(value, "0") != 0;
+}
+
+static void dtlv_tracef(const char *fmt, ...) {
+  if (!dtlv_trace_enabled()) return;
+  va_list args;
+  va_start(args, fmt);
+  vfprintf(stderr, fmt, args);
+  va_end(args);
 }
 
 static int dtlv_random_bytes(void *dst, size_t len) {
@@ -239,6 +236,9 @@ static int dtlv_write_full_fd(int fd, const void *data, size_t len) {
       if (errno == EINTR) continue;
       return errno;
     }
+    if (dtlv_trace_enabled()) {
+      dtlv_tracef("[wal_write_fd] chunk=%zu wrote=%zd\n", len - written, rc);
+    }
     written += (size_t)rc;
   }
   return 0;
@@ -320,9 +320,19 @@ static int dtlv_write_header(dtlv_usearch_wal_ctx *ctx, dtlv_ulog_state state) {
 static int dtlv_write_frame(dtlv_usearch_wal_ctx *ctx, const void *payload, size_t payload_len) {
   if (!payload || payload_len == 0 || payload_len > UINT32_MAX) return EINVAL;
   dtlv_ulog_frame_prefix_v1 prefix;
+  uint32_t crc = dtlv_crc32c(payload, payload_len);
+  if (dtlv_fault_flag_enabled("DTLV_FAULT_WAL_CRC")) crc ^= 0xa5a5a5a5u;
   prefix.ordinal = dtlv_to_be32(ctx->next_ordinal);
   prefix.delta_bytes = dtlv_to_be32((uint32_t)payload_len);
-  prefix.checksum = dtlv_to_be32(dtlv_crc32c(payload, payload_len));
+  prefix.checksum = dtlv_to_be32(crc);
+  if (dtlv_trace_enabled()) {
+    dtlv_tracef("[wal_write] token=%016llx%016llx ordinal=%u bytes=%zu crc=0x%08x\n",
+                (unsigned long long)ctx->token.hi,
+                (unsigned long long)ctx->token.lo,
+                ctx->next_ordinal,
+                payload_len,
+                crc);
+  }
 #ifndef _WIN32
   int rc = dtlv_write_full_fd(ctx->fd, &prefix, sizeof(prefix));
   if (rc != 0) return rc;
@@ -335,6 +345,14 @@ static int dtlv_write_frame(dtlv_usearch_wal_ctx *ctx, const void *payload, size
   if (rc != 0) return rc;
   ctx->next_ordinal += 1;
   ctx->frame_count += 1;
+#ifndef _WIN32
+  if (dtlv_trace_enabled()) {
+    struct stat st;
+    if (fstat(ctx->fd, &st) == 0) {
+      dtlv_tracef("[wal_write] size_now=%lld\n", (long long)st.st_size);
+    }
+  }
+#endif
   return 0;
 }
 
@@ -350,13 +368,18 @@ int dtlv_usearch_wal_open(const char *domain_root,
   ctx->next_ordinal = 1;
   ctx->frame_count = 0;
   ctx->state = DTLV_ULOG_STATE_WRITING;
+#if 1
+  if (dtlv_trace_enabled()) {
+    dtlv_tracef("[wal_open] header_size=%zu\n", sizeof(dtlv_ulog_header_v1));
+  }
+#endif
 #ifndef _WIN32
   ctx->fd = -1;
 #else
   ctx->handle = INVALID_HANDLE_VALUE;
 #endif
   memcpy(ctx->domain_root, domain_root, len + 1);
-  snprintf(ctx->pending_dir, sizeof(ctx->pending_dir), "%s/%s", ctx->domain_root, "pending");
+  snprintf(ctx->pending_dir, sizeof(ctx->pending_dir), "%s", ctx->domain_root);
   int rc = dtlv_make_directories(ctx->pending_dir);
   if (rc != 0) {
     free(ctx);
@@ -400,6 +423,21 @@ int dtlv_usearch_wal_open(const char *domain_root,
     dtlv_usearch_wal_close(ctx, 1);
     return rc;
   }
+#ifndef _WIN32
+  if (lseek(ctx->fd, (off_t)sizeof(dtlv_ulog_header_v1), SEEK_SET) < 0) {
+    rc = errno ? errno : EIO;
+    dtlv_usearch_wal_close(ctx, 1);
+    return rc;
+  }
+#else
+  LARGE_INTEGER cursor;
+  cursor.QuadPart = (LONGLONG)sizeof(dtlv_ulog_header_v1);
+  if (!SetFilePointerEx(ctx->handle, cursor, NULL, FILE_BEGIN)) {
+    rc = dtlv_win32_last_error();
+    dtlv_usearch_wal_close(ctx, 1);
+    return rc;
+  }
+#endif
   *ctx_out = ctx;
   return 0;
 }
@@ -429,6 +467,14 @@ int dtlv_usearch_wal_seal(dtlv_usearch_wal_ctx *ctx) {
   rc = dtlv_fdatasync_handle(ctx->handle);
 #endif
   if (rc != 0) return rc;
+#ifndef _WIN32
+  if (dtlv_trace_enabled()) {
+    struct stat st;
+    if (fstat(ctx->fd, &st) == 0) {
+      dtlv_tracef("[wal_seal] size=%lld\n", (long long)st.st_size);
+    }
+  }
+#endif
 #ifdef _WIN32
   rc = dtlv_win32_rename_file(ctx->path_open, ctx->path_sealed);
 #else
@@ -439,7 +485,7 @@ int dtlv_usearch_wal_seal(dtlv_usearch_wal_ctx *ctx) {
   return 0;
 }
 
-int dtlv_usearch_wal_mark_ready(dtlv_usearch_wal_ctx *ctx, int unlink_after_publish) {
+int dtlv_usearch_wal_mark_ready(dtlv_usearch_wal_ctx *ctx) {
   if (!ctx) return EINVAL;
   if (ctx->state != DTLV_ULOG_STATE_SEALED && ctx->state != DTLV_ULOG_STATE_READY_FOR_PUBLISH) {
     return EBUSY;
@@ -461,20 +507,6 @@ int dtlv_usearch_wal_mark_ready(dtlv_usearch_wal_ctx *ctx, int unlink_after_publ
     if (rc != 0) return rc;
   }
   ctx->state = DTLV_ULOG_STATE_READY_FOR_PUBLISH;
-  if (unlink_after_publish) {
-#ifdef _WIN32
-    if (ctx->handle && ctx->handle != INVALID_HANDLE_VALUE) {
-      CloseHandle(ctx->handle);
-      ctx->handle = INVALID_HANDLE_VALUE;
-    }
-    rc = dtlv_win32_delete_file(ctx->path_ready);
-    if (rc == ERROR_FILE_NOT_FOUND) rc = 0;
-#else
-    if (unlink(ctx->path_ready) != 0 && errno != ENOENT) return errno;
-    rc = 0;
-#endif
-    return rc;
-  }
   return 0;
 }
 
