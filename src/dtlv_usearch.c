@@ -15,6 +15,8 @@
 #include <sys/stat.h>
 #else
 #include <dirent.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -52,13 +54,17 @@
 #define DTLV_SNAPSHOT_CHUNK_HEADER_SIZE 12u
 #define DTLV_USEARCH_DEFAULT_SNAPSHOT_RETENTION 2u
 #define DTLV_READER_PIN_VERSION 1u
-#define DTLV_READER_PIN_ENV_MAPSIZE (1u << 20)
 #define DTLV_READER_PIN_DEFAULT_TTL_MS 60000u
 #define DTLV_READER_PIN_DEFAULT_HEARTBEAT_MS 5000u
-#define DTLV_READER_PIN_RECORD_SIZE 32u
+#define DTLV_READER_PIN_SLOT_COUNT 64u
+#define DTLV_READER_PIN_RECORD_SIZE 48u
 #define DTLV_USEARCH_MAGIC "usearch"
 #define DTLV_USEARCH_MAGIC_LEN 7u
 #define DTLV_USEARCH_HEADER_BYTES 64u
+
+#ifdef _WIN32
+static void dtlv_fix_windows_path(char *path);
+#endif
 
 typedef enum {
   DTLV_CHECKPOINT_STAGE_NONE = 0,
@@ -132,8 +138,15 @@ struct dtlv_usearch_domain {
   char filesystem_root[PATH_MAX];
   char pending_root[PATH_MAX];
   char pins_path[PATH_MAX];
-  MDB_env *pins_env;
-  MDB_dbi pins_dbi;
+#ifndef _WIN32
+  int pins_fd;
+#else
+  HANDLE pins_file;
+  HANDLE pins_mapping;
+#endif
+  uint8_t *pins_map;
+  size_t pins_map_size;
+  uint32_t pins_slot_count;
   uint32_t pin_ttl_ms;
   uint32_t pin_heartbeat_ms;
   uint32_t chunk_bytes;
@@ -194,6 +207,7 @@ typedef struct {
 typedef struct {
   uint8_t version;
   uint8_t reserved[7];
+  dtlv_uuid128 reader_uuid;
   uint64_t snapshot_seq;
   uint64_t log_seq;
   int64_t expires_at_ms;
@@ -247,95 +261,207 @@ static void dtlv_pin_pack_key(const dtlv_uuid128 *uuid, uint8_t out[16]) {
   memcpy(out + sizeof(hi), &lo, sizeof(lo));
 }
 
-static void dtlv_pin_pack_value(uint8_t *dst,
-                                uint64_t snapshot_seq,
-                                uint64_t log_seq,
-                                int64_t expires_at_ms) {
+static void dtlv_pin_pack_record(uint8_t *dst,
+                                 const dtlv_uuid128 *reader_uuid,
+                                 uint64_t snapshot_seq,
+                                 uint64_t log_seq,
+                                 int64_t expires_at_ms) {
   if (!dst) return;
   memset(dst, 0, DTLV_READER_PIN_RECORD_SIZE);
   dst[0] = (uint8_t)DTLV_READER_PIN_VERSION;
+  uint8_t uuid_bytes[16];
+  dtlv_pin_pack_key(reader_uuid, uuid_bytes);
+  memcpy(dst + 8, uuid_bytes, sizeof(uuid_bytes));
   uint64_t snap_be = dtlv_to_be64(snapshot_seq);
-  memcpy(dst + 8, &snap_be, sizeof(snap_be));
+  memcpy(dst + 24, &snap_be, sizeof(snap_be));
   uint64_t log_be = dtlv_to_be64(log_seq);
-  memcpy(dst + 16, &log_be, sizeof(log_be));
+  memcpy(dst + 32, &log_be, sizeof(log_be));
   uint64_t expires_be = dtlv_to_be64((uint64_t)expires_at_ms);
-  memcpy(dst + 24, &expires_be, sizeof(expires_be));
+  memcpy(dst + 40, &expires_be, sizeof(expires_be));
 }
 
-static int dtlv_pin_unpack_value(const MDB_val *val, dtlv_reader_pin_record *record) {
-  if (!val || !record) return EINVAL;
-  if (val->mv_size != DTLV_READER_PIN_RECORD_SIZE) return MDB_CORRUPTED;
-  const uint8_t *src = (const uint8_t *)val->mv_data;
-  memset(record, 0, sizeof(*record));
-  record->version = src[0];
-  if (record->version != DTLV_READER_PIN_VERSION) return EINVAL;
-  uint64_t snap_be;
-  memcpy(&snap_be, src + 8, sizeof(snap_be));
-  uint64_t log_be;
-  memcpy(&log_be, src + 16, sizeof(log_be));
-  uint64_t expires_be;
-  memcpy(&expires_be, src + 24, sizeof(expires_be));
-  record->snapshot_seq = dtlv_from_be64(snap_be);
-  record->log_seq = dtlv_from_be64(log_be);
-  record->expires_at_ms = (int64_t)dtlv_from_be64(expires_be);
+static int dtlv_pin_unpack_record(const uint8_t *src, dtlv_reader_pin_record *record) {
+  if (!src) return EINVAL;
+  uint8_t version = src[0];
+  if (version == 0) return ENOENT;
+  if (version != DTLV_READER_PIN_VERSION) return EINVAL;
+  if (record) {
+    memset(record, 0, sizeof(*record));
+    record->version = version;
+    uint64_t hi_be = 0;
+    uint64_t lo_be = 0;
+    uint64_t snap_be = 0;
+    uint64_t log_be = 0;
+    uint64_t expires_be = 0;
+    memcpy(&hi_be, src + 8, sizeof(hi_be));
+    memcpy(&lo_be, src + 16, sizeof(lo_be));
+    memcpy(&snap_be, src + 24, sizeof(snap_be));
+    memcpy(&log_be, src + 32, sizeof(log_be));
+    memcpy(&expires_be, src + 40, sizeof(expires_be));
+    record->reader_uuid.hi = dtlv_from_be64(hi_be);
+    record->reader_uuid.lo = dtlv_from_be64(lo_be);
+    record->snapshot_seq = dtlv_from_be64(snap_be);
+    record->log_seq = dtlv_from_be64(log_be);
+    record->expires_at_ms = (int64_t)dtlv_from_be64(expires_be);
+  }
   return 0;
+}
+
+static uint8_t *dtlv_pin_slot_ptr(dtlv_usearch_domain *domain, size_t slot_idx) {
+  if (!domain || !domain->pins_map) return NULL;
+  size_t offset = slot_idx * (size_t)DTLV_READER_PIN_RECORD_SIZE;
+  if (offset + DTLV_READER_PIN_RECORD_SIZE > domain->pins_map_size) return NULL;
+  return domain->pins_map + offset;
+}
+
+static void dtlv_pin_write_slot(uint8_t *slot,
+                                const dtlv_uuid128 *reader_uuid,
+                                uint64_t snapshot_seq,
+                                uint64_t log_seq,
+                                int64_t expires_at_ms) {
+  if (!slot) return;
+  uint8_t buf[DTLV_READER_PIN_RECORD_SIZE];
+  dtlv_pin_pack_record(buf, reader_uuid, snapshot_seq, log_seq, expires_at_ms);
+  slot[0] = 0;
+  memcpy(slot + 1, buf + 1, DTLV_READER_PIN_RECORD_SIZE - 1);
+  slot[0] = buf[0];
+}
+
+static int dtlv_reader_pins_lock(dtlv_usearch_domain *domain) {
+  if (!domain) return EINVAL;
+#ifdef _WIN32
+  OVERLAPPED ov = {0};
+  DWORD len_low = (DWORD)(domain->pins_map_size & 0xFFFFFFFFu);
+  DWORD len_high = (DWORD)(domain->pins_map_size >> 32);
+  if (!LockFileEx(domain->pins_file, LOCKFILE_EXCLUSIVE_LOCK, 0, len_low, len_high, &ov)) {
+    DWORD err = GetLastError();
+    return err ? (int)err : EIO;
+  }
+  return 0;
+#else
+  struct flock lock;
+  memset(&lock, 0, sizeof(lock));
+  lock.l_type = F_WRLCK;
+  lock.l_whence = SEEK_SET;
+  if (fcntl(domain->pins_fd, F_SETLKW, &lock) != 0) return errno ? errno : EIO;
+  return 0;
+#endif
+}
+
+static void dtlv_reader_pins_unlock(dtlv_usearch_domain *domain) {
+  if (!domain) return;
+#ifdef _WIN32
+  OVERLAPPED ov = {0};
+  DWORD len_low = (DWORD)(domain->pins_map_size & 0xFFFFFFFFu);
+  DWORD len_high = (DWORD)(domain->pins_map_size >> 32);
+  UnlockFileEx(domain->pins_file, 0, len_low, len_high, &ov);
+#else
+  struct flock lock;
+  memset(&lock, 0, sizeof(lock));
+  lock.l_type = F_UNLCK;
+  lock.l_whence = SEEK_SET;
+  fcntl(domain->pins_fd, F_SETLK, &lock);
+#endif
 }
 
 static int dtlv_reader_pins_open(dtlv_usearch_domain *domain) {
   if (!domain) return EINVAL;
-  if (snprintf(domain->pins_path, sizeof(domain->pins_path), "%s/reader-pins", domain->filesystem_root) >=
+  if (snprintf(domain->pins_path, sizeof(domain->pins_path), "%s/reader-pins.lock", domain->filesystem_root) >=
       (int)sizeof(domain->pins_path)) {
     return ENAMETOOLONG;
   }
-  int rc = dtlv_ensure_directory(domain->pins_path);
+#ifdef _WIN32
+  char root_path[PATH_MAX];
+  snprintf(root_path, sizeof(root_path), "%s", domain->filesystem_root);
+  dtlv_fix_windows_path(root_path);
+  int rc = dtlv_ensure_directory(root_path);
+#else
+  int rc = dtlv_ensure_directory(domain->filesystem_root);
+#endif
   if (rc != 0 && rc != EEXIST) return rc;
-  MDB_env *env = NULL;
-  rc = mdb_env_create(&env);
-  if (rc != 0) return rc;
-  rc = mdb_env_set_maxdbs(env, 1);
-  if (rc != 0) {
-    if (dtlv_trace_enabled()) dtlv_tracef("[pins] set_maxdbs rc=%d\n", rc);
-    mdb_env_close(env);
-    return rc;
+  size_t map_size = (size_t)DTLV_READER_PIN_RECORD_SIZE * (size_t)DTLV_READER_PIN_SLOT_COUNT;
+#ifdef _WIN32
+  char win_path[PATH_MAX];
+  snprintf(win_path, sizeof(win_path), "%s", domain->pins_path);
+  dtlv_fix_windows_path(win_path);
+  HANDLE file = CreateFileA(win_path,
+                            GENERIC_READ | GENERIC_WRITE,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            NULL,
+                            OPEN_ALWAYS,
+                            FILE_ATTRIBUTE_NORMAL,
+                            NULL);
+  if (file == INVALID_HANDLE_VALUE) return (int)GetLastError();
+  LARGE_INTEGER size;
+  size.QuadPart = (LONGLONG)map_size;
+  if (!SetFilePointerEx(file, size, NULL, FILE_BEGIN) || !SetEndOfFile(file)) {
+    DWORD err = GetLastError();
+    CloseHandle(file);
+    return err ? (int)err : EIO;
   }
-  rc = mdb_env_set_mapsize(env, DTLV_READER_PIN_ENV_MAPSIZE);
-  if (rc != 0) {
-    if (dtlv_trace_enabled()) dtlv_tracef("[pins] set_mapsize rc=%d\n", rc);
-    mdb_env_close(env);
-    return rc;
+  HANDLE mapping = CreateFileMappingA(file, NULL, PAGE_READWRITE, size.HighPart, size.LowPart, NULL);
+  if (!mapping) {
+    DWORD err = GetLastError();
+    CloseHandle(file);
+    return err ? (int)err : EIO;
   }
-  unsigned int flags = MDB_NOLOCK | MDB_NOSYNC | MDB_NOMETASYNC;
-  rc = mdb_env_open(env, domain->pins_path, flags, 0664);
-  if (rc != 0) {
-    if (dtlv_trace_enabled()) dtlv_tracef("[pins] env_open rc=%d\n", rc);
-    mdb_env_close(env);
-    return rc;
+  uint8_t *base = (uint8_t *)MapViewOfFile(mapping, FILE_MAP_WRITE, 0, 0, map_size);
+  if (!base) {
+    DWORD err = GetLastError();
+    CloseHandle(mapping);
+    CloseHandle(file);
+    return err ? (int)err : EIO;
   }
-  MDB_txn *txn = NULL;
-  rc = mdb_txn_begin(env, NULL, 0, &txn);
-  if (rc != 0) {
-    if (dtlv_trace_enabled()) dtlv_tracef("[pins] txn_begin rc=%d\n", rc);
-    mdb_env_close(env);
-    return rc;
+  domain->pins_file = file;
+  domain->pins_mapping = mapping;
+  domain->pins_map = base;
+#else
+  int fd = open(domain->pins_path, O_RDWR | O_CREAT, 0664);
+  if (fd < 0) return errno ? errno : EIO;
+  struct stat st;
+  if (fstat(fd, &st) != 0) {
+    int err = errno ? errno : EIO;
+    close(fd);
+    return err;
   }
-  rc = mdb_dbi_open(txn, NULL, MDB_CREATE, &domain->pins_dbi);
-  if (rc == 0) rc = mdb_txn_commit(txn);
-  else mdb_txn_abort(txn);
-  if (rc != 0) {
-    if (dtlv_trace_enabled()) dtlv_tracef("[pins] dbi_open rc=%d\n", rc);
-    mdb_env_close(env);
-    return rc;
+  if ((size_t)st.st_size != map_size) {
+    if (ftruncate(fd, (off_t)map_size) != 0) {
+      int err = errno ? errno : EIO;
+      close(fd);
+      return err;
+    }
   }
-  domain->pins_env = env;
+  void *base = mmap(NULL, map_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (base == MAP_FAILED) {
+    int err = errno ? errno : EIO;
+    close(fd);
+    return err;
+  }
+  domain->pins_fd = fd;
+  domain->pins_map = (uint8_t *)base;
+#endif
+  domain->pins_map_size = map_size;
+  domain->pins_slot_count = DTLV_READER_PIN_SLOT_COUNT;
   return 0;
 }
 
 static void dtlv_reader_pins_close(dtlv_usearch_domain *domain) {
   if (!domain) return;
-  if (domain->pins_env) {
-    mdb_env_close(domain->pins_env);
-    domain->pins_env = NULL;
-  }
+#ifdef _WIN32
+  if (domain->pins_map) UnmapViewOfFile(domain->pins_map);
+  if (domain->pins_mapping) CloseHandle(domain->pins_mapping);
+  if (domain->pins_file && domain->pins_file != INVALID_HANDLE_VALUE) CloseHandle(domain->pins_file);
+  domain->pins_map = NULL;
+  domain->pins_mapping = NULL;
+  domain->pins_file = NULL;
+#else
+  if (domain->pins_map && domain->pins_map_size) munmap(domain->pins_map, domain->pins_map_size);
+  if (domain->pins_fd >= 0) close(domain->pins_fd);
+  domain->pins_fd = -1;
+  domain->pins_map = NULL;
+#endif
+  domain->pins_map_size = 0;
+  domain->pins_slot_count = 0;
 }
 
 static MDB_val dtlv_meta_key(const char *key) {
@@ -1283,6 +1409,12 @@ int dtlv_usearch_domain_open(MDB_env *env,
   domain->env = env;
   domain->pin_ttl_ms = DTLV_READER_PIN_DEFAULT_TTL_MS;
   domain->pin_heartbeat_ms = DTLV_READER_PIN_DEFAULT_HEARTBEAT_MS;
+#ifndef _WIN32
+  domain->pins_fd = -1;
+#else
+  domain->pins_file = NULL;
+  domain->pins_mapping = NULL;
+#endif
   if (strlen(domain_name) >= sizeof(domain->domain_name)) {
     free(domain);
     return ENAMETOOLONG;
@@ -1503,74 +1635,106 @@ int dtlv_usearch_pin_handle(dtlv_usearch_domain *domain,
                             uint64_t log_seq,
                             int64_t expires_at_ms) {
   if (!domain || !reader_uuid) return EINVAL;
-  if (!domain->pins_env) return ENOSYS;
-  MDB_txn *txn = NULL;
-  int rc = mdb_txn_begin(domain->pins_env, NULL, 0, &txn);
+  if (!domain->pins_map) return ENOSYS;
+  int rc = dtlv_reader_pins_lock(domain);
   if (rc != 0) return rc;
-  uint8_t key_buf[16];
-  dtlv_pin_pack_key(reader_uuid, key_buf);
-  MDB_val key = {.mv_data = key_buf, .mv_size = sizeof(key_buf)};
-  uint8_t value_buf[DTLV_READER_PIN_RECORD_SIZE];
-  dtlv_pin_pack_value(value_buf, snapshot_seq, log_seq, expires_at_ms);
-  MDB_val val = {.mv_data = value_buf, .mv_size = sizeof(value_buf)};
-  rc = mdb_put(txn, domain->pins_dbi, &key, &val, 0);
-  if (rc == 0) rc = mdb_txn_commit(txn);
-  else if (txn) mdb_txn_abort(txn);
-  return rc;
+  size_t found_slot = (size_t)-1;
+  size_t empty_slot = (size_t)-1;
+  size_t expired_slot = (size_t)-1;
+  int64_t now_ms = dtlv_now_ms();
+  for (size_t i = 0; i < domain->pins_slot_count; ++i) {
+    uint8_t *slot = dtlv_pin_slot_ptr(domain, i);
+    if (!slot) break;
+    dtlv_reader_pin_record rec;
+    int decode = dtlv_pin_unpack_record(slot, &rec);
+    if (decode == ENOENT) {
+      if (empty_slot == (size_t)-1) empty_slot = i;
+      continue;
+    }
+    if (decode != 0) {
+      memset(slot, 0, DTLV_READER_PIN_RECORD_SIZE);
+      if (empty_slot == (size_t)-1) empty_slot = i;
+      continue;
+    }
+    if (rec.reader_uuid.hi == reader_uuid->hi && rec.reader_uuid.lo == reader_uuid->lo) {
+      found_slot = i;
+      break;
+    }
+    if (rec.expires_at_ms <= now_ms && expired_slot == (size_t)-1) expired_slot = i;
+  }
+  size_t target = found_slot != (size_t)-1 ? found_slot : (empty_slot != (size_t)-1 ? empty_slot : expired_slot);
+  if (target == (size_t)-1) {
+    dtlv_reader_pins_unlock(domain);
+    return ENOSPC;
+  }
+  dtlv_pin_write_slot(dtlv_pin_slot_ptr(domain, target), reader_uuid, snapshot_seq, log_seq, expires_at_ms);
+  dtlv_reader_pins_unlock(domain);
+  return 0;
 }
 
 int dtlv_usearch_touch_pin(dtlv_usearch_domain *domain,
                            const dtlv_uuid128 *reader_uuid,
                            int64_t expires_at_ms) {
   if (!domain || !reader_uuid) return EINVAL;
-  if (!domain->pins_env) return ENOSYS;
-  MDB_txn *txn = NULL;
-  int rc = mdb_txn_begin(domain->pins_env, NULL, 0, &txn);
+  if (!domain->pins_map) return ENOSYS;
+  int rc = dtlv_reader_pins_lock(domain);
   if (rc != 0) return rc;
-  uint8_t key_buf[16];
-  dtlv_pin_pack_key(reader_uuid, key_buf);
-  MDB_val key = {.mv_data = key_buf, .mv_size = sizeof(key_buf)};
-  MDB_val val;
-  rc = mdb_get(txn, domain->pins_dbi, &key, &val);
-  if (rc == MDB_NOTFOUND) {
-    mdb_txn_abort(txn);
-    return rc;
+  size_t found_slot = (size_t)-1;
+  dtlv_reader_pin_record rec;
+  for (size_t i = 0; i < domain->pins_slot_count; ++i) {
+    uint8_t *slot = dtlv_pin_slot_ptr(domain, i);
+    if (!slot) break;
+    int decode = dtlv_pin_unpack_record(slot, &rec);
+    if (decode == ENOENT) continue;
+    if (decode != 0) {
+      memset(slot, 0, DTLV_READER_PIN_RECORD_SIZE);
+      continue;
+    }
+    if (rec.reader_uuid.hi == reader_uuid->hi && rec.reader_uuid.lo == reader_uuid->lo) {
+      found_slot = i;
+      break;
+    }
   }
-  if (rc != 0) {
-    mdb_txn_abort(txn);
-    return rc;
+  if (found_slot == (size_t)-1) {
+    dtlv_reader_pins_unlock(domain);
+    return ENOENT;
   }
-  dtlv_reader_pin_record record;
-  rc = dtlv_pin_unpack_value(&val, &record);
-  if (rc != 0) {
-    mdb_txn_abort(txn);
-    return rc;
-  }
-  record.expires_at_ms = expires_at_ms;
-  uint8_t value_buf[DTLV_READER_PIN_RECORD_SIZE];
-  dtlv_pin_pack_value(value_buf, record.snapshot_seq, record.log_seq, record.expires_at_ms);
-  MDB_val new_val = {.mv_data = value_buf, .mv_size = sizeof(value_buf)};
-  rc = mdb_put(txn, domain->pins_dbi, &key, &new_val, 0);
-  if (rc == 0) rc = mdb_txn_commit(txn);
-  else mdb_txn_abort(txn);
-  return rc;
+  rec.expires_at_ms = expires_at_ms;
+  dtlv_pin_write_slot(dtlv_pin_slot_ptr(domain, found_slot),
+                      &rec.reader_uuid,
+                      rec.snapshot_seq,
+                      rec.log_seq,
+                      rec.expires_at_ms);
+  dtlv_reader_pins_unlock(domain);
+  return 0;
 }
 
 int dtlv_usearch_release_pin(dtlv_usearch_domain *domain,
                              const dtlv_uuid128 *reader_uuid) {
   if (!domain || !reader_uuid) return EINVAL;
-  if (!domain->pins_env) return ENOSYS;
-  MDB_txn *txn = NULL;
-  int rc = mdb_txn_begin(domain->pins_env, NULL, 0, &txn);
+  if (!domain->pins_map) return ENOSYS;
+  int rc = dtlv_reader_pins_lock(domain);
   if (rc != 0) return rc;
-  uint8_t key_buf[16];
-  dtlv_pin_pack_key(reader_uuid, key_buf);
-  MDB_val key = {.mv_data = key_buf, .mv_size = sizeof(key_buf)};
-  rc = mdb_del(txn, domain->pins_dbi, &key, NULL);
-  if (rc == MDB_NOTFOUND) rc = 0;
-  if (rc == 0) rc = mdb_txn_commit(txn);
-  else mdb_txn_abort(txn);
-  return rc;
+  int found = 0;
+  for (size_t i = 0; i < domain->pins_slot_count; ++i) {
+    uint8_t *slot = dtlv_pin_slot_ptr(domain, i);
+    if (!slot) break;
+    dtlv_reader_pin_record rec;
+    int decode = dtlv_pin_unpack_record(slot, &rec);
+    if (decode == ENOENT) continue;
+    if (decode != 0) {
+      memset(slot, 0, DTLV_READER_PIN_RECORD_SIZE);
+      continue;
+    }
+    if (rec.reader_uuid.hi == reader_uuid->hi && rec.reader_uuid.lo == reader_uuid->lo) {
+      memset(slot, 0, DTLV_READER_PIN_RECORD_SIZE);
+      found = 1;
+      break;
+    }
+  }
+  dtlv_reader_pins_unlock(domain);
+  (void)found;
+  return 0;
 }
 
 static int dtlv_hex_value(char c, uint8_t *out) {
