@@ -159,7 +159,7 @@ static int dtlv_win32_open_file(const char *path, HANDLE *handle) {
   HANDLE h = CreateFileW(
       utf16, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
       NULL, CREATE_NEW,
-      FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN | FILE_FLAG_WRITE_THROUGH,
+      FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
       NULL);
   free(utf16);
   if (h == INVALID_HANDLE_VALUE) return dtlv_win32_last_error();
@@ -402,9 +402,6 @@ int dtlv_usearch_wal_open(const char *domain_root,
 #ifdef O_CLOEXEC
   flags |= O_CLOEXEC;
 #endif
-#ifdef O_DSYNC
-  flags |= O_DSYNC;
-#endif
   ctx->fd = open(ctx->path_open, flags, 0640);
   if (ctx->fd < 0) {
     rc = errno;
@@ -453,13 +450,7 @@ int dtlv_usearch_wal_append(dtlv_usearch_wal_ctx *ctx,
 int dtlv_usearch_wal_seal(dtlv_usearch_wal_ctx *ctx) {
   if (!ctx) return EINVAL;
   if (ctx->state != DTLV_ULOG_STATE_WRITING) return EBUSY;
-#ifndef _WIN32
-  int rc = dtlv_fdatasync_fd(ctx->fd);
-#else
-  int rc = dtlv_fdatasync_handle(ctx->handle);
-#endif
-  if (rc != 0) return rc;
-  rc = dtlv_write_header(ctx, DTLV_ULOG_STATE_SEALED);
+  int rc = dtlv_write_header(ctx, DTLV_ULOG_STATE_SEALED);
   if (rc != 0) return rc;
 #ifndef _WIN32
   rc = dtlv_fdatasync_fd(ctx->fd);

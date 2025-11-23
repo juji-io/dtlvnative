@@ -111,6 +111,10 @@ int dtlv_usearch_inspect_domain(dtlv_usearch_domain *domain,
                                 MDB_txn *txn,
                                 dtlv_usearch_format_info *info);
 
+int dtlv_usearch_set_checkpoint_chunk_batch(dtlv_usearch_domain *domain, uint32_t batch);
+
+int dtlv_usearch_get_checkpoint_chunk_batch(dtlv_usearch_domain *domain, uint32_t *batch_out);
+
 #ifdef __cplusplus
 }
 #endif

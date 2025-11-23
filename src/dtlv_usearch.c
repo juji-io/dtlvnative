@@ -48,6 +48,7 @@
 #define DTLV_META_KEY_SEALED_LOG_SEQ "sealed_log_seq"
 #define DTLV_META_KEY_SNAPSHOT_RETENTION_COUNT "snapshot_retention_count"
 #define DTLV_META_KEY_SNAPSHOT_RETAINED_FLOOR "snapshot_retained_floor"
+#define DTLV_META_KEY_CHECKPOINT_CHUNK_BATCH "checkpoint_chunk_batch"
 #define DTLV_INIT_RECORD_VERSION 1u
 #define DTLV_INIT_RECORD_SIZE 44u
 #define DTLV_CHECKPOINT_RECORD_SIZE 32u
@@ -61,6 +62,7 @@
 #define DTLV_USEARCH_MAGIC "usearch"
 #define DTLV_USEARCH_MAGIC_LEN 7u
 #define DTLV_USEARCH_HEADER_BYTES 64u
+#define DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH 8u
 
 #ifdef _WIN32
 static void dtlv_fix_windows_path(char *path);
@@ -150,6 +152,7 @@ struct dtlv_usearch_domain {
   uint32_t pin_ttl_ms;
   uint32_t pin_heartbeat_ms;
   uint32_t chunk_bytes;
+  uint32_t checkpoint_chunk_batch;
   uint32_t snapshot_retention_count;
   struct dtlv_usearch_handle *handles_head;
 };
@@ -218,6 +221,7 @@ typedef struct {
 static int dtlv_decode_delta(const MDB_val *val, dtlv_delta_entry_view *entry);
 int dtlv_usearch_checkpoint_recover(dtlv_usearch_domain *domain);
 static int dtlv_usearch_wal_recover(dtlv_usearch_domain *domain);
+static int dtlv_meta_put_u32(MDB_txn *txn, MDB_dbi dbi, const char *key, uint32_t value);
 
 static int64_t dtlv_now_ms(void) {
 #ifdef _WIN32
@@ -1472,6 +1476,19 @@ int dtlv_usearch_domain_open(MDB_env *env,
                                       &chunk_bytes);
   if (chunk_bytes == 0) chunk_bytes = DTLV_USEARCH_DEFAULT_CHUNK_BYTES;
   if (rc == 0) rc = dtlv_meta_put_u32(txn, domain->meta_dbi, DTLV_META_KEY_CHUNK_BYTES, chunk_bytes);
+  uint32_t checkpoint_chunk_batch = DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
+  if (rc == 0) rc = dtlv_meta_get_u32(txn,
+                                      domain->meta_dbi,
+                                      DTLV_META_KEY_CHECKPOINT_CHUNK_BATCH,
+                                      DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH,
+                                      &checkpoint_chunk_batch);
+  if (checkpoint_chunk_batch == 0) checkpoint_chunk_batch = DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
+  if (rc == 0) {
+    rc = dtlv_meta_put_u32(txn,
+                           domain->meta_dbi,
+                           DTLV_META_KEY_CHECKPOINT_CHUNK_BATCH,
+                           checkpoint_chunk_batch);
+  }
   uint32_t retention_count = DTLV_USEARCH_DEFAULT_SNAPSHOT_RETENTION;
   if (rc == 0) rc = dtlv_meta_get_u32(txn,
                                       domain->meta_dbi,
@@ -1494,6 +1511,7 @@ int dtlv_usearch_domain_open(MDB_env *env,
     return rc;
   }
   domain->chunk_bytes = chunk_bytes;
+  domain->checkpoint_chunk_batch = checkpoint_chunk_batch;
   domain->snapshot_retention_count = retention_count;
   rc = dtlv_usearch_checkpoint_recover(domain);
   if (rc != 0) {
@@ -2031,34 +2049,40 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
   size_t chunk_limit = domain->chunk_bytes ? domain->chunk_bytes : DTLV_USEARCH_DEFAULT_CHUNK_BYTES;
   size_t chunks_written = 0;
   size_t offset = 0;
+  size_t batch_limit = domain->checkpoint_chunk_batch ? (size_t)domain->checkpoint_chunk_batch
+                                                      : (size_t)DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
+  if (batch_limit == 0) batch_limit = DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
   while (offset < serialized_len) {
-    size_t remaining = serialized_len - offset;
-    size_t chunk_len = remaining < chunk_limit ? remaining : chunk_limit;
-    if (chunks_written >= UINT32_MAX) {
-      rc = EOVERFLOW;
-      break;
-    }
     txn = NULL;
     rc = mdb_txn_begin(domain->env, NULL, 0, &txn);
     if (rc != 0) break;
-    rc = dtlv_snapshot_store_chunk(domain,
-                                   txn,
-                                   snapshot_seq,
-                                   (uint32_t)chunks_written,
-                                   snapshot + offset,
-                                   chunk_len);
+    size_t batch_written = 0;
+    while (offset < serialized_len && batch_written < batch_limit) {
+      size_t remaining = serialized_len - offset;
+      size_t chunk_len = remaining < chunk_limit ? remaining : chunk_limit;
+      if (chunks_written >= UINT32_MAX) {
+        rc = EOVERFLOW;
+        break;
+      }
+      rc = dtlv_snapshot_store_chunk(domain,
+                                     txn,
+                                     snapshot_seq,
+                                     (uint32_t)chunks_written,
+                                     snapshot + offset,
+                                     chunk_len);
+      if (rc != 0) break;
+      offset += chunk_len;
+      chunks_written++;
+      batch_written++;
+    }
     if (rc == 0) {
       pending.stage = (uint8_t)DTLV_CHECKPOINT_STAGE_WRITING;
-      pending.chunk_cursor = (uint32_t)(chunks_written + 1);
+      pending.chunk_cursor = (uint32_t)chunks_written;
       rc = dtlv_meta_put_checkpoint_pending(txn, domain->meta_dbi, &pending);
     }
     if (rc == 0) rc = mdb_txn_commit(txn);
-    else {
-      if (txn) mdb_txn_abort(txn);
-    }
+    else if (txn) mdb_txn_abort(txn);
     if (rc != 0) break;
-    offset += chunk_len;
-    chunks_written++;
   }
   if (rc == 0 && serialized_len == 0) {
     txn = NULL;
@@ -2587,5 +2611,36 @@ int dtlv_usearch_inspect_domain(dtlv_usearch_domain *domain,
   info->connectivity = dtlv_size_to_u32(opts.connectivity);
   info->multi = opts.multi ? true : false;
   memset(info->reserved, 0, sizeof(info->reserved));
+  return 0;
+}
+
+int dtlv_usearch_set_checkpoint_chunk_batch(dtlv_usearch_domain *domain, uint32_t batch) {
+  if (!domain || !domain->env) return EINVAL;
+  if (batch == 0) batch = DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
+  MDB_txn *txn = NULL;
+  int rc = mdb_txn_begin(domain->env, NULL, 0, &txn);
+  if (rc != 0) return rc;
+  rc = dtlv_meta_put_u32(txn, domain->meta_dbi, DTLV_META_KEY_CHECKPOINT_CHUNK_BATCH, batch);
+  if (rc == 0) rc = mdb_txn_commit(txn);
+  else if (txn) mdb_txn_abort(txn);
+  if (rc == 0) domain->checkpoint_chunk_batch = batch;
+  return rc;
+}
+
+int dtlv_usearch_get_checkpoint_chunk_batch(dtlv_usearch_domain *domain, uint32_t *batch_out) {
+  if (!domain || !batch_out || !domain->env) return EINVAL;
+  MDB_txn *txn = NULL;
+  int rc = mdb_txn_begin(domain->env, NULL, MDB_RDONLY, &txn);
+  if (rc != 0) return rc;
+  uint32_t batch = DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
+  rc = dtlv_meta_get_u32(txn,
+                         domain->meta_dbi,
+                         DTLV_META_KEY_CHECKPOINT_CHUNK_BATCH,
+                         DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH,
+                         &batch);
+  mdb_txn_abort(txn);
+  if (rc != 0) return rc;
+  if (batch == 0) batch = DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
+  *batch_out = batch;
   return 0;
 }
