@@ -2401,7 +2401,16 @@ int dtlv_usearch_publish_log(dtlv_usearch_txn_ctx *ctx, int unlink_after_publish
     }
 #endif
   }
-  return dtlv_usearch_replay_wal_file(ctx->domain, path, token, start, unlink_after_publish);
+  rc = dtlv_usearch_replay_wal_file(ctx->domain, path, token, start, unlink_after_publish);
+  if (rc == 0) {
+    /* Keep active handles in sync so later refreshes don't reapply the same deltas. */
+    dtlv_usearch_handle *handle = ctx->domain->handles_head;
+    while (handle) {
+      handle->log_seq = ctx->last_log_seq;
+      handle = handle->next;
+    }
+  }
+  return rc;
 }
 
 void dtlv_usearch_txn_ctx_abort(dtlv_usearch_txn_ctx *ctx) {
