@@ -1793,6 +1793,8 @@ public class Test {
             expect(DTLV.dtlv_usearch_apply_pending(txnCtx) == 0, "Failed to apply pending updates");
             expect(DTLV.mdb_txn_commit(txn) == 0, "Failed to commit update txn");
             expect(DTLV.dtlv_usearch_publish_log(txnCtx, 1) == 0, "Failed to publish log");
+        expect(DTLV.dtlv_usearch_compact(domain, 1) == 0,
+               "Failed to compact deltas");
             DTLV.dtlv_usearch_txn_ctx_close(txnCtx);
             payload.close();
             keyBytes.close();

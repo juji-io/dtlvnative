@@ -84,6 +84,8 @@ int dtlv_usearch_checkpoint_finalize(dtlv_usearch_domain *domain,
 
 int dtlv_usearch_checkpoint_recover(dtlv_usearch_domain *domain);
 
+int dtlv_usearch_compact(dtlv_usearch_domain *domain, uint64_t upto_seq);
+
 int dtlv_usearch_apply_pending(dtlv_usearch_txn_ctx *ctx);
 
 int dtlv_usearch_publish_log(dtlv_usearch_txn_ctx *ctx, int unlink_after_publish);

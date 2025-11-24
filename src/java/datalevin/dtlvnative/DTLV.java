@@ -4081,6 +4081,8 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
             @Cast("uint64_t") long prune_log_seq);
 
     public static native int dtlv_usearch_checkpoint_recover(dtlv_usearch_domain domain);
+    public static native int dtlv_usearch_compact(dtlv_usearch_domain domain, @Cast("uint64_t") long upto_seq);
+
 
     public static native int dtlv_usearch_set_checkpoint_chunk_batch(dtlv_usearch_domain domain,
             @Cast("uint32_t") long batch);

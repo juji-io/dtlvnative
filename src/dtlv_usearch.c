@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#ifndef EPROTONOSUPPORT
+#define EPROTONOSUPPORT ENOTSUP
+#endif
 
 #ifdef _WIN32
 #include <direct.h>
@@ -49,6 +52,8 @@
 #define DTLV_META_KEY_SNAPSHOT_RETENTION_COUNT "snapshot_retention_count"
 #define DTLV_META_KEY_SNAPSHOT_RETAINED_FLOOR "snapshot_retained_floor"
 #define DTLV_META_KEY_CHECKPOINT_CHUNK_BATCH "checkpoint_chunk_batch"
+#define DTLV_META_KEY_COMPACTION_PENDING "compaction_pending"
+#define DTLV_META_KEY_COMPACTION_APPLIED "compaction_applied"
 #define DTLV_INIT_RECORD_VERSION 1u
 #define DTLV_INIT_RECORD_SIZE 44u
 #define DTLV_CHECKPOINT_RECORD_SIZE 32u
@@ -63,6 +68,9 @@
 #define DTLV_USEARCH_MAGIC_LEN 7u
 #define DTLV_USEARCH_HEADER_BYTES 64u
 #define DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH 8u
+#define DTLV_USEARCH_INCOMPATIBLE 2001
+#define DTLV_COMPACTION_RECORD_VERSION 1u
+#define DTLV_COMPACTION_RECORD_SIZE 16u
 
 #ifdef _WIN32
 static void dtlv_fix_windows_path(char *path);
@@ -91,6 +99,12 @@ typedef struct {
   uint32_t chunk_len;
   uint32_t checksum;
 } dtlv_snapshot_chunk_header;
+
+typedef struct {
+  uint8_t version;
+  uint8_t reserved[7];
+  uint64_t upto_seq;
+} dtlv_compaction_record;
 
 typedef struct {
   uint8_t version;
@@ -222,6 +236,7 @@ static int dtlv_decode_delta(const MDB_val *val, dtlv_delta_entry_view *entry);
 int dtlv_usearch_checkpoint_recover(dtlv_usearch_domain *domain);
 static int dtlv_usearch_wal_recover(dtlv_usearch_domain *domain);
 static int dtlv_meta_put_u32(MDB_txn *txn, MDB_dbi dbi, const char *key, uint32_t value);
+static int dtlv_usearch_compaction_recover(dtlv_usearch_domain *domain);
 
 static int64_t dtlv_now_ms(void) {
 #ifdef _WIN32
@@ -1020,6 +1035,11 @@ static int dtlv_usearch_replay_wal_file(dtlv_usearch_domain *domain,
   }
   uint32_t frame_count = dtlv_from_be32(header.frame_count);
   if (start_ordinal <= 1) start_ordinal = 1;
+  if (header.state != (uint8_t)DTLV_ULOG_STATE_READY_FOR_PUBLISH &&
+      header.state != (uint8_t)DTLV_ULOG_STATE_SEALED) {
+    fclose(fp);
+    return EBUSY;
+  }
   dtlv_tracef("[wal] reader_header_size=%zu\n", sizeof(dtlv_ulog_header_v1));
   dtlv_tracef("[wal] replay path=%s start=%u frames=%u\n", path, (unsigned)start_ordinal, (unsigned)frame_count);
   MDB_txn *read_txn = NULL;
@@ -1322,6 +1342,27 @@ static int dtlv_unpack_checkpoint_pending(const MDB_val *val,
   return 0;
 }
 
+static void dtlv_pack_compaction_record(const dtlv_compaction_record *rec, uint8_t out[DTLV_COMPACTION_RECORD_SIZE]) {
+  if (!out) return;
+  memset(out, 0, DTLV_COMPACTION_RECORD_SIZE);
+  out[0] = rec ? rec->version : 0;
+  uint64_t upto = dtlv_to_be64(rec ? rec->upto_seq : 0);
+  memcpy(out + 8, &upto, sizeof(upto));
+}
+
+static int dtlv_unpack_compaction_record(const MDB_val *val, dtlv_compaction_record *rec) {
+  if (!val || !rec) return EINVAL;
+  if (val->mv_size != DTLV_COMPACTION_RECORD_SIZE) return MDB_CORRUPTED;
+  const uint8_t *src = (const uint8_t *)val->mv_data;
+  rec->version = src[0];
+  if (rec->version == 0) return ENOENT;
+  if (rec->version != DTLV_COMPACTION_RECORD_VERSION) return EINVAL;
+  uint64_t upto_be = 0;
+  memcpy(&upto_be, src + 8, sizeof(upto_be));
+  rec->upto_seq = dtlv_from_be64(upto_be);
+  return 0;
+}
+
 static int dtlv_meta_put_checkpoint_pending(MDB_txn *txn,
                                             MDB_dbi dbi,
                                             const dtlv_checkpoint_pending_record *pending) {
@@ -1329,6 +1370,13 @@ static int dtlv_meta_put_checkpoint_pending(MDB_txn *txn,
   uint8_t buf[DTLV_CHECKPOINT_RECORD_SIZE];
   dtlv_pack_checkpoint_pending(pending, buf);
   return dtlv_meta_put_bytes(txn, dbi, DTLV_META_KEY_CHECKPOINT_PENDING, buf, sizeof(buf));
+}
+
+static int dtlv_meta_put_compaction_pending(MDB_txn *txn, MDB_dbi dbi, const dtlv_compaction_record *rec) {
+  if (!txn || !rec) return EINVAL;
+  uint8_t buf[DTLV_COMPACTION_RECORD_SIZE];
+  dtlv_pack_compaction_record(rec, buf);
+  return dtlv_meta_put_bytes(txn, dbi, DTLV_META_KEY_COMPACTION_PENDING, buf, sizeof(buf));
 }
 
 static int dtlv_meta_get_checkpoint_pending(MDB_txn *txn,
@@ -1343,6 +1391,23 @@ static int dtlv_meta_get_checkpoint_pending(MDB_txn *txn,
   if (rc == MDB_NOTFOUND) return 0;
   if (rc != 0) return rc;
   rc = dtlv_unpack_checkpoint_pending(&val, pending);
+  if (rc != 0) return rc;
+  if (found) *found = 1;
+  return 0;
+}
+
+static int dtlv_meta_get_compaction_pending(MDB_txn *txn,
+                                            MDB_dbi dbi,
+                                            dtlv_compaction_record *rec,
+                                            int *found) {
+  if (found) *found = 0;
+  if (!txn || !rec) return EINVAL;
+  MDB_val key = dtlv_meta_key(DTLV_META_KEY_COMPACTION_PENDING);
+  MDB_val val;
+  int rc = mdb_get(txn, dbi, &key, &val);
+  if (rc == MDB_NOTFOUND) return 0;
+  if (rc != 0) return rc;
+  rc = dtlv_unpack_compaction_record(&val, rec);
   if (rc != 0) return rc;
   if (found) *found = 1;
   return 0;
@@ -1467,6 +1532,38 @@ int dtlv_usearch_domain_open(MDB_env *env,
   rc = mdb_dbi_open(txn, domain->meta_name, MDB_CREATE, &domain->meta_dbi);
   if (rc == 0) rc = mdb_dbi_open(txn, domain->delta_name, MDB_CREATE, &domain->delta_dbi);
   if (rc == 0) rc = mdb_dbi_open(txn, domain->snapshot_name, MDB_CREATE, &domain->snapshot_dbi);
+  int schema_found = 0;
+  uint64_t schema_version = DTLV_USEARCH_SCHEMA_VERSION;
+  if (rc == 0) {
+    MDB_val schema_key = dtlv_meta_key(DTLV_META_KEY_SCHEMA_VERSION);
+    MDB_val schema_val;
+    int get_rc = mdb_get(txn, domain->meta_dbi, &schema_key, &schema_val);
+    if (get_rc == 0) {
+      schema_found = 1;
+      if (schema_val.mv_size != sizeof(uint64_t)) rc = MDB_CORRUPTED;
+      else {
+        uint64_t be;
+        memcpy(&be, schema_val.mv_data, sizeof(be));
+        schema_version = dtlv_from_be64(be);
+      }
+    } else if (get_rc != MDB_NOTFOUND) {
+      rc = get_rc;
+    }
+  }
+  if (rc == 0 && schema_found) {
+    if (schema_version > DTLV_USEARCH_SCHEMA_VERSION) {
+      mdb_txn_abort(txn);
+      dtlv_reader_pins_close(domain);
+      free(domain);
+      return EPROTONOSUPPORT;
+    }
+    if (schema_version < DTLV_USEARCH_SCHEMA_VERSION) {
+      mdb_txn_abort(txn);
+      dtlv_reader_pins_close(domain);
+      free(domain);
+      return DTLV_USEARCH_INCOMPATIBLE;
+    }
+  }
   if (rc == 0) rc = dtlv_ensure_defaults(txn, domain->meta_dbi);
   uint32_t chunk_bytes = DTLV_USEARCH_DEFAULT_CHUNK_BYTES;
   if (rc == 0) rc = dtlv_meta_get_u32(txn,
@@ -1518,6 +1615,11 @@ int dtlv_usearch_domain_open(MDB_env *env,
     dtlv_usearch_domain_close(domain);
     return rc;
   }
+  rc = dtlv_usearch_compaction_recover(domain);
+  if (rc != 0) {
+    dtlv_usearch_domain_close(domain);
+    return rc;
+  }
   rc = dtlv_usearch_wal_recover(domain);
   if (rc != 0) {
     dtlv_usearch_domain_close(domain);
@@ -1556,9 +1658,13 @@ int dtlv_usearch_activate(dtlv_usearch_domain *domain, dtlv_usearch_handle **han
     mdb_txn_abort(txn);
     return rc;
   }
-  if (schema_version != DTLV_USEARCH_SCHEMA_VERSION) {
+  if (schema_version > DTLV_USEARCH_SCHEMA_VERSION) {
     mdb_txn_abort(txn);
-    return EINVAL;
+    return EPROTONOSUPPORT;
+  }
+  if (schema_version < DTLV_USEARCH_SCHEMA_VERSION) {
+    mdb_txn_abort(txn);
+    return DTLV_USEARCH_INCOMPATIBLE;
   }
   usearch_init_options_t init_opts;
   int init_found = 0;
@@ -2103,6 +2209,7 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
   if (rc != 0 && rc != MDB_MAP_FULL && checkpoint_started) {
     MDB_txn *cleanup_txn = NULL;
     if (mdb_txn_begin(domain->env, NULL, 0, &cleanup_txn) == 0) {
+      dtlv_snapshot_delete_chunks_from(domain, cleanup_txn, pending.snapshot_seq, pending.chunk_cursor);
       dtlv_meta_delete(cleanup_txn, domain->meta_dbi, DTLV_META_KEY_CHECKPOINT_PENDING);
       mdb_txn_commit(cleanup_txn);
     }
@@ -2203,7 +2310,7 @@ int dtlv_usearch_checkpoint_recover(dtlv_usearch_domain *domain) {
       MDB_txn *cleanup_txn = NULL;
       rc = mdb_txn_begin(domain->env, NULL, 0, &cleanup_txn);
       if (rc != 0) return rc;
-      rc = dtlv_snapshot_delete_chunks_from(domain, cleanup_txn, pending.snapshot_seq, 0);
+      rc = dtlv_snapshot_delete_chunks_from(domain, cleanup_txn, pending.snapshot_seq, pending.chunk_cursor);
       if (rc == 0) rc = dtlv_meta_delete(cleanup_txn, domain->meta_dbi, DTLV_META_KEY_CHECKPOINT_PENDING);
       if (rc == 0) rc = mdb_txn_commit(cleanup_txn);
       else if (cleanup_txn) mdb_txn_abort(cleanup_txn);
@@ -2221,6 +2328,77 @@ int dtlv_usearch_checkpoint_recover(dtlv_usearch_domain *domain) {
       return rc;
     }
   }
+}
+
+static int dtlv_usearch_compaction_apply(dtlv_usearch_domain *domain, uint64_t upto_seq) {
+  if (!domain || !domain->env) return EINVAL;
+  MDB_txn *txn = NULL;
+  int rc = mdb_txn_begin(domain->env, NULL, 0, &txn);
+  if (rc != 0) return rc;
+  uint64_t existing_tail = 0;
+  rc = dtlv_meta_get_u64(txn, domain->meta_dbi, DTLV_META_KEY_LOG_TAIL_SEQ, 0, &existing_tail);
+  if (rc != 0) {
+    mdb_txn_abort(txn);
+    return rc;
+  }
+  rc = dtlv_delta_delete_upto(domain, txn, upto_seq);
+  uint64_t new_tail = existing_tail;
+  if (rc == 0 && upto_seq > new_tail) new_tail = upto_seq;
+  if (rc == 0) rc = dtlv_meta_put_u64(txn, domain->meta_dbi, DTLV_META_KEY_LOG_TAIL_SEQ, new_tail);
+  if (rc == 0) rc = dtlv_meta_put_u64(txn, domain->meta_dbi, DTLV_META_KEY_COMPACTION_APPLIED, new_tail);
+  if (rc == 0) rc = dtlv_meta_delete(txn, domain->meta_dbi, DTLV_META_KEY_COMPACTION_PENDING);
+  if (rc == 0) rc = mdb_txn_commit(txn);
+  else if (txn) mdb_txn_abort(txn);
+  return rc;
+}
+
+int dtlv_usearch_compact(dtlv_usearch_domain *domain, uint64_t upto_seq) {
+  if (!domain || !domain->env) return EINVAL;
+  MDB_txn *txn = NULL;
+  dtlv_compaction_record pending;
+  int found = 0;
+  int rc = mdb_txn_begin(domain->env, NULL, MDB_RDONLY, &txn);
+  if (rc != 0) return rc;
+  rc = dtlv_meta_get_compaction_pending(txn, domain->meta_dbi, &pending, &found);
+  mdb_txn_abort(txn);
+  if (rc != 0) return rc;
+  if (found && pending.version != 0) return EBUSY;
+  uint64_t log_seq = 0;
+  rc = mdb_txn_begin(domain->env, NULL, MDB_RDONLY, &txn);
+  if (rc != 0) return rc;
+  rc = dtlv_meta_get_u64(txn, domain->meta_dbi, DTLV_META_KEY_LOG_SEQ, 0, &log_seq);
+  mdb_txn_abort(txn);
+  if (rc != 0) return rc;
+  if (upto_seq > log_seq) return EINVAL;
+  memset(&pending, 0, sizeof(pending));
+  pending.version = (uint8_t)DTLV_COMPACTION_RECORD_VERSION;
+  pending.upto_seq = upto_seq;
+  rc = mdb_txn_begin(domain->env, NULL, 0, &txn);
+  if (rc == 0) rc = dtlv_meta_put_compaction_pending(txn, domain->meta_dbi, &pending);
+  if (rc == 0) rc = mdb_txn_commit(txn);
+  else if (txn) mdb_txn_abort(txn);
+  if (rc != 0) return rc;
+  return dtlv_usearch_compaction_apply(domain, upto_seq);
+}
+
+static int dtlv_usearch_compaction_recover(dtlv_usearch_domain *domain) {
+  if (!domain || !domain->env) return EINVAL;
+  dtlv_compaction_record pending;
+  int found = 0;
+  MDB_txn *txn = NULL;
+  int rc = mdb_txn_begin(domain->env, NULL, MDB_RDONLY, &txn);
+  if (rc != 0) return rc;
+  rc = dtlv_meta_get_compaction_pending(txn, domain->meta_dbi, &pending, &found);
+  mdb_txn_abort(txn);
+  if (rc != 0 || !found) return rc;
+  uint64_t log_seq = 0;
+  rc = mdb_txn_begin(domain->env, NULL, MDB_RDONLY, &txn);
+  if (rc != 0) return rc;
+  rc = dtlv_meta_get_u64(txn, domain->meta_dbi, DTLV_META_KEY_LOG_SEQ, 0, &log_seq);
+  mdb_txn_abort(txn);
+  if (rc != 0) return rc;
+  if (pending.upto_seq > log_seq) return EINVAL;
+  return dtlv_usearch_compaction_apply(domain, pending.upto_seq);
 }
 
 
@@ -2264,16 +2442,6 @@ static int dtlv_encode_delta_payload(const dtlv_usearch_txn_ctx *ctx,
   *out_buf = buffer;
   *out_len = header_len + update->key_len + payload_len;
   return 0;
-}
-
-static int dtlv_append_delta(dtlv_usearch_txn_ctx *ctx,
-                             uint64_t log_seq,
-                             const uint8_t *payload,
-                             size_t payload_len) {
-  uint64_t key_be = dtlv_to_be64(log_seq);
-  MDB_val key = {.mv_size = sizeof(key_be), .mv_data = &key_be};
-  MDB_val val = {.mv_size = payload_len, .mv_data = (void *)payload};
-  return mdb_put(ctx->txn, ctx->domain->delta_dbi, &key, &val, 0);
 }
 
 static dtlv_usearch_txn_ctx *dtlv_usearch_txn_ctx_new(dtlv_usearch_domain *domain,
@@ -2333,32 +2501,115 @@ int dtlv_usearch_stage_update(dtlv_usearch_domain *domain,
     free(delta_buf);
     return rc;
   }
-  ctx->last_log_seq = ctx->log_seq_head + 1;
-  rc = dtlv_append_delta(ctx, ctx->last_log_seq, delta_buf, delta_len);
-  if (rc != 0) {
-    free(delta_buf);
-    return rc;
-  }
-  rc = dtlv_meta_put_u64(txn, domain->meta_dbi, DTLV_META_KEY_LOG_SEQ, ctx->last_log_seq);
-  if (rc != 0) {
-    free(delta_buf);
-    return rc;
-  }
   rc = dtlv_usearch_wal_append(ctx->wal, delta_buf, delta_len);
   free(delta_buf);
   if (rc != 0) return rc;
   ctx->frames_appended = ordinal;
-  ctx->log_seq_head = ctx->last_log_seq;
+  ctx->last_log_seq = ctx->log_seq_head + ordinal;
   return 0;
 }
 
 int dtlv_usearch_apply_pending(dtlv_usearch_txn_ctx *ctx) {
-  if (!ctx || !ctx->wal) return EINVAL;
+  if (!ctx || !ctx->wal || !ctx->txn) return EINVAL;
   if (ctx->frames_appended == 0) return EINVAL;
   int rc = dtlv_usearch_wal_seal(ctx->wal);
   if (rc != 0) return rc;
+  const char *sealed_path = dtlv_usearch_wal_sealed_path(ctx->wal);
+  if (!sealed_path) return EINVAL;
   const dtlv_uuid128 *token = dtlv_usearch_wal_token(ctx->wal);
   if (!token) return EINVAL;
+  FILE *fp = fopen(sealed_path, "rb");
+  if (!fp) return errno ? errno : EIO;
+  dtlv_ulog_header_v1 header;
+  size_t read_bytes = fread(&header, 1, sizeof(header), fp);
+  if (read_bytes != sizeof(header)) {
+    fclose(fp);
+    return EIO;
+  }
+  if (memcmp(header.magic, DTLV_ULOG_MAGIC, sizeof(header.magic)) != 0) {
+    fclose(fp);
+    return EINVAL;
+  }
+  if (header.version != DTLV_ULOG_VERSION) {
+    fclose(fp);
+    return EINVAL;
+  }
+  uint16_t header_len = dtlv_from_be16(header.header_len);
+  if (header_len != sizeof(header)) {
+    fclose(fp);
+    return MDB_CORRUPTED;
+  }
+  if (header.state != (uint8_t)DTLV_ULOG_STATE_SEALED &&
+      header.state != (uint8_t)DTLV_ULOG_STATE_READY_FOR_PUBLISH) {
+    fclose(fp);
+    return EBUSY;
+  }
+  uint32_t stored_checksum = dtlv_from_be32(header.checksum);
+  size_t checksum_offset = offsetof(dtlv_ulog_header_v1, header_len);
+  size_t checksum_len = sizeof(header) - checksum_offset - sizeof(uint32_t);
+  uint32_t computed_checksum = dtlv_crc32c(((const uint8_t *)&header) + checksum_offset, checksum_len);
+  if (computed_checksum != stored_checksum) {
+    fclose(fp);
+    return EIO;
+  }
+  uint32_t frame_count = dtlv_from_be32(header.frame_count);
+  if (frame_count != ctx->frames_appended) {
+    fclose(fp);
+    return EIO;
+  }
+  uint64_t next_log_seq = ctx->log_seq_head;
+  for (uint32_t ordinal = 1; ordinal <= frame_count; ++ordinal) {
+    dtlv_ulog_frame_prefix_v1 prefix;
+    read_bytes = fread(&prefix, 1, sizeof(prefix), fp);
+    if (read_bytes != sizeof(prefix)) {
+      rc = EIO;
+      break;
+    }
+    uint32_t frame_ordinal = dtlv_from_be32(prefix.ordinal);
+    uint32_t delta_bytes = dtlv_from_be32(prefix.delta_bytes);
+    uint32_t crc_be = dtlv_from_be32(prefix.checksum);
+    if (frame_ordinal != ordinal || delta_bytes == 0) {
+      rc = MDB_CORRUPTED;
+      break;
+    }
+    uint8_t *payload = (uint8_t *)malloc(delta_bytes);
+    if (!payload) {
+      rc = ENOMEM;
+      break;
+    }
+    size_t payload_read = fread(payload, 1, delta_bytes, fp);
+    if (payload_read != delta_bytes) {
+      free(payload);
+      rc = EIO;
+      break;
+    }
+    uint32_t payload_crc = dtlv_crc32c(payload, delta_bytes);
+    if (payload_crc != crc_be) {
+      free(payload);
+      rc = EIO;
+      break;
+    }
+    MDB_val val = {.mv_size = delta_bytes, .mv_data = payload};
+    dtlv_delta_entry_view decoded;
+    rc = dtlv_decode_delta(&val, &decoded);
+    if (rc == 0) {
+      uint64_t log_seq = next_log_seq + 1;
+      uint64_t key_be = dtlv_to_be64(log_seq);
+      MDB_val key = {.mv_size = sizeof(key_be), .mv_data = &key_be};
+      rc = mdb_put(ctx->txn, ctx->domain->delta_dbi, &key, &val, 0);
+      if (rc == 0) {
+        ctx->last_log_seq = log_seq;
+        next_log_seq = log_seq;
+      }
+    }
+    free(payload);
+    if (rc != 0) break;
+  }
+  int close_err = fclose(fp);
+  if (rc == 0 && close_err != 0) rc = errno ? errno : EIO;
+  if (rc != 0) return rc;
+  rc = dtlv_meta_put_u64(ctx->txn, ctx->domain->meta_dbi, DTLV_META_KEY_LOG_SEQ, ctx->last_log_seq);
+  if (rc != 0) return rc;
   struct {
     uint64_t token_hi;
     uint64_t token_lo;
@@ -2613,6 +2864,8 @@ int dtlv_usearch_inspect_domain(dtlv_usearch_domain *domain,
                          &schema_u64);
   if (owned_txn) mdb_txn_abort(local_txn);
   if (rc != 0) return rc;
+  if (schema_u64 > DTLV_USEARCH_SCHEMA_VERSION) return EPROTONOSUPPORT;
+  if (schema_u64 < DTLV_USEARCH_SCHEMA_VERSION) return DTLV_USEARCH_INCOMPATIBLE;
   info->schema_version = schema_u64 > UINT32_MAX ? UINT32_MAX : (uint32_t)schema_u64;
   info->metric_kind = opts.metric_kind;
   info->scalar_kind = opts.quantization;
