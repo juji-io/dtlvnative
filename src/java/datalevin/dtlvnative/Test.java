@@ -865,6 +865,12 @@ public class Test {
             final long unlimitedBudget = 1_000_000L;
             final long budgetStep = 1L;
 
+            LongPointer keyCount = new LongPointer(1);
+            result = DTLV.mdb_range_count_keys(rtxn, dbi.get(), null, null, 0, keyCount);
+            expect(result == 0, "Key range count (full) failed");
+            expect(keyCount.get() == orderedKeys.size(),
+                   "Key range count (full) returned unexpected total");
+
             long[] baseSample = { 0L, 2L, 4L };
             SizeTPointer indices = toSizeTPointer(baseSample);
             List<String> fullRankSamples = new ArrayList<>();
@@ -931,6 +937,13 @@ public class Test {
             fillValWithString(startKey, "bravo", allocations);
             DTLV.MDB_val endKey = new DTLV.MDB_val();
             fillValWithString(endKey, "delta", allocations);
+
+            LongPointer boundedKeyCount = new LongPointer(1);
+            int inclusiveFlags = DTLV.MDB_COUNT_LOWER_INCL | DTLV.MDB_COUNT_UPPER_INCL;
+            result = DTLV.mdb_range_count_keys(rtxn, dbi.get(), startKey, endKey, inclusiveFlags, boundedKeyCount);
+            expect(result == 0, "Key range count (bounded) failed");
+            expect(boundedKeyCount.get() == 3,
+                   "Key range count (bounded) returned unexpected total");
 
             DTLV.dtlv_key_rank_sample_iter boundedIter =
                 new DTLV.dtlv_key_rank_sample_iter();
