@@ -151,6 +151,7 @@ public class Test {
         testLMDBCountedPrefix();
         testRankSampleIterator();
         testKeyRankSampleIterator();
+        testKeyRankSampleIteratorDupsort();
         testListValIteratorBounds();
 
         System.out.println("Passed LMDB tests.");
@@ -987,6 +988,192 @@ public class Test {
             bounded.close();
 
             System.out.println("Passed key rank sample iterator test.");
+        } finally {
+            if (cursorOpened)
+                DTLV.mdb_cursor_close(cursor);
+            if (readTxnActive)
+                DTLV.mdb_txn_abort(rtxn);
+            if (writeTxnActive)
+                DTLV.mdb_txn_abort(txn);
+            dbi.close();
+            for (BytePointer ptr : allocations)
+                ptr.close();
+            if (envCreated)
+                DTLV.mdb_env_close(env);
+            deleteDirectoryFiles(dir);
+        }
+    }
+
+    static void testKeyRankSampleIteratorDupsort() {
+
+        System.err.println("Testing key rank sample iterator on dupsort ...");
+
+        String dir = "db-key-rank-sample-dups";
+        List<BytePointer> allocations = new ArrayList<>();
+
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.MDB_txn txn = new DTLV.MDB_txn();
+        DTLV.MDB_txn rtxn = new DTLV.MDB_txn();
+        DTLV.MDB_cursor cursor = new DTLV.MDB_cursor();
+        IntPointer dbi = new IntPointer(1);
+
+        boolean envCreated = false;
+        boolean writeTxnActive = false;
+        boolean readTxnActive = false;
+        boolean cursorOpened = false;
+
+        try {
+            int result = DTLV.mdb_env_create(env);
+            if (result != 0) {
+                System.err.println("Failed to create dupsort key rank env: " + result);
+                return;
+            }
+            envCreated = true;
+
+            result = DTLV.mdb_env_set_maxdbs(env, 5);
+            if (result != 0) {
+                System.err.println("Failed to set max dbs for dupsort key rank env: " + result);
+                return;
+            }
+
+            try {
+                Files.createDirectories(Paths.get(dir));
+            } catch (IOException e) {
+                System.err.println("Failed to create directory: " + dir);
+                e.printStackTrace();
+                return;
+            }
+
+            int envFlags = DTLV.MDB_NOLOCK;
+            result = DTLV.mdb_env_open(env, dir, envFlags, 0664);
+            if (result != 0) {
+                System.err.println("Failed to open dupsort key rank env: " + result);
+                return;
+            }
+
+            result = DTLV.mdb_txn_begin(env, null, 0, txn);
+            if (result != 0) {
+                System.err.println("Failed to begin dupsort key rank write txn: " + result);
+                return;
+            }
+            writeTxnActive = true;
+
+            int flags = DTLV.MDB_CREATE | DTLV.MDB_COUNTED | DTLV.MDB_DUPSORT;
+            result = DTLV.mdb_dbi_open(txn, "key_rank_sample_dups", flags, dbi);
+            if (result != 0) {
+                System.err.println("Failed to open dupsort key rank dbi: " + result);
+                return;
+            }
+
+            String[][] dataset = {
+                { "alpha", "a1" },
+                { "alpha", "a2" },
+                { "bravo", "b1" },
+                { "bravo", "b2" },
+                { "bravo", "b3" },
+                { "charlie", "c1" }
+            };
+
+            for (String[] pair : dataset) {
+                DTLV.MDB_val kval = new DTLV.MDB_val();
+                fillValWithString(kval, pair[0], allocations);
+                DTLV.MDB_val vval = new DTLV.MDB_val();
+                fillValWithString(vval, pair[1], allocations);
+                result = DTLV.mdb_put(txn, dbi.get(), kval, vval, 0);
+                if (result != 0) {
+                    System.err.println("Failed to put dupsort key rank kv: " + result);
+                    return;
+                }
+            }
+
+            result = DTLV.mdb_txn_commit(txn);
+            if (result != 0) {
+                System.err.println("Failed to commit dupsort key rank data: " + result);
+                return;
+            }
+            writeTxnActive = false;
+
+            result = DTLV.mdb_txn_begin(env, null, DTLV.MDB_RDONLY, rtxn);
+            if (result != 0) {
+                System.err.println("Failed to begin dupsort key rank read txn: " + result);
+                return;
+            }
+            readTxnActive = true;
+
+            result = DTLV.mdb_cursor_open(rtxn, dbi.get(), cursor);
+            if (result != 0) {
+                System.err.println("Failed to open dupsort key rank cursor: " + result);
+                return;
+            }
+            cursorOpened = true;
+
+            DTLV.MDB_val keyHolder = new DTLV.MDB_val();
+            DTLV.MDB_val valHolder = new DTLV.MDB_val();
+
+            long[] fullSample = { 0L, 3L, 5L };
+            String[] expectedFullKeys = { "alpha", "bravo", "charlie" };
+            String[] expectedFullVals = { "a1", "b2", "c1" };
+            SizeTPointer fullIndices = toSizeTPointer(fullSample);
+
+            DTLV.dtlv_key_rank_sample_iter iter =
+                new DTLV.dtlv_key_rank_sample_iter();
+            result = DTLV.dtlv_key_rank_sample_iter_create(
+                iter, fullIndices, fullSample.length,
+                cursor, keyHolder, valHolder,
+                null, null);
+            if (result != 0) {
+                System.err.println("Failed to create dupsort full-range key rank iterator: " + result);
+                fullIndices.close();
+                return;
+            }
+            for (int i = 0; i < fullSample.length; i++) {
+                int hasNext = DTLV.dtlv_key_rank_sample_iter_has_next(iter);
+                expect(hasNext == DTLV.DTLV_TRUE, "Dupsort key rank iterator missing expected sample");
+                String actualKey = mdbValToString(keyHolder);
+                String actualVal = mdbValToString(valHolder);
+                expect(actualKey.equals(expectedFullKeys[i]),
+                       "Dupsort key rank iterator produced unexpected key");
+                expect(actualVal.equals(expectedFullVals[i]),
+                       "Dupsort key rank iterator produced unexpected value");
+            }
+            expect(DTLV.dtlv_key_rank_sample_iter_has_next(iter) == DTLV.DTLV_FALSE,
+                   "Dupsort key rank iterator should be exhausted");
+            DTLV.dtlv_key_rank_sample_iter_destroy(iter);
+            fullIndices.close();
+
+            long[] bravoSample = { 0L, 2L };
+            String[] expectedBravoVals = { "b1", "b3" };
+            SizeTPointer bravoIndices = toSizeTPointer(bravoSample);
+            DTLV.MDB_val bravoKey = new DTLV.MDB_val();
+            fillValWithString(bravoKey, "bravo", allocations);
+
+            DTLV.dtlv_key_rank_sample_iter bravoIter =
+                new DTLV.dtlv_key_rank_sample_iter();
+            result = DTLV.dtlv_key_rank_sample_iter_create(
+                bravoIter, bravoIndices, bravoSample.length,
+                cursor, keyHolder, valHolder,
+                bravoKey, bravoKey);
+            if (result != 0) {
+                System.err.println("Failed to create bounded dupsort key rank iterator: " + result);
+                bravoIndices.close();
+                return;
+            }
+            for (int i = 0; i < expectedBravoVals.length; i++) {
+                int hasNext = DTLV.dtlv_key_rank_sample_iter_has_next(bravoIter);
+                expect(hasNext == DTLV.DTLV_TRUE, "Bounded dupsort key iterator missing expected sample");
+                String actualKey = mdbValToString(keyHolder);
+                String actualVal = mdbValToString(valHolder);
+                expect(actualKey.equals("bravo"),
+                       "Bounded dupsort key iterator produced unexpected key");
+                expect(actualVal.equals(expectedBravoVals[i]),
+                       "Bounded dupsort key iterator produced unexpected value");
+            }
+            expect(DTLV.dtlv_key_rank_sample_iter_has_next(bravoIter) == DTLV.DTLV_FALSE,
+                   "Bounded dupsort key iterator should be exhausted");
+            DTLV.dtlv_key_rank_sample_iter_destroy(bravoIter);
+            bravoIndices.close();
+
+            System.out.println("Passed dupsort key rank sample iterator test.");
         } finally {
             if (cursorOpened)
                 DTLV.mdb_cursor_close(cursor);

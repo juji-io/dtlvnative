@@ -878,7 +878,7 @@ static int dtlv_key_rank_sample_iter_compute_upper(
     return mdb_cursor_key_rank(iter->cur, iter->key, NULL, 0, rank_out);
 
   /* cmp == 0: step past the inclusive upper bound. */
-  rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_NEXT);
+  rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_NEXT_NODUP);
   if (rc == MDB_NOTFOUND) return mdb_count_all(iter->txn, iter->dbi, 0, rank_out);
   if (rc != MDB_SUCCESS) return rc;
   return mdb_cursor_key_rank(iter->cur, iter->key, NULL, 0, rank_out);
