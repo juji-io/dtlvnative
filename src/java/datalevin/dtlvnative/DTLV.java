@@ -1749,6 +1749,28 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
             @Const MDB_val high, @Cast("unsigned int") int flags, @Cast("uint64_t*") long[] out);
 
     /**
+     * \brief Count distinct keys within a key range in a counted database.
+     *
+     * Works for both plain and dupsort DBIs opened with #MDB_COUNTED. On dupsort DBIs
+     * the count ignores duplicate values and only tallies unique keys.
+     *
+     * @param txn   [in] A transaction handle returned by #mdb_txn_begin()
+     * @param dbi   [in] A database handle returned by #mdb_dbi_open()
+     * @param low   [in] Lower bound key; may be NULL to begin from the first key.
+     * @param high  [in] Upper bound key; may be NULL to count through the last key.
+     * @param flags [in] Bound modifiers using #mdb_count flags.
+     * @param out   [out] Destination for the computed key count.
+     */
+    public static native int mdb_range_count_keys(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val low,
+            @Const MDB_val high, @Cast("unsigned int") int flags, @Cast("uint64_t*") LongPointer out);
+
+    public static native int mdb_range_count_keys(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val low,
+            @Const MDB_val high, @Cast("unsigned int") int flags, @Cast("uint64_t*") LongBuffer out);
+
+    public static native int mdb_range_count_keys(MDB_txn txn, @Cast("MDB_dbi") int dbi, @Const MDB_val low,
+            @Const MDB_val high, @Cast("unsigned int") int flags, @Cast("uint64_t*") long[] out);
+
+    /**
      * \brief Count values for a key range in a counted dupsort database.
      *
      * Limits counting to the subset of keys in [\b key_low, \b key_high], applying #mdb_count flags via \b key_flags.

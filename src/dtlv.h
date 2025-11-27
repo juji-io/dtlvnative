@@ -67,13 +67,14 @@ extern "C" {
   void dtlv_key_iter_destroy(dtlv_key_iter *iter);
 
   /**
-   * Opaque structure for a rank based key sample iterator (plain DB).
+   * Opaque structure for a rank based key sample iterator.
    */
   typedef struct dtlv_key_rank_sample_iter dtlv_key_rank_sample_iter;
 
   /**
    * Create a rank based key sample iterator. Iteration is forward only with
-   * inclusive start/end key boundaries.
+   * inclusive start/end key boundaries. Supports both plain and dupsort DBIs;
+   * on dupsort DBIs ranks are computed over key/value pairs.
    *
    * @param iter The address where the iterator will be stored.
    * @param indices The array of strictly increasing sample indices relative to
