@@ -73,8 +73,9 @@ extern "C" {
 
   /**
    * Create a rank based key sample iterator. Iteration is forward only with
-   * inclusive start/end key boundaries. Supports both plain and dupsort DBIs;
-   * on dupsort DBIs ranks are computed over key/value pairs.
+   * inclusive start/end key boundaries and requires a counted DB. On dupsort
+   * DBs ranks are over key/value pairs (duplicate keys will surface multiple
+   * times).
    *
    * @param iter The address where the iterator will be stored.
    * @param indices The array of strictly increasing sample indices relative to
