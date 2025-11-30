@@ -2399,9 +2399,9 @@ public class Test {
                 DTLV.mdb_env_close(env);
             }
         }
-        expect(directoryHasSuffix(fsPathA + "/pending", ".ulog"),
+        expect(directoryHasSuffix(fsPathA + "/pending/" + domainAName, ".ulog"),
                 "Domain A pending WAL not sealed");
-        expect(directoryHasSuffix(fsPathB + "/pending", ".ulog"),
+        expect(directoryHasSuffix(fsPathB + "/pending/" + domainBName, ".ulog"),
                 "Domain B pending WAL not sealed");
 
         DTLV.MDB_env reloadEnv = new DTLV.MDB_env();
@@ -2472,13 +2472,13 @@ public class Test {
                 DTLV.mdb_env_close(reloadEnv);
             }
         }
-        expect(!directoryHasSuffix(fsPathA + "/pending", ".ulog"),
+        expect(!directoryHasSuffix(fsPathA + "/pending/" + domainAName, ".ulog"),
                 "Domain A pending WAL not cleared after recovery");
-        expect(!directoryHasSuffix(fsPathA + "/pending", ".ulog.sealed"),
+        expect(!directoryHasSuffix(fsPathA + "/pending/" + domainAName, ".ulog.sealed"),
                 "Domain A sealed WAL not cleared after recovery");
-        expect(!directoryHasSuffix(fsPathB + "/pending", ".ulog"),
+        expect(!directoryHasSuffix(fsPathB + "/pending/" + domainBName, ".ulog"),
                 "Domain B pending WAL not cleared after recovery");
-        expect(!directoryHasSuffix(fsPathB + "/pending", ".ulog.sealed"),
+        expect(!directoryHasSuffix(fsPathB + "/pending/" + domainBName, ".ulog.sealed"),
                 "Domain B sealed WAL not cleared after recovery");
         deleteDirectoryFiles(fsPathA);
         deleteDirectoryFiles(fsPathB);

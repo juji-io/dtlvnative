@@ -237,6 +237,7 @@ int dtlv_usearch_checkpoint_recover(dtlv_usearch_domain *domain);
 static int dtlv_usearch_wal_recover(dtlv_usearch_domain *domain);
 static int dtlv_meta_put_u32(MDB_txn *txn, MDB_dbi dbi, const char *key, uint32_t value);
 static int dtlv_usearch_compaction_recover(dtlv_usearch_domain *domain);
+static int dtlv_usearch_file_size(const char *path, uint64_t *size_out);
 
 static int64_t dtlv_now_ms(void) {
 #ifdef _WIN32
@@ -1041,8 +1042,8 @@ static int dtlv_usearch_replay_wal_file(dtlv_usearch_domain *domain,
   }
   dtlv_tracef("[wal] reader_header_size=%zu\n", sizeof(dtlv_ulog_header_v1));
   dtlv_tracef("[wal] replay path=%s start=%u frames=%u\n", path, (unsigned)start_ordinal, (unsigned)frame_count);
-  MDB_txn *write_txn = NULL;
-  int rc = mdb_txn_begin(domain->env, NULL, 0, &write_txn);
+  MDB_txn *read_txn = NULL;
+  int rc = mdb_txn_begin(domain->env, NULL, MDB_RDONLY, &read_txn);
   if (rc != 0) {
     fclose(fp);
     return rc;
@@ -1050,27 +1051,26 @@ static int dtlv_usearch_replay_wal_file(dtlv_usearch_domain *domain,
   uint64_t wal_snapshot_base = dtlv_from_be64(header.snapshot_seq_base);
   uint64_t wal_log_hint = dtlv_from_be64(header.log_seq_hint);
   if (frame_count == 0 || wal_log_hint == 0) {
-    mdb_txn_abort(write_txn);
+    mdb_txn_abort(read_txn);
     fclose(fp);
     return MDB_CORRUPTED;
   }
   uint64_t wal_end_seq = wal_log_hint + (uint64_t)frame_count - 1;
   if (wal_end_seq < wal_log_hint) {
-    mdb_txn_abort(write_txn);
+    mdb_txn_abort(read_txn);
     fclose(fp);
     return MDB_CORRUPTED;
   }
   uint64_t current_snapshot_seq = 0;
   uint64_t current_log_seq = 0;
-  rc = dtlv_meta_get_u64(write_txn, domain->meta_dbi, DTLV_META_KEY_SNAPSHOT_SEQ, 0, &current_snapshot_seq);
-  if (rc == 0) rc = dtlv_meta_get_u64(write_txn, domain->meta_dbi, DTLV_META_KEY_LOG_SEQ, 0, &current_log_seq);
+  rc = dtlv_meta_get_u64(read_txn, domain->meta_dbi, DTLV_META_KEY_SNAPSHOT_SEQ, 0, &current_snapshot_seq);
+  if (rc == 0) rc = dtlv_meta_get_u64(read_txn, domain->meta_dbi, DTLV_META_KEY_LOG_SEQ, 0, &current_log_seq);
+  mdb_txn_abort(read_txn);
   if (rc != 0) {
-    mdb_txn_abort(write_txn);
     fclose(fp);
     return rc;
   }
   if (current_log_seq < wal_log_hint) {
-    mdb_txn_abort(write_txn);
     fclose(fp);
     return MDB_CORRUPTED;
   }
@@ -1082,7 +1082,8 @@ static int dtlv_usearch_replay_wal_file(dtlv_usearch_domain *domain,
     /* A newer checkpoint/log tail already covers this WAL generation. */
     skip_replay = 1;
   }
-  uint32_t processed = 0;
+  uint32_t processed = start_ordinal > 0 ? start_ordinal - 1 : 0;
+  if (skip_replay) processed = frame_count;
   for (uint32_t ordinal = 1; ordinal <= frame_count && !skip_replay; ++ordinal) {
     dtlv_ulog_frame_prefix_v1 prefix;
     read_bytes = fread(&prefix, 1, sizeof(prefix), fp);
@@ -1124,13 +1125,21 @@ static int dtlv_usearch_replay_wal_file(dtlv_usearch_domain *domain,
       break;
     }
     if (ordinal >= start_ordinal) {
-      MDB_val val = {.mv_size = delta_bytes, .mv_data = payload};
-      dtlv_delta_entry_view entry;
-      rc = dtlv_decode_delta(&val, &entry);
-      if (rc != 0) dtlv_tracef("[wal] decode error %d at ordinal %u\n", rc, (unsigned)ordinal);
-      if (rc == 0) rc = dtlv_publish_apply_entry(domain, write_txn, &entry);
+      MDB_txn *write_txn = NULL;
+      rc = mdb_txn_begin(domain->env, NULL, 0, &write_txn);
+      if (rc == 0) {
+        MDB_val val = {.mv_size = delta_bytes, .mv_data = payload};
+        dtlv_delta_entry_view entry;
+        rc = dtlv_decode_delta(&val, &entry);
+        if (rc != 0) dtlv_tracef("[wal] decode error %d at ordinal %u\n", rc, (unsigned)ordinal);
+        if (rc == 0) rc = dtlv_publish_apply_entry(domain, write_txn, &entry);
+        if (rc == 0) {
+          rc = dtlv_meta_put_published_log_tail(write_txn, domain->meta_dbi, &file_token, ordinal);
+        }
+      }
+      if (rc == 0) rc = mdb_txn_commit(write_txn);
+      else if (write_txn) mdb_txn_abort(write_txn);
       if (rc != 0) {
-        dtlv_tracef("[wal] apply/update error %d at ordinal %u\n", rc, (unsigned)ordinal);
         free(payload);
         break;
       }
@@ -1138,12 +1147,16 @@ static int dtlv_usearch_replay_wal_file(dtlv_usearch_domain *domain,
     free(payload);
     processed = ordinal;
   }
-  if (skip_replay) processed = frame_count;
-  if (rc == 0 && processed >= start_ordinal) {
-    rc = dtlv_meta_put_published_log_tail(write_txn, domain->meta_dbi, &file_token, processed);
+  if (skip_replay && rc == 0 && processed >= start_ordinal) {
+    MDB_txn *write_txn = NULL;
+    int tail_rc = mdb_txn_begin(domain->env, NULL, 0, &write_txn);
+    if (tail_rc == 0) {
+      tail_rc = dtlv_meta_put_published_log_tail(write_txn, domain->meta_dbi, &file_token, processed);
+    }
+    if (tail_rc == 0) tail_rc = mdb_txn_commit(write_txn);
+    else if (write_txn) mdb_txn_abort(write_txn);
+    if (rc == 0) rc = tail_rc;
   }
-  if (rc == 0) rc = mdb_txn_commit(write_txn);
-  else if (write_txn) mdb_txn_abort(write_txn);
   if (rc != 0) dtlv_usearch_refresh_handles_best_effort(domain);
   int close_rc = fclose(fp);
   if (rc == 0 && close_rc != 0) rc = errno ? errno : EIO;
@@ -1533,7 +1546,11 @@ int dtlv_usearch_domain_open(MDB_env *env,
     return ENAMETOOLONG;
   }
   strcpy(domain->filesystem_root, filesystem_root);
-  if (snprintf(domain->pending_root, sizeof(domain->pending_root), "%s/pending", filesystem_root) >= (int)sizeof(domain->pending_root)) {
+  if (snprintf(domain->pending_root,
+               sizeof(domain->pending_root),
+               "%s/pending/%s",
+               filesystem_root,
+               domain_name) >= (int)sizeof(domain->pending_root)) {
     free(domain);
     return ENAMETOOLONG;
   }
@@ -2160,19 +2177,37 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
   if (rc != 0) return rc;
   if (pending_found && existing_pending.stage != DTLV_CHECKPOINT_STAGE_NONE) return EBUSY;
   usearch_error_t err = NULL;
-  size_t serialized_len = usearch_serialized_length(index, &err);
-  rc = dtlv_usearch_error_status(err);
-  if (rc != 0) return rc;
-  size_t buffer_len = serialized_len;
-  if (buffer_len == 0) buffer_len = 1;
-  uint8_t *snapshot = (uint8_t *)malloc(buffer_len);
-  if (!snapshot) return ENOMEM;
+  char temp_path[PATH_MAX];
+  if (snprintf(temp_path,
+               sizeof(temp_path),
+               "%s/checkpoint-%llu.tmp",
+               domain->pending_root,
+               (unsigned long long)snapshot_seq) >= (int)sizeof(temp_path)) {
+    return ENAMETOOLONG;
+  }
+  dtlv_delete_file_best_effort(temp_path);
   err = NULL;
-  usearch_save_buffer(index, snapshot, serialized_len, &err);
+  usearch_save(index, temp_path, &err);
   rc = dtlv_usearch_error_status(err);
   if (rc != 0) {
-    free(snapshot);
+    dtlv_delete_file_best_effort(temp_path);
     return rc;
+  }
+  uint64_t file_size_u64 = 0;
+  rc = dtlv_usearch_file_size(temp_path, &file_size_u64);
+  if (rc != 0) {
+    dtlv_delete_file_best_effort(temp_path);
+    return rc;
+  }
+  size_t file_size = dtlv_u64_to_size(file_size_u64);
+  if ((uint64_t)file_size != file_size_u64) {
+    dtlv_delete_file_best_effort(temp_path);
+    return EOVERFLOW;
+  }
+  FILE *snapshot_fp = fopen(temp_path, "rb");
+  if (!snapshot_fp) {
+    dtlv_delete_file_best_effort(temp_path);
+    return errno ? errno : EIO;
   }
   dtlv_checkpoint_pending_record pending;
   memset(&pending, 0, sizeof(pending));
@@ -2187,7 +2222,8 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
   if (rc == 0) rc = mdb_txn_commit(txn);
   else if (txn) mdb_txn_abort(txn);
   if (rc != 0) {
-    free(snapshot);
+    fclose(snapshot_fp);
+    dtlv_delete_file_best_effort(temp_path);
     return rc;
   }
   checkpoint_started = 1;
@@ -2197,23 +2233,35 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
   size_t batch_limit = domain->checkpoint_chunk_batch ? (size_t)domain->checkpoint_chunk_batch
                                                       : (size_t)DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
   if (batch_limit == 0) batch_limit = DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
-  while (offset < serialized_len) {
+  if (chunk_limit == 0) chunk_limit = DTLV_USEARCH_DEFAULT_CHUNK_BYTES;
+  uint8_t *chunk_buf = (uint8_t *)malloc(chunk_limit ? chunk_limit : 1);
+  if (!chunk_buf) {
+    fclose(snapshot_fp);
+    dtlv_delete_file_best_effort(temp_path);
+    return ENOMEM;
+  }
+  while (offset < file_size) {
     txn = NULL;
     rc = mdb_txn_begin(domain->env, NULL, 0, &txn);
     if (rc != 0) break;
     size_t batch_written = 0;
-    while (offset < serialized_len && batch_written < batch_limit) {
-      size_t remaining = serialized_len - offset;
+    while (offset < file_size && batch_written < batch_limit) {
+      size_t remaining = file_size - offset;
       size_t chunk_len = remaining < chunk_limit ? remaining : chunk_limit;
       if (chunks_written >= UINT32_MAX) {
         rc = EOVERFLOW;
+        break;
+      }
+      size_t read_len = fread(chunk_buf, 1, chunk_len, snapshot_fp);
+      if (read_len != chunk_len) {
+        rc = EIO;
         break;
       }
       rc = dtlv_snapshot_store_chunk(domain,
                                      txn,
                                      snapshot_seq,
                                      (uint32_t)chunks_written,
-                                     snapshot + offset,
+                                     chunk_buf,
                                      chunk_len);
       if (rc != 0) break;
       offset += chunk_len;
@@ -2229,7 +2277,7 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
     else if (txn) mdb_txn_abort(txn);
     if (rc != 0) break;
   }
-  if (rc == 0 && serialized_len == 0) {
+  if (rc == 0 && file_size == 0) {
     txn = NULL;
     rc = mdb_txn_begin(domain->env, NULL, 0, &txn);
     if (rc == 0) {
@@ -2240,6 +2288,8 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
     if (rc == 0) rc = mdb_txn_commit(txn);
     else if (txn) mdb_txn_abort(txn);
   }
+  free(chunk_buf);
+  fclose(snapshot_fp);
   if (rc == MDB_MAP_FULL && checkpoint_started && dtlv_trace_enabled()) {
     dtlv_tracef("[checkpoint] map full after %zu chunks (seq=%llu)\n",
                 chunks_written,
@@ -2253,7 +2303,7 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
       mdb_txn_commit(cleanup_txn);
     }
   }
-  free(snapshot);
+  dtlv_delete_file_best_effort(temp_path);
   if (chunk_count_out) *chunk_count_out = chunks_written;
   return rc;
 }

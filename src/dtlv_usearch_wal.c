@@ -78,6 +78,36 @@ static void dtlv_tracef(const char *fmt, ...) {
   va_end(args);
 }
 
+#ifndef _WIN32
+/* fsync the parent directory to persist rename transitions on crash. */
+static int dtlv_fsync_parent_dir(const char *path) {
+  if (!path || !*path) return EINVAL;
+  char dir[PATH_MAX];
+  snprintf(dir, sizeof(dir), "%s", path);
+  char *last_sep = strrchr(dir, '/');
+  if (!last_sep) last_sep = strrchr(dir, '\\');
+  if (last_sep) {
+    if (last_sep == dir) last_sep[1] = '\0';
+    else *last_sep = '\0';
+  } else {
+    strcpy(dir, ".");
+  }
+  int fd = open(dir, O_RDONLY
+#ifdef O_DIRECTORY
+                         | O_DIRECTORY
+#endif
+#ifdef O_CLOEXEC
+                         | O_CLOEXEC
+#endif
+  );
+  if (fd < 0) return errno ? errno : EIO;
+  int rc = fsync(fd);
+  int err = (rc == 0) ? 0 : (errno ? errno : EIO);
+  close(fd);
+  return err;
+}
+#endif
+
 static int dtlv_random_bytes(void *dst, size_t len) {
   uint8_t *bytes = (uint8_t *)dst;
   size_t produced = 0;
@@ -470,6 +500,7 @@ int dtlv_usearch_wal_seal(dtlv_usearch_wal_ctx *ctx) {
   rc = dtlv_win32_rename_file(ctx->path_open, ctx->path_sealed);
 #else
   if (rename(ctx->path_open, ctx->path_sealed) != 0) rc = errno;
+  if (rc == 0) rc = dtlv_fsync_parent_dir(ctx->path_sealed);
 #endif
   if (rc != 0) return rc;
   ctx->state = DTLV_ULOG_STATE_SEALED;
@@ -494,6 +525,7 @@ int dtlv_usearch_wal_mark_ready(dtlv_usearch_wal_ctx *ctx) {
     rc = dtlv_win32_rename_file(ctx->path_sealed, ctx->path_ready);
 #else
     if (rename(ctx->path_sealed, ctx->path_ready) != 0) rc = errno;
+    if (rc == 0) rc = dtlv_fsync_parent_dir(ctx->path_ready);
 #endif
     if (rc != 0) return rc;
   }
