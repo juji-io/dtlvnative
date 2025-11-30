@@ -3305,6 +3305,8 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
 
     /**
      * Create a rank based key sample iterator (forward, inclusive bounds).
+     * Requires a counted DB. On dupsort DBs ranks are over key/value pairs, so
+     * duplicate keys may appear multiple times in the sample.
      */
     public static native int dtlv_key_rank_sample_iter_create(
             @Cast("dtlv_key_rank_sample_iter**") PointerPointer iter,
