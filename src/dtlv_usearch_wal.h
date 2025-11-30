@@ -25,7 +25,14 @@ typedef enum {
 
 typedef struct dtlv_usearch_wal_ctx dtlv_usearch_wal_ctx;
 
-typedef struct {
+#if defined(_MSC_VER)
+#pragma pack(push, 1)
+#define DTLV_PACKED
+#else
+#define DTLV_PACKED __attribute__((packed))
+#endif
+
+typedef struct DTLV_PACKED {
   char magic[8];
   uint8_t version;
   uint8_t state;
@@ -38,11 +45,18 @@ typedef struct {
   uint32_t checksum;
 } dtlv_ulog_header_v1;
 
-typedef struct {
+typedef struct DTLV_PACKED {
   uint32_t ordinal;
   uint32_t delta_bytes;
   uint32_t checksum;
 } dtlv_ulog_frame_prefix_v1;
+
+#if defined(_MSC_VER)
+#pragma pack(pop)
+#undef DTLV_PACKED
+#else
+#undef DTLV_PACKED
+#endif
 
 int dtlv_usearch_wal_open(const char *domain_root,
                           uint64_t snapshot_seq_base,

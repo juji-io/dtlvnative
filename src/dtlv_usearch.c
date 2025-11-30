@@ -75,6 +75,7 @@
 #ifdef _WIN32
 static void dtlv_fix_windows_path(char *path);
 #endif
+static int dtlv_delete_file_best_effort(const char *path);
 
 typedef enum {
   DTLV_CHECKPOINT_STAGE_NONE = 0,
@@ -706,17 +707,141 @@ static void dtlv_snapshot_pack_key(uint64_t snapshot_seq, uint32_t chunk, uint8_
   memcpy(out + sizeof(seq_be), &chunk_be, sizeof(chunk_be));
 }
 
+typedef struct {
+#ifdef _WIN32
+  HANDLE handle;
+#else
+  int fd;
+#endif
+  char path[PATH_MAX];
+  size_t written;
+  int opened;
+} dtlv_snapshot_sink;
+
+static void dtlv_snapshot_sink_reset(dtlv_snapshot_sink *sink) {
+  if (!sink) return;
+  memset(sink, 0, sizeof(*sink));
+#ifdef _WIN32
+  sink->handle = NULL;
+#else
+  sink->fd = -1;
+#endif
+}
+
+static int dtlv_snapshot_sink_open(dtlv_usearch_domain *domain,
+                                   uint64_t snapshot_seq,
+                                   dtlv_snapshot_sink *sink) {
+  if (!domain || !sink) return EINVAL;
+#ifdef _WIN32
+  char dir[PATH_MAX];
+  if (snprintf(dir, sizeof(dir), "%s", domain->pending_root) >= (int)sizeof(dir)) return ENAMETOOLONG;
+  dtlv_fix_windows_path(dir);
+  char tmp_path[PATH_MAX];
+  if (!GetTempFileNameA(dir, "dts", 0, tmp_path)) return (int)GetLastError();
+  HANDLE handle = CreateFileA(tmp_path,
+                              GENERIC_READ | GENERIC_WRITE,
+                              FILE_SHARE_READ,
+                              NULL,
+                              CREATE_ALWAYS,
+                              FILE_ATTRIBUTE_NORMAL,
+                              NULL);
+  if (handle == INVALID_HANDLE_VALUE) return (int)GetLastError();
+  sink->handle = handle;
+  if (snprintf(sink->path, sizeof(sink->path), "%s", tmp_path) >= (int)sizeof(sink->path)) {
+    CloseHandle(handle);
+    sink->handle = NULL;
+    return ENAMETOOLONG;
+  }
+#else
+  char pattern[PATH_MAX];
+  if (snprintf(pattern,
+               sizeof(pattern),
+               "%s/snapshot-load-%llu-XXXXXX",
+               domain->pending_root,
+               (unsigned long long)snapshot_seq) >= (int)sizeof(pattern)) {
+    return ENAMETOOLONG;
+  }
+  int fd = mkstemp(pattern);
+  if (fd < 0) return errno ? errno : EIO;
+  sink->fd = fd;
+  if (snprintf(sink->path, sizeof(sink->path), "%s", pattern) >= (int)sizeof(sink->path)) {
+    close(fd);
+    sink->fd = -1;
+    return ENAMETOOLONG;
+  }
+#endif
+  sink->opened = 1;
+  sink->written = 0;
+  return 0;
+}
+
+static int dtlv_snapshot_sink_write(dtlv_snapshot_sink *sink, const uint8_t *data, size_t len) {
+  if (!sink || !data) return EINVAL;
+  if (!len) return 0;
+#ifdef _WIN32
+  size_t total = 0;
+  while (total < len) {
+    DWORD chunk = (DWORD)((len - total) > (size_t)UINT32_MAX ? (size_t)UINT32_MAX : (len - total));
+    DWORD wrote = 0;
+    if (!WriteFile(sink->handle, data + total, chunk, &wrote, NULL)) return (int)GetLastError();
+    if (wrote == 0) return EIO;
+    total += wrote;
+  }
+#else
+  size_t total = 0;
+  while (total < len) {
+    ssize_t wrote = write(sink->fd, data + total, len - total);
+    if (wrote < 0) {
+      if (errno == EINTR) continue;
+      return errno ? errno : EIO;
+    }
+    if (wrote == 0) return EIO;
+    total += (size_t)wrote;
+  }
+#endif
+  sink->written += len;
+  return 0;
+}
+
+static int dtlv_snapshot_sink_close(dtlv_snapshot_sink *sink) {
+  if (!sink || !sink->opened) return 0;
+  int rc = 0;
+#ifdef _WIN32
+  if (!FlushFileBuffers(sink->handle)) rc = (int)GetLastError();
+  if (!CloseHandle(sink->handle) && rc == 0) rc = (int)GetLastError();
+  sink->handle = NULL;
+#else
+  if (fsync(sink->fd) != 0 && errno != EINVAL) rc = errno ? errno : EIO;
+  if (close(sink->fd) != 0 && rc == 0) rc = errno ? errno : EIO;
+  sink->fd = -1;
+#endif
+  sink->opened = 0;
+  return rc;
+}
+
+static void dtlv_snapshot_sink_dispose(dtlv_snapshot_sink *sink) {
+  if (!sink) return;
+  if (sink->opened) dtlv_snapshot_sink_close(sink);
+  if (sink->path[0]) dtlv_delete_file_best_effort(sink->path);
+  sink->path[0] = '\0';
+}
+
 static int dtlv_snapshot_load(dtlv_usearch_domain *domain,
                               MDB_txn *txn,
                               uint64_t snapshot_seq,
-                              uint8_t **buffer_out,
+                              char path_out[PATH_MAX],
                               size_t *length_out) {
-  if (!domain || !txn || !buffer_out || !length_out) return EINVAL;
-  *buffer_out = NULL;
+  if (!domain || !txn || !path_out || !length_out) return EINVAL;
+  path_out[0] = '\0';
   *length_out = 0;
   if (snapshot_seq == 0) return 0;
+  int rc = dtlv_ensure_pending_root(domain);
+  if (rc != 0) return rc;
+  dtlv_snapshot_sink sink;
+  dtlv_snapshot_sink_reset(&sink);
+
   MDB_cursor *cursor = NULL;
-  int rc = mdb_cursor_open(txn, domain->snapshot_dbi, &cursor);
+  rc = mdb_cursor_open(txn, domain->snapshot_dbi, &cursor);
   if (rc != 0) return rc;
   uint8_t key_buf[12];
   dtlv_snapshot_pack_key(snapshot_seq, 0, key_buf);
@@ -724,8 +849,6 @@ static int dtlv_snapshot_load(dtlv_usearch_domain *domain,
   MDB_val val;
   rc = mdb_cursor_get(cursor, &key, &val, MDB_SET_RANGE);
   size_t expected_chunk = 0;
-  uint8_t *buffer = NULL;
-  size_t buffer_len = 0;
   while (rc == 0) {
     if (key.mv_size != sizeof(key_buf)) {
       rc = MDB_CORRUPTED;
@@ -774,32 +897,35 @@ static int dtlv_snapshot_load(dtlv_usearch_domain *domain,
       rc = EIO;
       break;
     }
-    size_t needed = buffer_len + chunk_len;
-    uint8_t *tmp = realloc(buffer, needed ? needed : 1);
-    if (!tmp) {
-      rc = ENOMEM;
-      break;
+    if (!sink.opened) {
+      rc = dtlv_snapshot_sink_open(domain, snapshot_seq, &sink);
+      if (rc != 0) break;
     }
-    buffer = tmp;
-    if (chunk_len) memcpy(buffer + buffer_len, payload, chunk_len);
-    buffer_len += chunk_len;
+    rc = dtlv_snapshot_sink_write(&sink, payload, chunk_len);
+    if (rc != 0) break;
     expected_chunk++;
     rc = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
   }
   if (rc == MDB_NOTFOUND) rc = 0;
   mdb_cursor_close(cursor);
   if (rc != 0) {
-    free(buffer);
+    dtlv_snapshot_sink_dispose(&sink);
     return rc;
   }
   if (expected_chunk == 0) {
-    free(buffer);
-    *buffer_out = NULL;
     *length_out = 0;
     return 0;
   }
-  *buffer_out = buffer;
-  *length_out = buffer_len;
+  rc = dtlv_snapshot_sink_close(&sink);
+  if (rc != 0) {
+    dtlv_snapshot_sink_dispose(&sink);
+    return rc;
+  }
+  if (snprintf(path_out, PATH_MAX, "%s", sink.path) >= (int)PATH_MAX) {
+    dtlv_snapshot_sink_dispose(&sink);
+    return ENAMETOOLONG;
+  }
+  *length_out = sink.written;
   return 0;
 }
 
@@ -1318,19 +1444,17 @@ static int dtlv_usearch_build_index(dtlv_usearch_domain *domain,
   usearch_index_t index = usearch_init((usearch_init_options_t *)init_opts, &err);
   int rc = dtlv_usearch_error_status(err);
   if (rc != 0 || !index) return rc != 0 ? rc : ENOMEM;
-  uint8_t *snapshot_buf = NULL;
   size_t snapshot_len = 0;
-  rc = dtlv_snapshot_load(domain, txn, snapshot_seq, &snapshot_buf, &snapshot_len);
+  char snapshot_path[PATH_MAX];
+  snapshot_path[0] = '\0';
+  rc = dtlv_snapshot_load(domain, txn, snapshot_seq, snapshot_path, &snapshot_len);
   if (rc != 0) goto fail;
-  if (snapshot_len > 0 && snapshot_buf) {
+  if (snapshot_len > 0 && snapshot_path[0]) {
     err = NULL;
-    usearch_load_buffer(index, snapshot_buf, snapshot_len, &err);
+    usearch_load(index, snapshot_path, &err);
     rc = dtlv_usearch_error_status(err);
+    dtlv_delete_file_best_effort(snapshot_path);
     if (rc != 0) goto fail;
-  }
-  if (snapshot_buf) {
-    free(snapshot_buf);
-    snapshot_buf = NULL;
   }
   uint64_t hint = reserve_hint < 16u ? 16u : reserve_hint;
   size_t reserve_members = dtlv_u64_to_size(hint);
@@ -1343,7 +1467,7 @@ static int dtlv_usearch_build_index(dtlv_usearch_domain *domain,
   *index_out = index;
   return 0;
 fail:
-  if (snapshot_buf) free(snapshot_buf);
+  if (snapshot_path[0]) dtlv_delete_file_best_effort(snapshot_path);
   if (index) {
     usearch_error_t free_err = NULL;
     usearch_free(index, &free_err);
