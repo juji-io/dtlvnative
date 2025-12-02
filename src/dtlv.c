@@ -857,6 +857,11 @@ static int dtlv_key_rank_sample_iter_compute_lower(
   if (dtlv_key_rank_sample_iter_within_end(iter, end_key) == DTLV_FALSE)
     return DTLV_FALSE;
 
+  if (!start_key) {
+    *rank_out = 0;
+    return MDB_SUCCESS;
+  }
+
   uint64_t rank = 0;
   rc = mdb_cursor_key_rank(iter->cur, iter->key, NULL, 0, &rank);
   if (rc != MDB_SUCCESS) return rc;
@@ -949,6 +954,7 @@ int dtlv_key_rank_sample_iter_has_next(dtlv_key_rank_sample_iter *iter) {
     iter->current++;
     return DTLV_TRUE;
   }
+  if (rc == MDB_NOTFOUND) return DTLV_FALSE;
   return rc;
 }
 
@@ -1323,6 +1329,10 @@ static int dtlv_list_rank_sample_iter_compute_lower(
   if (rc != DTLV_TRUE) return rc;
   if (dtlv_list_rank_sample_iter_within_end(iter, end_key) == DTLV_FALSE)
     return DTLV_FALSE;
+  if (!start_key) {
+    *rank_out = 0;
+    return MDB_SUCCESS;
+  }
   uint64_t rank = 0;
   rc = mdb_cursor_key_rank(iter->cur, iter->key, iter->val, 0, &rank);
   if (rc != MDB_SUCCESS) return rc;
@@ -1432,6 +1442,7 @@ int dtlv_list_rank_sample_iter_has_next(dtlv_list_rank_sample_iter *iter) {
     iter->current++;
     return DTLV_TRUE;
   }
+  if (rc == MDB_NOTFOUND) return DTLV_FALSE;
   return rc;
 }
 

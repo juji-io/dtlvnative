@@ -151,6 +151,7 @@ public class Test {
         testLMDBCountedPrefix();
         testRankSampleIterator();
         testKeyRankSampleIterator();
+        testKeyRankSampleIteratorShrink();
         testKeyRankSampleIteratorDupsort();
         testListValIteratorBounds();
 
@@ -746,6 +747,163 @@ public class Test {
                 DTLV.mdb_txn_abort(rtxn);
             if (writeTxnActive)
                 DTLV.mdb_txn_abort(txn);
+            dbi.close();
+            for (BytePointer ptr : allocations)
+                ptr.close();
+            if (envCreated)
+                DTLV.mdb_env_close(env);
+            deleteDirectoryFiles(dir);
+        }
+    }
+
+    static void testKeyRankSampleIteratorShrink() {
+
+        System.err.println("Testing key rank sample iterator with shrinking data ...");
+
+        String dir = "db-key-rank-sample-shrink";
+        List<BytePointer> allocations = new ArrayList<>();
+
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.MDB_txn txn = new DTLV.MDB_txn();
+        DTLV.MDB_cursor cursor = new DTLV.MDB_cursor();
+        IntPointer dbi = new IntPointer(1);
+        SizeTPointer indices = null;
+        DTLV.dtlv_key_rank_sample_iter iter = null;
+        boolean iterCreated = false;
+
+        boolean envCreated = false;
+        boolean writeTxnActive = false;
+        boolean cursorOpened = false;
+
+        try {
+            int result = DTLV.mdb_env_create(env);
+            if (result != 0) {
+                System.err.println("Failed to create shrink test env: " + result);
+                return;
+            }
+            envCreated = true;
+
+            result = DTLV.mdb_env_set_maxdbs(env, 5);
+            if (result != 0) {
+                System.err.println("Failed to set max dbs for shrink test: " + result);
+                return;
+            }
+
+            try {
+                Files.createDirectories(Paths.get(dir));
+            } catch (IOException e) {
+                System.err.println("Failed to create directory: " + dir);
+                e.printStackTrace();
+                return;
+            }
+
+            int envFlags = DTLV.MDB_NOLOCK;
+            result = DTLV.mdb_env_open(env, dir, envFlags, 0664);
+            if (result != 0) {
+                System.err.println("Failed to open shrink test env: " + result);
+                return;
+            }
+
+            result = DTLV.mdb_txn_begin(env, null, 0, txn);
+            if (result != 0) {
+                System.err.println("Failed to begin shrink test write txn: " + result);
+                return;
+            }
+            writeTxnActive = true;
+
+            int flags = DTLV.MDB_CREATE | DTLV.MDB_COUNTED;
+            result = DTLV.mdb_dbi_open(txn, "key_rank_sample_shrink", flags, dbi);
+            if (result != 0) {
+                System.err.println("Failed to open shrink test dbi: " + result);
+                return;
+            }
+
+            String[][] dataset = {
+                { "alpha", "v1" },
+                { "bravo", "v2" },
+                { "charlie", "v3" }
+            };
+
+            for (String[] pair : dataset) {
+                DTLV.MDB_val kval = new DTLV.MDB_val();
+                fillValWithString(kval, pair[0], allocations);
+                DTLV.MDB_val vval = new DTLV.MDB_val();
+                fillValWithString(vval, pair[1], allocations);
+                result = DTLV.mdb_put(txn, dbi.get(), kval, vval, 0);
+                if (result != 0) {
+                    System.err.println("Failed to put shrink test kv: " + result);
+                    return;
+                }
+            }
+
+            result = DTLV.mdb_cursor_open(txn, dbi.get(), cursor);
+            if (result != 0) {
+                System.err.println("Failed to open shrink test cursor: " + result);
+                return;
+            }
+            cursorOpened = true;
+
+            long[] sample = { 0L, 1L };
+            indices = toSizeTPointer(sample);
+
+            DTLV.MDB_val keyHolder = new DTLV.MDB_val();
+            DTLV.MDB_val valHolder = new DTLV.MDB_val();
+
+            iter = new DTLV.dtlv_key_rank_sample_iter();
+            result = DTLV.dtlv_key_rank_sample_iter_create(
+                iter, indices, sample.length,
+                cursor, keyHolder, valHolder,
+                null, null);
+            if (result != 0) {
+                System.err.println("Failed to create shrink test iterator: " + result);
+                return;
+            }
+            iterCreated = true;
+
+            for (String[] pair : dataset) {
+                DTLV.MDB_val deleteKey = new DTLV.MDB_val();
+                fillValWithString(deleteKey, pair[0], allocations);
+                result = DTLV.mdb_del(txn, dbi.get(), deleteKey, null);
+                expect(result == 0, "Failed to delete key during shrink test");
+            }
+
+            long[] remaining = new long[1];
+            result = DTLV.mdb_count_all(txn, dbi.get(), 0, remaining);
+            expect(result == 0, "Failed to count entries after shrink");
+            expect(remaining[0] == 0, "Shrink test did not remove all entries");
+
+            int hasNext = DTLV.dtlv_key_rank_sample_iter_has_next(iter);
+            expect(hasNext == DTLV.DTLV_FALSE,
+                   "Key rank iterator should treat missing rank as exhausted after shrink");
+            expect(DTLV.dtlv_key_rank_sample_iter_has_next(iter) == DTLV.DTLV_FALSE,
+                   "Key rank iterator should stay exhausted after shrink");
+
+            DTLV.dtlv_key_rank_sample_iter_destroy(iter);
+            iter = null;
+            iterCreated = false;
+
+            if (indices != null) {
+                indices.close();
+                indices = null;
+            }
+
+            result = DTLV.mdb_txn_commit(txn);
+            if (result != 0) {
+                System.err.println("Failed to commit shrink test txn: " + result);
+                return;
+            }
+            writeTxnActive = false;
+
+            System.out.println("Passed key rank sample iterator shrink test.");
+        } finally {
+            if (cursorOpened)
+                DTLV.mdb_cursor_close(cursor);
+            if (writeTxnActive)
+                DTLV.mdb_txn_abort(txn);
+            if (indices != null)
+                indices.close();
+            if (iterCreated && iter != null)
+                DTLV.dtlv_key_rank_sample_iter_destroy(iter);
             dbi.close();
             for (BytePointer ptr : allocations)
                 ptr.close();
