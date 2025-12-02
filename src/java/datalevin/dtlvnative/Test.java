@@ -13,6 +13,42 @@ import datalevin.dtlvnative.DTLV.usearch_metric_t;
 
 public class Test {
 
+    private static int completedTests = 0;
+    private static final List<Pointer> cursorKeepAlive = new ArrayList<>();
+
+    static void fail(String message) {
+        System.err.println(message);
+        System.exit(-1);
+    }
+
+    static void fail(String message, Throwable t) {
+        System.err.println(message);
+        t.printStackTrace(System.err);
+        System.exit(-1);
+    }
+
+    static void pass(String message) {
+        completedTests++;
+        System.out.println(message);
+    }
+
+    static void runTest(String name, Runnable test) {
+        int before = completedTests;
+        try {
+            test.run();
+        } catch (Throwable t) {
+            fail("Test '" + name + "' threw an exception", t);
+        }
+        if (completedTests == before) {
+            fail("Test '" + name + "' did not report success");
+        }
+    }
+
+    static void keepAlive(Pointer p) {
+        if (p != null)
+            cursorKeepAlive.add(p);
+    }
+
     static void deleteDirectoryFiles(final String path) {
         File directory = new File(path);
         if (!directory.isDirectory()) {
@@ -24,9 +60,7 @@ public class Test {
         directory.delete();
     }
 
-    static void testLMDB() {
-
-        System.err.println("Testing LMDB ...");
+    static void testLMDBBasic() {
 
         DTLV.MDB_env env = new DTLV.MDB_env();
         int result = DTLV.mdb_env_create(env);
@@ -148,14 +182,22 @@ public class Test {
 
         deleteDirectoryFiles(dir);
 
-        testLMDBCountedPrefix();
-        testRankSampleIterator();
-        testKeyRankSampleIterator();
-        testKeyRankSampleIteratorShrink();
-        testKeyRankSampleIteratorDupsort();
-        testListValIteratorBounds();
+        pass("Passed basic LMDB test.");
+    }
 
-        System.out.println("Passed LMDB tests.");
+    static void testLMDB() {
+
+        System.err.println("Testing LMDB ...");
+
+        runTest("basic LMDB operations", Test::testLMDBBasic);
+        runTest("counted/prefix LMDB", Test::testLMDBCountedPrefix);
+        runTest("rank-based list sample iterator", Test::testRankSampleIterator);
+        runTest("key rank sample iterator", Test::testKeyRankSampleIterator);
+        runTest("key rank sample iterator shrink", Test::testKeyRankSampleIteratorShrink);
+        runTest("key rank sample iterator on dupsort", Test::testKeyRankSampleIteratorDupsort);
+        runTest("list value iterator bounds", Test::testListValIteratorBounds);
+
+        pass("Passed LMDB tests.");
     }
 
     static void testLMDBCountedPrefix() {
@@ -315,7 +357,7 @@ public class Test {
             DTLV.mdb_txn_abort(rtxn);
             readTxnActive = false;
 
-            System.out.println("Passed counted/prefix LMDB test.");
+            pass("Passed counted/prefix LMDB test.");
         } finally {
             if (readTxnActive && rtxn != null)
                 DTLV.mdb_txn_abort(rtxn);
@@ -347,6 +389,7 @@ public class Test {
         DTLV.MDB_txn txn = new DTLV.MDB_txn();
         DTLV.MDB_txn rtxn = new DTLV.MDB_txn();
         DTLV.MDB_cursor cursor = new DTLV.MDB_cursor();
+        keepAlive(cursor);
         DTLV.dtlv_list_val_iter iter = null;
         IntPointer dbi = new IntPointer(1);
 
@@ -470,7 +513,7 @@ public class Test {
             expect(valuesInRange.equals(expected),
                    "List value iterator bounds mismatch: " + valuesInRange);
 
-            System.out.println("Passed list value iterator bounds test.");
+            pass("Passed list value iterator bounds test.");
         } finally {
             if (iter != null)
                 DTLV.dtlv_list_val_iter_destroy(iter);
@@ -500,6 +543,7 @@ public class Test {
         DTLV.MDB_txn txn = new DTLV.MDB_txn();
         DTLV.MDB_txn rtxn = new DTLV.MDB_txn();
         DTLV.MDB_cursor cursor = new DTLV.MDB_cursor();
+        keepAlive(cursor);
         IntPointer dbi = new IntPointer(1);
 
         boolean envCreated = false;
@@ -739,7 +783,7 @@ public class Test {
                    "Rank and list iterators differ on bounded samples");
             bounded.close();
 
-            System.out.println("Passed rank-based list sample iterator test.");
+            pass("Passed rank-based list sample iterator test.");
         } finally {
             if (cursorOpened)
                 DTLV.mdb_cursor_close(cursor);
@@ -766,6 +810,7 @@ public class Test {
         DTLV.MDB_env env = new DTLV.MDB_env();
         DTLV.MDB_txn txn = new DTLV.MDB_txn();
         DTLV.MDB_cursor cursor = new DTLV.MDB_cursor();
+        keepAlive(cursor);
         IntPointer dbi = new IntPointer(1);
         SizeTPointer indices = null;
         DTLV.dtlv_key_rank_sample_iter iter = null;
@@ -893,8 +938,9 @@ public class Test {
                 return;
             }
             writeTxnActive = false;
+            cursorOpened = false;
 
-            System.out.println("Passed key rank sample iterator shrink test.");
+            pass("Passed key rank sample iterator shrink test.");
         } finally {
             if (cursorOpened)
                 DTLV.mdb_cursor_close(cursor);
@@ -924,6 +970,7 @@ public class Test {
         DTLV.MDB_txn txn = new DTLV.MDB_txn();
         DTLV.MDB_txn rtxn = new DTLV.MDB_txn();
         DTLV.MDB_cursor cursor = new DTLV.MDB_cursor();
+        keepAlive(cursor);
         IntPointer dbi = new IntPointer(1);
 
         boolean envCreated = false;
@@ -1158,7 +1205,7 @@ public class Test {
                    "Key rank and list iterators differ on bounded samples");
             bounded.close();
 
-            System.out.println("Passed key rank sample iterator test.");
+            pass("Passed key rank sample iterator test.");
         } finally {
             if (cursorOpened)
                 DTLV.mdb_cursor_close(cursor);
@@ -1186,6 +1233,7 @@ public class Test {
         DTLV.MDB_txn txn = new DTLV.MDB_txn();
         DTLV.MDB_txn rtxn = new DTLV.MDB_txn();
         DTLV.MDB_cursor cursor = new DTLV.MDB_cursor();
+        keepAlive(cursor);
         IntPointer dbi = new IntPointer(1);
 
         boolean envCreated = false;
@@ -1344,7 +1392,7 @@ public class Test {
             DTLV.dtlv_key_rank_sample_iter_destroy(bravoIter);
             bravoIndices.close();
 
-            System.out.println("Passed dupsort key rank sample iterator test.");
+            pass("Passed dupsort key rank sample iterator test.");
         } finally {
             if (cursorOpened)
                 DTLV.mdb_cursor_close(cursor);
@@ -1517,7 +1565,7 @@ public class Test {
         DTLV.usearch_free(index, error);
         expectNoError(error, "Fail to free index");
 
-        System.out.println("Passed init.");
+        pass("Passed init.");
     }
 
 
@@ -1560,7 +1608,7 @@ public class Test {
 
         error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
-        System.out.println("Passed add.");
+        pass("Passed add.");
     }
 
     static void testUsearchFind(int collSize, int dimensions) {
@@ -1596,7 +1644,7 @@ public class Test {
 
         error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
-        System.out.println("Passed find.");
+        pass("Passed find.");
     }
 
     static void testUsearchGet(int collSize, int dimensions) {
@@ -1631,7 +1679,7 @@ public class Test {
         error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
 
-        System.out.println("Passed get.");
+        pass("Passed get.");
     }
 
     static void testUsearchRemove(int collSize, int dimensions) {
@@ -1661,7 +1709,7 @@ public class Test {
 
         error.put(0, (BytePointer) null);
         DTLV.usearch_free(index, error);
-        System.out.println("Passed remove.");
+        pass("Passed remove.");
     }
 
     static void testUsearchLoad(int collSize, int dimensions) {
@@ -1743,7 +1791,7 @@ public class Test {
 
         deleteDirectoryFiles(dir);
 
-        System.out.println("Passed load.");
+        pass("Passed load.");
     }
 
     static void testUsearchView(int collSize, int dimensions) {
@@ -1786,7 +1834,7 @@ public class Test {
 
         deleteDirectoryFiles(dir);
 
-        System.out.println("Passed view.");
+        pass("Passed view.");
     }
 
     static void testUsearch() {
@@ -1797,23 +1845,26 @@ public class Test {
 
         for (int i = 0; i < collSizes.length; i++) {
             for (int j = 0; j < dims.length; j++) {
-                System.err.println("Testing " + collSizes[i] + " " + dims[j]);
-                testUsearchInit(collSizes[i], dims[j]);
-                testUsearchAdd(collSizes[i], dims[j]);
-                testUsearchFind(collSizes[i], dims[j]);
-                testUsearchGet(collSizes[i], dims[j]);
-                testUsearchRemove(collSizes[i], dims[j]);
-                testUsearchLoad(collSizes[i], dims[j]);
-                testUsearchView(collSizes[i], dims[j]);
+                final int collSize = collSizes[i];
+                final int dim = dims[j];
+                System.err.println("Testing " + collSize + " " + dim);
+                String suffix = collSize + "x" + dim;
+                runTest("usearch init " + suffix, () -> testUsearchInit(collSize, dim));
+                runTest("usearch add " + suffix, () -> testUsearchAdd(collSize, dim));
+                runTest("usearch find " + suffix, () -> testUsearchFind(collSize, dim));
+                runTest("usearch get " + suffix, () -> testUsearchGet(collSize, dim));
+                runTest("usearch remove " + suffix, () -> testUsearchRemove(collSize, dim));
+                runTest("usearch load " + suffix, () -> testUsearchLoad(collSize, dim));
+                runTest("usearch view " + suffix, () -> testUsearchView(collSize, dim));
             }
         }
 
-        System.out.println("Passed all usearch tests.");
+        pass("Passed all usearch tests.");
     }
 
     public static void main(String[] args) {
-        testLMDB();
+        runTest("LMDB suite", Test::testLMDB);
         System.out.println("----");
-        testUsearch();
+        runTest("usearch suite", Test::testUsearch);
     }
 }

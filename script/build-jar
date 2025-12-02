@@ -1,7 +1,9 @@
 #!/bin/bash
 
+set -euo pipefail
+
 rm -rf src/java/datalevin/dtlvnative/*.class src/java/datalevin/dtlvnative/macosx-arm64
-rm macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/*
+rm -f macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/*
 
 script/build-macos
 
