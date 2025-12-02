@@ -913,8 +913,8 @@ static int dtlv_snapshot_load(dtlv_usearch_domain *domain,
     return rc;
   }
   if (expected_chunk == 0) {
-    *length_out = 0;
-    return 0;
+    dtlv_snapshot_sink_dispose(&sink);
+    return snapshot_seq == 0 ? 0 : MDB_CORRUPTED;
   }
   rc = dtlv_snapshot_sink_close(&sink);
   if (rc != 0) {
@@ -2401,27 +2401,36 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
     mdb_txn_abort(txn);
     return rc;
   }
-  if (pending_found && existing_pending.stage != DTLV_CHECKPOINT_STAGE_NONE) {
-    mdb_txn_abort(txn);
-    return EBUSY;
-  }
   dtlv_checkpoint_pending_record pending;
   memset(&pending, 0, sizeof(pending));
-  pending.version = (uint8_t)DTLV_USEARCH_CHECKPOINT_VERSION;
-  pending.stage = (uint8_t)DTLV_CHECKPOINT_STAGE_INIT;
-  pending.snapshot_seq = snapshot_seq;
-  pending.chunk_cursor = 0;
-  pending.writer_uuid = writer_uuid ? *writer_uuid : (dtlv_uuid128){0};
-  rc = dtlv_meta_put_checkpoint_pending(txn, domain->meta_dbi, &pending);
+  uint32_t start_chunk = 0;
+  int created_pending = 0;
+  if (pending_found) {
+    if (existing_pending.snapshot_seq != snapshot_seq ||
+        existing_pending.stage == DTLV_CHECKPOINT_STAGE_FINALIZING) {
+      mdb_txn_abort(txn);
+      return EBUSY;
+    }
+    pending = existing_pending;
+    if (pending.version == 0) pending.version = (uint8_t)DTLV_USEARCH_CHECKPOINT_VERSION;
+    start_chunk = pending.chunk_cursor;
+  } else {
+    pending.version = (uint8_t)DTLV_USEARCH_CHECKPOINT_VERSION;
+    pending.stage = (uint8_t)DTLV_CHECKPOINT_STAGE_INIT;
+    pending.snapshot_seq = snapshot_seq;
+    pending.chunk_cursor = 0;
+    pending.writer_uuid = writer_uuid ? *writer_uuid : (dtlv_uuid128){0};
+    rc = dtlv_meta_put_checkpoint_pending(txn, domain->meta_dbi, &pending);
+    created_pending = (rc == 0);
+  }
   if (rc == 0) rc = mdb_txn_commit(txn);
   else if (txn) mdb_txn_abort(txn);
   if (rc != 0) return rc;
-  int checkpoint_started = 1;
   usearch_error_t err = NULL;
   size_t snapshot_len = usearch_serialized_length(index, &err);
   rc = dtlv_usearch_error_status(err);
   if (rc != 0) {
-    if (checkpoint_started) {
+    if (created_pending) {
       MDB_txn *cleanup_txn = NULL;
       if (mdb_txn_begin(domain->env, NULL, 0, &cleanup_txn) == 0) {
         dtlv_meta_delete(cleanup_txn, domain->meta_dbi, DTLV_META_KEY_CHECKPOINT_PENDING);
@@ -2434,10 +2443,12 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
   if (snapshot_len > 0) {
     snapshot_buf = (uint8_t *)malloc(snapshot_len);
     if (!snapshot_buf) {
-      MDB_txn *cleanup_txn = NULL;
-      if (checkpoint_started && mdb_txn_begin(domain->env, NULL, 0, &cleanup_txn) == 0) {
-        dtlv_meta_delete(cleanup_txn, domain->meta_dbi, DTLV_META_KEY_CHECKPOINT_PENDING);
-        mdb_txn_commit(cleanup_txn);
+      if (created_pending) {
+        MDB_txn *cleanup_txn = NULL;
+        if (mdb_txn_begin(domain->env, NULL, 0, &cleanup_txn) == 0) {
+          dtlv_meta_delete(cleanup_txn, domain->meta_dbi, DTLV_META_KEY_CHECKPOINT_PENDING);
+          mdb_txn_commit(cleanup_txn);
+        }
       }
       return ENOMEM;
     }
@@ -2448,7 +2459,7 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
     rc = dtlv_usearch_error_status(err);
     if (rc != 0) {
       free(snapshot_buf);
-      if (checkpoint_started) {
+      if (created_pending) {
         MDB_txn *cleanup_txn = NULL;
         if (mdb_txn_begin(domain->env, NULL, 0, &cleanup_txn) == 0) {
           dtlv_meta_delete(cleanup_txn, domain->meta_dbi, DTLV_META_KEY_CHECKPOINT_PENDING);
@@ -2459,12 +2470,18 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
     }
   }
   size_t chunk_limit = domain->chunk_bytes ? domain->chunk_bytes : DTLV_USEARCH_DEFAULT_CHUNK_BYTES;
-  size_t chunks_written = 0;
-  size_t offset = 0;
+  if (chunk_limit == 0) chunk_limit = DTLV_USEARCH_DEFAULT_CHUNK_BYTES;
+  size_t chunks_written = start_chunk;
+  size_t offset = chunk_limit * start_chunk;
   size_t batch_limit = domain->checkpoint_chunk_batch ? (size_t)domain->checkpoint_chunk_batch
                                                       : (size_t)DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
   if (batch_limit == 0) batch_limit = DTLV_USEARCH_DEFAULT_CHECKPOINT_CHUNK_BATCH;
-  if (chunk_limit == 0) chunk_limit = DTLV_USEARCH_DEFAULT_CHUNK_BYTES;
+  size_t total_chunks = snapshot_len == 0 ? 0 : (snapshot_len + chunk_limit - 1) / chunk_limit;
+  if (offset > snapshot_len) offset = snapshot_len;
+  if (start_chunk > total_chunks) {
+    free(snapshot_buf);
+    return MDB_CORRUPTED;
+  }
   while (offset < snapshot_len) {
     txn = NULL;
     rc = mdb_txn_begin(domain->env, NULL, 0, &txn);
@@ -2497,26 +2514,26 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
     else if (txn) mdb_txn_abort(txn);
     if (rc != 0) break;
   }
-  if (rc == 0 && snapshot_len == 0) {
+  if (rc == 0) {
     txn = NULL;
     rc = mdb_txn_begin(domain->env, NULL, 0, &txn);
     if (rc == 0) {
-      pending.stage = (uint8_t)DTLV_CHECKPOINT_STAGE_WRITING;
-      pending.chunk_cursor = 0;
+      pending.stage = (uint8_t)DTLV_CHECKPOINT_STAGE_FINALIZING;
+      pending.chunk_cursor = (uint32_t)chunks_written;
       rc = dtlv_meta_put_checkpoint_pending(txn, domain->meta_dbi, &pending);
     }
     if (rc == 0) rc = mdb_txn_commit(txn);
     else if (txn) mdb_txn_abort(txn);
   }
-  if (rc == MDB_MAP_FULL && checkpoint_started && dtlv_trace_enabled()) {
+  if (rc == MDB_MAP_FULL && dtlv_trace_enabled()) {
     dtlv_tracef("[checkpoint] map full after %zu chunks (seq=%llu)\n",
                 chunks_written,
                 (unsigned long long)snapshot_seq);
   }
-  if (rc != 0 && rc != MDB_MAP_FULL && checkpoint_started) {
+  if (rc != 0 && rc != MDB_MAP_FULL) {
     MDB_txn *cleanup_txn = NULL;
     if (mdb_txn_begin(domain->env, NULL, 0, &cleanup_txn) == 0) {
-      dtlv_snapshot_delete_chunks_from(domain, cleanup_txn, pending.snapshot_seq, pending.chunk_cursor);
+      dtlv_snapshot_delete_chunks_from(domain, cleanup_txn, pending.snapshot_seq, 0);
       dtlv_meta_delete(cleanup_txn, domain->meta_dbi, DTLV_META_KEY_CHECKPOINT_PENDING);
       mdb_txn_commit(cleanup_txn);
     }
@@ -2544,7 +2561,7 @@ int dtlv_usearch_checkpoint_finalize(dtlv_usearch_domain *domain,
     mdb_txn_abort(txn);
     return ENOENT;
   }
-  if (pending.stage < DTLV_CHECKPOINT_STAGE_WRITING) {
+  if (pending.stage != DTLV_CHECKPOINT_STAGE_FINALIZING) {
     mdb_txn_abort(txn);
     return EBUSY;
   }
