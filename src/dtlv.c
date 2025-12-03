@@ -836,7 +836,7 @@ static int dtlv_key_rank_sample_iter_within_end(
 static int dtlv_key_rank_sample_iter_seek_start(
     dtlv_key_rank_sample_iter *iter, MDB_val *start_key) {
   int rc;
-  if (start_key) {
+  if (start_key && start_key->mv_size > 0) {
     val_in(iter->key, start_key);
     rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
   } else {
@@ -874,7 +874,12 @@ static int dtlv_key_rank_sample_iter_compute_upper(
   if (!end_key) return mdb_count_all(iter->txn, iter->dbi, 0, rank_out);
 
   val_in(iter->key, end_key);
-  int rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
+  int rc;
+  if (end_key->mv_size > 0) {
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_SET_RANGE);
+  } else {
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_FIRST);
+  }
   if (rc == MDB_NOTFOUND) return mdb_count_all(iter->txn, iter->dbi, 0, rank_out);
   if (rc != MDB_SUCCESS) return rc;
 
