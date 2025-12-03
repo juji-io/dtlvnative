@@ -945,6 +945,27 @@ int dtlv_key_rank_sample_iter_create(dtlv_key_rank_sample_iter **iter,
   return MDB_SUCCESS;
 }
 
+static int dtlv_key_rank_sample_iter_resync(
+    dtlv_key_rank_sample_iter *iter, uint64_t target) {
+  uint64_t total = 0;
+  int rc = mdb_count_all(iter->txn, iter->dbi, 0, &total);
+  if (rc != MDB_SUCCESS) return rc;
+
+  if (total < iter->upper_rank) iter->upper_rank = total;
+  if (target >= iter->upper_rank) return MDB_NOTFOUND;
+
+  rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_FIRST);
+  if (rc != MDB_SUCCESS) return rc;
+
+  uint64_t i = 0;
+  while (i < target) {
+    rc = mdb_cursor_get(iter->cur, iter->key, iter->val, MDB_NEXT);
+    if (rc != MDB_SUCCESS) return rc;
+    i++;
+  }
+  return MDB_SUCCESS;
+}
+
 int dtlv_key_rank_sample_iter_has_next(dtlv_key_rank_sample_iter *iter) {
   if (!iter) return EINVAL;
   if (iter->range_empty == DTLV_TRUE) return DTLV_FALSE;
@@ -952,14 +973,36 @@ int dtlv_key_rank_sample_iter_has_next(dtlv_key_rank_sample_iter *iter) {
 
   uint64_t offset = (uint64_t)iter->indices[iter->current];
   uint64_t target = iter->lower_rank + offset;
-  if (target >= iter->upper_rank) return DTLV_FALSE;
+  if (target >= iter->upper_rank) {
+    iter->range_empty = DTLV_TRUE;
+    return DTLV_FALSE;
+  }
 
   int rc = mdb_cursor_get_rank(iter->cur, target, iter->key, iter->val, 0);
   if (rc == MDB_SUCCESS) {
     iter->current++;
     return DTLV_TRUE;
   }
-  if (rc == MDB_NOTFOUND) return DTLV_FALSE;
+  if (rc == MDB_NOTFOUND) {
+    iter->range_empty = DTLV_TRUE;
+    return DTLV_FALSE;
+  }
+  if (rc == MDB_BAD_VALSIZE) {
+    /* Some LMDB states can surface BAD_VALSIZE; fall back to a manual walk. */
+    rc = dtlv_key_rank_sample_iter_resync(iter, target);
+    if (rc == MDB_SUCCESS) {
+      iter->current++;
+      return DTLV_TRUE;
+    }
+    if (rc == MDB_NOTFOUND) {
+      iter->range_empty = DTLV_TRUE;
+      return DTLV_FALSE;
+    }
+    if (rc == MDB_BAD_VALSIZE) {
+      iter->range_empty = DTLV_TRUE;
+      return DTLV_FALSE;
+    }
+  }
   return rc;
 }
 
