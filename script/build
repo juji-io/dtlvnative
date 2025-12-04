@@ -25,7 +25,7 @@ build_release/test_c
 
 # build lmdb and dtlv
 
-export LDFLAGS="${LDFLAGS:+$LDFLAGS }-static-libstdc++ -static-libgcc -Wl,-rpath,'$ORIGIN'"
+export LDFLAGS="${LDFLAGS:+$LDFLAGS }-static-libstdc++ -static-libgcc -Wl,-rpath,'$$ORIGIN'"
 export OMP_LIB="-fopenmp"
 export USEARCH_LIB="-Wl,--whole-archive -lusearch -Wl,--no-whole-archive"
 

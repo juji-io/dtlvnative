@@ -2,6 +2,7 @@
 set PWD=%cd%
 
 set CPATH=%PWD%\src
+set BUILD_TEST_FLAG=-DBUILD_TEST=ON
 
 cd %PWD%
 
@@ -9,7 +10,7 @@ cd %CPATH%
 
 cmake -G "Visual Studio 17 2022" ^
       -DCLOSE_WARNING=on ^
-      -DBUILD_TEST=ON ^
+      %BUILD_TEST_FLAG% ^
       -DUSEARCH_USE_FP16LIB=ON ^
       -DUSEARCH_USE_OPENMP=ON ^
       -DUSEARCH_USE_SIMSIMD=ON ^
