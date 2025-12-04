@@ -36,18 +36,24 @@ set TEST_DTLV=build_dtlv\Release\dtlv_usearch_checkpoint_test.exe
 if exist "%TEST_DTLV%" "%TEST_DTLV%"
 
 REM Copy built static libs into src for JavaCPP linking
-for %%F in (dtlv lmdb usearch_static_c) do (
-  if exist "build_dtlv\Release\%%F.lib" (
-    copy /Y "build_dtlv\Release\%%F.lib" "%CPATH%\%%F.lib"
-  ) else if exist "build_dtlv\x64\Release\%%F.lib" (
-    copy /Y "build_dtlv\x64\Release\%%F.lib" "%CPATH%\%%F.lib"
-  ) else if exist "build_dtlv\%%F.lib" (
-    copy /Y "build_dtlv\%%F.lib" "%CPATH%\%%F.lib"
-  ) else if exist "build_dtlv\lib%%F.lib" (
-    copy /Y "build_dtlv\lib%%F.lib" "%CPATH%\%%F.lib"
-  ) else (
-    echo ERROR: %%F.lib not found after build. && exit /b 1
-  )
+if exist "build_dtlv\dtlv.lib" (
+  copy /Y "build_dtlv\dtlv.lib" "%CPATH%\dtlv.lib"
+) else (
+  echo ERROR: dtlv.lib not found. && exit /b 1
+)
+
+if exist "build_dtlv\lmdb.lib" (
+  copy /Y "build_dtlv\lmdb.lib" "%CPATH%\lmdb.lib"
+) else (
+  echo ERROR: lmdb.lib not found. && exit /b 1
+)
+
+if exist "build_dtlv\usearch_static_c.lib" (
+  copy /Y "build_dtlv\usearch_static_c.lib" "%CPATH%\usearch_static_c.lib"
+) else if exist "build_dtlv\libusearch_static_c.lib" (
+  copy /Y "build_dtlv\libusearch_static_c.lib" "%CPATH%\usearch_static_c.lib"
+) else (
+  echo ERROR: usearch library not found. && exit /b 1
 )
 
 cd %PWD%

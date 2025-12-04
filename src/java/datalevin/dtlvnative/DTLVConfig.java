@@ -16,7 +16,7 @@ import org.bytedeco.javacpp.tools.*;
                            ),
                 @Platform( // Windows
                            value = "windows",
-                           link = { "lmdb", "libusearch_static_c", "dtlv", "Advapi32" },
+                           link = { "lmdb", "usearch_static_c", "dtlv", "Advapi32" },
                            preload = { "vcomp140" }
                            ),
                 @Platform( // Linux
