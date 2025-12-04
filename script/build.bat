@@ -37,11 +37,12 @@ REM Copy built static libs where JavaCPP expects them
 setlocal enabledelayedexpansion
 for %%F in (dtlv lmdb usearch_static_c) do (
   set FOUND_LIB=
-  if exist "build_dtlv\%%F.lib" set FOUND_LIB=build_dtlv\%%F.lib
+  if exist "%CPATH%\%%F.lib" set FOUND_LIB=%CPATH%\%%F.lib
+  if not defined FOUND_LIB if exist "build_dtlv\%%F.lib" set FOUND_LIB=build_dtlv\%%F.lib
   if not defined FOUND_LIB if exist "build_dtlv\Release\%%F.lib" set FOUND_LIB=build_dtlv\Release\%%F.lib
   if defined FOUND_LIB (
-    echo Copying %%F from !FOUND_LIB! to %CPATH%\%%F.lib
-    copy /Y "!FOUND_LIB!" %CPATH%\%%F.lib
+    echo Using %%F from !FOUND_LIB! -> %CPATH%\%%F.lib
+    if /I not "!FOUND_LIB!"=="%CPATH%\%%F.lib" copy /Y "!FOUND_LIB!" %CPATH%\%%F.lib
   ) else (
     echo ERROR: %%F.lib not found under build_dtlv. Failing.
     exit /b 1
