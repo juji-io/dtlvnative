@@ -42,26 +42,25 @@ jobs:
         uses: knicknic/os-specific-run@v1.0.3
         with:
           macos: |
-            # mkdir -p src/java/datalevin/dtlvnative/macosx-arm64
-            # mkdir -p macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64
+            mkdir -p src/java/datalevin/dtlvnative/macosx-arm64
+            mkdir -p macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64
 
             brew install libomp llvm
 
-            # script/build-macos
-            script/build-jar
-            # cp src/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
+            script/build-macos
+            cp src/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
 
-            # cd macosx-arm64
-            # lein deps
+            cd macosx-arm64
+            lein deps
 
-            # cd ../src/java
-            # java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.12/javacpp-1.5.12.jar datalevin/dtlvnative/DTLV.java
+            cd ../src/java
+            java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.12/javacpp-1.5.12.jar datalevin/dtlvnative/DTLV.java
 
-            # cd ../..
-            # cp src/java/datalevin/dtlvnative/macosx-arm64/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
+            cd ../..
+            cp src/java/datalevin/dtlvnative/macosx-arm64/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
 
-            # cd macosx-arm64
-            # lein run
+            cd macosx-arm64
+            lein run
             lein deploy clojars
 
           linux: |
