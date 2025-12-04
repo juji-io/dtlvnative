@@ -297,7 +297,7 @@ static int dtlv_write_full_handle(HANDLE handle, const void *data, size_t len) {
   const uint8_t *ptr = (const uint8_t *)data;
   size_t written = 0;
   while (written < len) {
-    DWORD chunk = (DWORD)((len - written) > (size_t)DWORD_MAX ? (size_t)DWORD_MAX : (len - written));
+    DWORD chunk = (DWORD)((len - written) > (size_t)UINT32_MAX ? (size_t)UINT32_MAX : (len - written));
     DWORD out = 0;
     if (!WriteFile(handle, ptr + written, chunk, &out, NULL)) return dtlv_win32_last_error();
     if (out == 0) return EIO;
