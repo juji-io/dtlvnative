@@ -34,9 +34,10 @@ set TEST_DTLV=build_dtlv\Release\dtlv_usearch_checkpoint_test.exe
 if exist "%TEST_DTLV%" "%TEST_DTLV%"
 
 REM Copy built static libs where JavaCPP expects them
-copy /Y build_dtlv\dtlv.lib %CPATH%\
-copy /Y build_dtlv\lmdb.lib %CPATH%\
-copy /Y build_dtlv\usearch_static_c.lib %CPATH%\
+for %%F in (dtlv lmdb usearch_static_c) do (
+  if exist "build_dtlv\%%F.lib" copy /Y "build_dtlv\%%F.lib" %CPATH%\%%F.lib
+  if exist "build_dtlv\Release\%%F.lib" copy /Y "build_dtlv\Release\%%F.lib" %CPATH%\%%F.lib
+)
 
 cd %PWD%
 
