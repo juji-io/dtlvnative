@@ -1,4 +1,4 @@
-# Vector API Usage (Java)
+# Vector API Usage (Java & Clojure Glue)
 
 This document summarizes how the Datalevin Java bindings interact with the
 native USearch–LMDB integration layer, covering the lifecycle of vector
@@ -14,6 +14,37 @@ domains, staging mutations, and coordinating multi-process recovery.
 - An LMDB environment must exist (created via `DTLV.mdb_env_create`,
   `mdb_env_open`, etc.) and configured with `mdb_env_set_maxdbs` large enough
   to hold the per-domain `usearch-*` DBIs.
+
+## Clojure Integration Points
+
+- Loading: Clojure namespaces import the generated JavaCPP class via
+  `(import '[datalevin.dtlvnative DTLV])`; the platform jar ships JNI binaries
+  under `resources/datalevin/dtlvnative/<platform>/` so `Loader.load()` works
+  without additional setup.
+- Domain lifecycle: when the Clojure layer opens an LMDB environment for a DB,
+  it should call `dtlv_usearch_domain_open` once per logical vector domain
+  (e.g., per Datalevin index) and persist the returned pointer alongside the
+  DB handle. Store init options exactly once (metric, scalar kind, dimensions)
+  via `dtlv_usearch_store_init_options` and fail fast on
+  `DTLV_USEARCH_INCOMPATIBLE` to trigger migrations.
+- Query path: before issuing vector searches inside a Datalevin read
+  transaction, call `dtlv_usearch_activate` to obtain a handle, and refresh it
+  with `dtlv_usearch_refresh(handle, readTxn)` so the handle matches the
+  LMDB snapshot. If the runtime tracks reader pins, also call
+  `dtlv_usearch_pin_handle` when a read txn starts and `dtlv_usearch_release_pin`
+  when it ends; this keeps compaction/checkpoint schedulers aware of active
+  readers.
+- Write path: Datalevin write transactions should stage mutations using
+  `dtlv_usearch_stage_update` on the same LMDB write transaction, then call
+  `dtlv_usearch_apply_pending` before the LMDB commit and
+  `dtlv_usearch_publish_log` immediately after commit. This preserves LMDB’s
+  single-writer semantics and guarantees WAL promotion/replay across processes.
+- Maintenance hooks: background tasks in the Clojure layer (e.g., periodic
+  checkpoints or compaction) should invoke
+  `dtlv_usearch_checkpoint_write_snapshot`/`_finalize` and
+  `dtlv_usearch_compact` while honoring `DTLV_USEARCH_BUSY` and `MDB_MAP_FULL`
+  responses. On startup, run `dtlv_usearch_checkpoint_recover` so torn
+  checkpoints or orphaned WAL files are cleaned up before the DB is served.
 
 ## Creating and Initializing a Vector Domain
 
