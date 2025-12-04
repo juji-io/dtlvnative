@@ -40,6 +40,7 @@ for %%F in (dtlv lmdb usearch_static_c) do (
   set FOUND_LIB=
   if exist "%CPATH%\%%F.lib" set FOUND_LIB=%CPATH%\%%F.lib
   if not defined FOUND_LIB if exist "%INSTALL_DIR%\%%F.lib" set FOUND_LIB=%INSTALL_DIR%\%%F.lib
+  if not defined FOUND_LIB if exist "%INSTALL_DIR%\Release\%%F.lib" set FOUND_LIB=%INSTALL_DIR%\Release\%%F.lib
   if not defined FOUND_LIB if exist "build_dtlv\Release\%%F.lib" set FOUND_LIB=build_dtlv\Release\%%F.lib
   if not defined FOUND_LIB if exist "build_dtlv\%%F.lib" set FOUND_LIB=build_dtlv\%%F.lib
   if defined FOUND_LIB (
