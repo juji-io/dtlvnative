@@ -35,9 +35,11 @@ if exist "%TEST_DTLV%" "%TEST_DTLV%"
 
 REM Copy built static libs where JavaCPP expects them (search build_dtlv first, then src)
 setlocal enabledelayedexpansion
+set INSTALL_DIR=%CPATH%\build_dtlv\install
 for %%F in (dtlv lmdb usearch_static_c) do (
   set FOUND_LIB=
   if exist "%CPATH%\%%F.lib" set FOUND_LIB=%CPATH%\%%F.lib
+  if not defined FOUND_LIB if exist "%INSTALL_DIR%\%%F.lib" set FOUND_LIB=%INSTALL_DIR%\%%F.lib
   if not defined FOUND_LIB if exist "build_dtlv\Release\%%F.lib" set FOUND_LIB=build_dtlv\Release\%%F.lib
   if not defined FOUND_LIB if exist "build_dtlv\%%F.lib" set FOUND_LIB=build_dtlv\%%F.lib
   if defined FOUND_LIB (
