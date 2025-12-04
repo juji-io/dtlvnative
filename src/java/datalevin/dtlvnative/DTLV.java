@@ -3852,6 +3852,298 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native void dtlv_list_rank_sample_iter_destroy(
             dtlv_list_rank_sample_iter iter);
 
+    /** enum dtlv_usearch_op */
+    public static final int DTLV_USEARCH_OP_ADD = 0,
+            DTLV_USEARCH_OP_REPLACE = 1,
+            DTLV_USEARCH_OP_DELETE = 2;
+
+    public static class dtlv_uuid128 extends Pointer {
+        static {
+            Loader.load();
+        }
+
+        public dtlv_uuid128() {
+            super((Pointer) null);
+            allocate();
+        }
+
+        public dtlv_uuid128(long size) {
+            super((Pointer) null);
+            allocateArray(size);
+        }
+
+        public dtlv_uuid128(Pointer p) {
+            super(p);
+        }
+
+        private native void allocate();
+
+        private native void allocateArray(long size);
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public dtlv_uuid128 position(long position) {
+            return (dtlv_uuid128) super.position(position);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public dtlv_uuid128 getPointer(long i) {
+            return new dtlv_uuid128((Pointer) this).offsetAddress(i);
+        }
+
+        public native @Cast("uint64_t") long hi();
+
+        public native dtlv_uuid128 hi(@Cast("uint64_t") long setter);
+
+        public native @Cast("uint64_t") long lo();
+
+        public native dtlv_uuid128 lo(@Cast("uint64_t") long setter);
+    }
+
+    public static class dtlv_usearch_update extends Pointer {
+        static {
+            Loader.load();
+        }
+
+        public dtlv_usearch_update() {
+            super((Pointer) null);
+            allocate();
+        }
+
+        public dtlv_usearch_update(long size) {
+            super((Pointer) null);
+            allocateArray(size);
+        }
+
+        public dtlv_usearch_update(Pointer p) {
+            super(p);
+        }
+
+        private native void allocate();
+
+        private native void allocateArray(long size);
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public dtlv_usearch_update position(long position) {
+            return (dtlv_usearch_update) super.position(position);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public dtlv_usearch_update getPointer(long i) {
+            return new dtlv_usearch_update((Pointer) this).offsetAddress(i);
+        }
+
+        public native @Cast("dtlv_usearch_op") int op();
+
+        public native dtlv_usearch_update op(@Cast("dtlv_usearch_op") int setter);
+
+        public native @Cast("const void*") Pointer key();
+
+        public native dtlv_usearch_update key(@Cast("const void*") Pointer setter);
+
+        public native @Cast("size_t") long key_len();
+
+        public native dtlv_usearch_update key_len(@Cast("size_t") long setter);
+
+        public native @Cast("const void*") Pointer payload();
+
+        public native dtlv_usearch_update payload(@Cast("const void*") Pointer setter);
+
+        public native @Cast("size_t") long payload_len();
+
+        public native dtlv_usearch_update payload_len(@Cast("size_t") long setter);
+
+        public native @Cast("uint8_t") byte scalar_kind();
+
+        public native dtlv_usearch_update scalar_kind(@Cast("uint8_t") byte setter);
+
+        public native @Cast("uint16_t") short dimensions();
+
+        public native dtlv_usearch_update dimensions(@Cast("uint16_t") short setter);
+    }
+
+    public static class dtlv_usearch_format_info extends Pointer {
+        static {
+            Loader.load();
+        }
+
+        public dtlv_usearch_format_info() {
+            super((Pointer) null);
+            allocate();
+        }
+
+        public dtlv_usearch_format_info(long size) {
+            super((Pointer) null);
+            allocateArray(size);
+        }
+
+        public dtlv_usearch_format_info(Pointer p) {
+            super(p);
+        }
+
+        private native void allocate();
+
+        private native void allocateArray(long size);
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public dtlv_usearch_format_info position(long position) {
+            return (dtlv_usearch_format_info) super.position(position);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public dtlv_usearch_format_info getPointer(long i) {
+            return new dtlv_usearch_format_info((Pointer) this).offsetAddress(i);
+        }
+
+        public native @Cast("uint32_t") long schema_version();
+
+        public native dtlv_usearch_format_info schema_version(@Cast("uint32_t") long setter);
+
+        public native @Cast("usearch_metric_kind_t") int metric_kind();
+
+        public native dtlv_usearch_format_info metric_kind(@Cast("usearch_metric_kind_t") int setter);
+
+        public native @Cast("usearch_scalar_kind_t") int scalar_kind();
+
+        public native dtlv_usearch_format_info scalar_kind(@Cast("usearch_scalar_kind_t") int setter);
+
+        public native @Cast("uint32_t") long dimensions();
+
+        public native dtlv_usearch_format_info dimensions(@Cast("uint32_t") long setter);
+
+        public native @Cast("uint32_t") long connectivity();
+
+        public native dtlv_usearch_format_info connectivity(@Cast("uint32_t") long setter);
+
+        public native @Cast("bool") boolean multi();
+
+        public native dtlv_usearch_format_info multi(@Cast("bool") boolean setter);
+    }
+
+    @Opaque
+    public static class dtlv_usearch_domain extends Pointer {
+        public dtlv_usearch_domain() {
+            super((Pointer) null);
+        }
+
+        public dtlv_usearch_domain(Pointer p) {
+            super(p);
+        }
+    }
+
+    @Opaque
+    public static class dtlv_usearch_txn_ctx extends Pointer {
+        public dtlv_usearch_txn_ctx() {
+            super((Pointer) null);
+        }
+
+        public dtlv_usearch_txn_ctx(Pointer p) {
+            super(p);
+        }
+    }
+
+    @Opaque
+    public static class dtlv_usearch_handle extends Pointer {
+        public dtlv_usearch_handle() {
+            super((Pointer) null);
+        }
+
+        public dtlv_usearch_handle(Pointer p) {
+            super(p);
+        }
+    }
+
+    public static native int dtlv_usearch_domain_open(MDB_env env,
+            @Cast("const char*") BytePointer domain_name,
+            @Cast("const char*") BytePointer filesystem_root,
+            @Cast("dtlv_usearch_domain**") PointerPointer domain_out);
+
+    public static native int dtlv_usearch_domain_open(MDB_env env, String domain_name,
+            String filesystem_root, @ByPtrPtr dtlv_usearch_domain domain_out);
+
+    public static native void dtlv_usearch_domain_close(dtlv_usearch_domain domain);
+
+    public static native int dtlv_usearch_activate(dtlv_usearch_domain domain,
+            @Cast("dtlv_usearch_handle**") PointerPointer handle_out);
+
+    public static native int dtlv_usearch_activate(dtlv_usearch_domain domain,
+            @ByPtrPtr dtlv_usearch_handle handle_out);
+
+    public static native void dtlv_usearch_deactivate(dtlv_usearch_handle handle);
+
+    public static native @Cast("usearch_index_t") usearch_index_t dtlv_usearch_handle_index(
+            @Const dtlv_usearch_handle handle);
+
+    public static native int dtlv_usearch_refresh(dtlv_usearch_handle handle, MDB_txn txn);
+
+    public static native int dtlv_usearch_stage_update(dtlv_usearch_domain domain,
+            MDB_txn txn, dtlv_usearch_update update,
+            @Cast("dtlv_usearch_txn_ctx**") PointerPointer ctx_inout);
+
+    public static native int dtlv_usearch_stage_update(dtlv_usearch_domain domain,
+            MDB_txn txn, dtlv_usearch_update update,
+            @ByPtrPtr dtlv_usearch_txn_ctx ctx_inout);
+
+    public static native int dtlv_usearch_store_init_options(dtlv_usearch_domain domain,
+            MDB_txn txn, usearch_init_options_t opts);
+
+    public static native int dtlv_usearch_load_init_options(dtlv_usearch_domain domain,
+            MDB_txn txn, usearch_init_options_t opts, IntPointer found);
+
+    public static native int dtlv_usearch_checkpoint_write_snapshot(
+            dtlv_usearch_domain domain, usearch_index_t index,
+            @Cast("uint64_t") long snapshot_seq, @Const dtlv_uuid128 writer_uuid,
+            @Cast("size_t*") SizeTPointer chunk_count_out);
+
+    public static native int dtlv_usearch_checkpoint_finalize(dtlv_usearch_domain domain,
+            @Cast("uint64_t") long snapshot_seq,
+            @Cast("uint64_t") long prune_log_seq);
+
+    public static native int dtlv_usearch_checkpoint_recover(dtlv_usearch_domain domain);
+    public static native int dtlv_usearch_compact(dtlv_usearch_domain domain, @Cast("uint64_t") long upto_seq);
+
+
+    public static native int dtlv_usearch_set_checkpoint_chunk_batch(dtlv_usearch_domain domain,
+            @Cast("uint32_t") long batch);
+
+    public static native int dtlv_usearch_get_checkpoint_chunk_batch(dtlv_usearch_domain domain,
+            @Cast("uint32_t*") IntPointer batch_out);
+
+    public static native int dtlv_usearch_apply_pending(dtlv_usearch_txn_ctx ctx);
+
+    public static native int dtlv_usearch_publish_log(dtlv_usearch_txn_ctx ctx,
+            int unlink_after_publish);
+
+    public static native int dtlv_usearch_pin_handle(dtlv_usearch_domain domain,
+            @Const dtlv_uuid128 reader_uuid,
+            @Cast("uint64_t") long snapshot_seq,
+            @Cast("uint64_t") long log_seq,
+            @Cast("int64_t") long expires_at_ms);
+
+    public static native int dtlv_usearch_touch_pin(dtlv_usearch_domain domain,
+            @Const dtlv_uuid128 reader_uuid,
+            @Cast("int64_t") long expires_at_ms);
+
+    public static native int dtlv_usearch_release_pin(dtlv_usearch_domain domain,
+            @Const dtlv_uuid128 reader_uuid);
+
+    public static native void dtlv_usearch_txn_ctx_abort(dtlv_usearch_txn_ctx ctx);
+
+    public static native void dtlv_usearch_txn_ctx_close(dtlv_usearch_txn_ctx ctx);
+
+    public static native int dtlv_usearch_probe_filesystem(@Cast("const char*") BytePointer path,
+            dtlv_usearch_format_info info);
+
+    public static native int dtlv_usearch_probe_filesystem(String path, dtlv_usearch_format_info info);
+
+    public static native int dtlv_usearch_inspect_domain(dtlv_usearch_domain domain, MDB_txn txn,
+            dtlv_usearch_format_info info);
+
     // #ifdef __cplusplus
     // #endif
 

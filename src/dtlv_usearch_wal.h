@@ -8,6 +8,10 @@
 extern "C" {
 #endif
 
+#define DTLV_ULOG_MAGIC "DTLVULOG"
+#define DTLV_ULOG_VERSION 1
+#define DTLV_ULOG_TOKEN_HEX 32
+
 typedef struct {
   uint64_t hi;
   uint64_t lo;
@@ -21,6 +25,39 @@ typedef enum {
 
 typedef struct dtlv_usearch_wal_ctx dtlv_usearch_wal_ctx;
 
+#if defined(_MSC_VER)
+#pragma pack(push, 1)
+#define DTLV_PACKED
+#else
+#define DTLV_PACKED __attribute__((packed))
+#endif
+
+typedef struct DTLV_PACKED {
+  char magic[8];
+  uint8_t version;
+  uint8_t state;
+  uint16_t header_len;
+  uint64_t snapshot_seq_base;
+  uint64_t log_seq_hint;
+  uint64_t txn_token_hi;
+  uint64_t txn_token_lo;
+  uint32_t frame_count;
+  uint32_t checksum;
+} dtlv_ulog_header_v1;
+
+typedef struct DTLV_PACKED {
+  uint32_t ordinal;
+  uint32_t delta_bytes;
+  uint32_t checksum;
+} dtlv_ulog_frame_prefix_v1;
+
+#if defined(_MSC_VER)
+#pragma pack(pop)
+#undef DTLV_PACKED
+#else
+#undef DTLV_PACKED
+#endif
+
 int dtlv_usearch_wal_open(const char *domain_root,
                           uint64_t snapshot_seq_base,
                           uint64_t log_seq_hint,
@@ -32,8 +69,7 @@ int dtlv_usearch_wal_append(dtlv_usearch_wal_ctx *ctx,
 
 int dtlv_usearch_wal_seal(dtlv_usearch_wal_ctx *ctx);
 
-int dtlv_usearch_wal_mark_ready(dtlv_usearch_wal_ctx *ctx,
-                                int unlink_after_publish);
+int dtlv_usearch_wal_mark_ready(dtlv_usearch_wal_ctx *ctx);
 
 void dtlv_usearch_wal_close(dtlv_usearch_wal_ctx *ctx, int best_effort_delete);
 
