@@ -25,9 +25,18 @@ build_release/test_c
 
 # build lmdb and dtlv
 
+export LDFLAGS="${LDFLAGS:+$LDFLAGS }-static-libstdc++ -static-libgcc -Wl,-rpath,'$ORIGIN'"
 export OMP_LIB="-fopenmp"
 export USEARCH_LIB="-Wl,--whole-archive -lusearch -Wl,--no-whole-archive"
 
 cd ..
 make clean
 make
+
+# Bundle libgomp/libomp so users do not need system packages
+GCC_BIN="${CC:-gcc}"
+LIBGOMP_SO="$($GCC_BIN -print-file-name=libgomp.so.1)"
+if [ -f "${LIBGOMP_SO}" ]; then
+  cp "${LIBGOMP_SO}" libgomp.so.1
+  cp "${LIBGOMP_SO}" libgomp.so
+fi

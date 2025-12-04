@@ -9,7 +9,7 @@
                  [org.bytedeco/javacpp "1.5.12"]]
   :java-source-paths ["../src/java"]
   :jar-exclusions [#"\.java"]
-  :javac-options ["-Xlint:unchecked" "-Xlint:-options" "--release" "17"]
+  :javac-options ["-Xlint:unchecked" "-Xlint:-options" "--release" "21"]
   :main datalevin.dtlvnative.Test
   :jvm-opts ["-XX:+IgnoreUnrecognizedVMOptions"
              "--enable-native-access=ALL-UNNAMED"

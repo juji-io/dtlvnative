@@ -16,11 +16,18 @@ import org.bytedeco.javacpp.tools.*;
                            ),
                 @Platform( // Windows
                            value = "windows",
-                           link = { "lmdb", "libusearch_static_c", "dtlv", "Advapi32" }
+                           link = { "lmdb", "libusearch_static_c", "dtlv", "Advapi32" },
+                           preload = { "vcomp140" }
                            ),
-                @Platform( // Unix-like
-                           value = { "linux", "macosx" },
-                           link = { "dtlv" }
+                @Platform( // Linux
+                           value = "linux",
+                           link = { "dtlv" },
+                           preload = { "gomp", "omp" }
+                           ),
+                @Platform( // macOS
+                           value = "macosx",
+                           link = { "dtlv" },
+                           preload = { "omp" }
                            )
             },
             target = "datalevin.dtlvnative.DTLV"

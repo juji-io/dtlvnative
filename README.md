@@ -29,15 +29,11 @@ The name of the released JAR is `org.clojars.huahaiy/dtlvnative-PLATFORM`, where
 
 Right now, the included shared libraries depend on some system libraries.
 
-* `libc`
-* `libomp` or `libgomp`
-* `libmvec`
+* `libc`/`libmvec` (from the host glibc)
 
-On systems that these are not available by default, you will have to install
-them yourself. For example, on Ubuntu/Debian, `apt install libgomp1`, or `apt
-install gcc-12 g++-12`; on MacOS, `brew install libomp libllvm`
-
-Building these into our jars statically is a future work. PR is always welcome.
+We bundle the OpenMP runtimes (`libgomp`/`libomp`) inside the platform jars so
+you should not need to install them separately. If you hit a missing system
+dependency, please open an issue.
 
 ## License
 

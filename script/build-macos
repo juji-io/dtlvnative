@@ -8,10 +8,28 @@ export SOEXT=.dylib
 
 cd src/usearch
 
-# Use LLVM CLang (v19) instead of Apple one (v16) to compile
-export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-export LDFLAGS="${LDFLAGS:+$LDFLAGS }-L/opt/homebrew/opt/llvm/lib -L/opt/homebrew/opt/libomp/lib -L/usr/local/opt/llvm/lib -L/usr/local/opt/libomp/lib"
-export CPPFLAGS="${CPPFLAG:+$CPPFLAGS }-I/opt/homebrew/opt/llvm/include -I/opt/homebrew/opt/libomp/include -I/usr/local/opt/llvm/include -I/usr/local/opt/libomp/include"
+# Use LLVM clang with OpenMP. Allow overrides so CI can preinstall toolchains without Homebrew.
+LLVM_PREFIX="${LLVM_PREFIX:-}"
+LIBOMP_PREFIX="${LIBOMP_PREFIX:-}"
+if [ -z "${LLVM_PREFIX}" ] && command -v brew >/dev/null 2>&1; then
+  LLVM_PREFIX="$(brew --prefix llvm 2>/dev/null || true)"
+fi
+if [ -z "${LIBOMP_PREFIX}" ] && command -v brew >/dev/null 2>&1; then
+  LIBOMP_PREFIX="$(brew --prefix libomp 2>/dev/null || true)"
+fi
+
+# Fallbacks for common Homebrew prefixes
+LLVM_PREFIX="${LLVM_PREFIX:-/opt/homebrew/opt/llvm}"
+LIBOMP_PREFIX="${LIBOMP_PREFIX:-/opt/homebrew/opt/libomp}"
+
+if [ ! -x "${LLVM_PREFIX}/bin/clang" ]; then
+  echo "clang with OpenMP not found; set LLVM_PREFIX to a toolchain that provides it." >&2
+  exit 1
+fi
+
+export PATH="${LLVM_PREFIX}/bin:$PATH"
+export LDFLAGS="${LDFLAGS:+$LDFLAGS }-L${LLVM_PREFIX}/lib -L${LIBOMP_PREFIX}/lib -L/opt/homebrew/opt/llvm/lib -L/opt/homebrew/opt/libomp/lib -L/usr/local/opt/llvm/lib -L/usr/local/opt/libomp/lib"
+export CPPFLAGS="${CPPFLAGS:+$CPPFLAGS }-I${LLVM_PREFIX}/include -I${LIBOMP_PREFIX}/include -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/opt/libomp/include -I/usr/local/opt/llvm/include -I/usr/local/opt/libomp/include"
 
 cmake \
     -D CMAKE_BUILD_TYPE=Release \
@@ -38,3 +56,14 @@ export USEARCH_LIB="-Wl,-force_load,libusearch.a"
 cd ..
 make clean
 make
+
+# Bundle libomp so end users do not need Homebrew
+LIBOMP_DYLIB="${LIBOMP_PREFIX}/lib/libomp.dylib"
+CURRENT_LIBOMP_PATH="$(otool -L libdtlv.dylib | awk '/libomp/{print $1;exit}' || true)"
+if [ -n "${CURRENT_LIBOMP_PATH}" ] && [ "${CURRENT_LIBOMP_PATH}" != "@loader_path/libomp.dylib" ]; then
+  install_name_tool -change "${CURRENT_LIBOMP_PATH}" "@loader_path/libomp.dylib" libdtlv.dylib
+fi
+LIBOMP_SOURCE="${CURRENT_LIBOMP_PATH:-${LIBOMP_DYLIB}}"
+if [ -f "${LIBOMP_SOURCE}" ]; then
+  cp "${LIBOMP_SOURCE}" libomp.dylib
+fi

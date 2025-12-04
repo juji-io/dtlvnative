@@ -3,18 +3,25 @@ set -euo pipefail
 
 set -euo pipefail
 
+MACOS_RES_DIR="macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64"
+
 rm -rf src/java/datalevin/dtlvnative/*.class src/java/datalevin/dtlvnative/macosx-arm64
-rm -f macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/*
+rm -f "${MACOS_RES_DIR}"/*
+mkdir -p "${MACOS_RES_DIR}"
 
 script/build-macos
 
-cp src/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
+cp src/*.dylib "${MACOS_RES_DIR}/"
 
 cd src/java
 java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.12/javacpp-1.5.12.jar datalevin/dtlvnative/DTLV.java
 
 cd ../..
-cp src/java/datalevin/dtlvnative/macosx-arm64/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
+cp src/java/datalevin/dtlvnative/macosx-arm64/*.dylib "${MACOS_RES_DIR}/"
+
+if [ -f "${MACOS_RES_DIR}/libjniDTLV.dylib" ]; then
+  install_name_tool -change "libdtlv.dylib" "@loader_path/libdtlv.dylib" "${MACOS_RES_DIR}/libjniDTLV.dylib"
+fi
 
 cd macosx-arm64
 lein clean
