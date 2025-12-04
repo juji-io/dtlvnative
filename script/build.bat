@@ -33,6 +33,11 @@ if exist "%TEST_C%" "%TEST_C%"
 set TEST_DTLV=build_dtlv\Release\dtlv_usearch_checkpoint_test.exe
 if exist "%TEST_DTLV%" "%TEST_DTLV%"
 
+REM Copy built static libs where JavaCPP expects them
+copy /Y build_dtlv\dtlv.lib %CPATH%\
+copy /Y build_dtlv\lmdb.lib %CPATH%\
+copy /Y build_dtlv\usearch_static_c.lib %CPATH%\
+
 cd %PWD%
 
 cd %CPATH%
