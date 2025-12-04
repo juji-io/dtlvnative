@@ -41,6 +41,10 @@ for %%F in (dtlv lmdb usearch_static_c) do (
     copy /Y "build_dtlv\Release\%%F.lib" "%CPATH%\%%F.lib"
   ) else if exist "build_dtlv\x64\Release\%%F.lib" (
     copy /Y "build_dtlv\x64\Release\%%F.lib" "%CPATH%\%%F.lib"
+  ) else if exist "build_dtlv\%%F.lib" (
+    copy /Y "build_dtlv\%%F.lib" "%CPATH%\%%F.lib"
+  ) else if exist "build_dtlv\lib%%F.lib" (
+    copy /Y "build_dtlv\lib%%F.lib" "%CPATH%\%%F.lib"
   ) else (
     echo ERROR: %%F.lib not found after build. && exit /b 1
   )
