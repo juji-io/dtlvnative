@@ -1,5 +1,11 @@
 # Change Log
 
+## WIP
+### Added
+- Tight integration of usearch with DLMDB with a WAL/checkpoint approach to
+  ensure ACID of vector index.
+- Bundle OpenMP in the jar so users don't have to install it.
+
 ## 0.13.23
 ### Added
 - Key range full value iterator
