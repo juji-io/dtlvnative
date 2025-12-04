@@ -33,18 +33,18 @@ if exist "%TEST_C%" "%TEST_C%"
 set TEST_DTLV=build_dtlv\Release\dtlv_usearch_checkpoint_test.exe
 if exist "%TEST_DTLV%" "%TEST_DTLV%"
 
-REM Copy built static libs where JavaCPP expects them
+REM Copy built static libs where JavaCPP expects them (search build_dtlv first, then src)
 setlocal enabledelayedexpansion
 for %%F in (dtlv lmdb usearch_static_c) do (
   set FOUND_LIB=
   if exist "%CPATH%\%%F.lib" set FOUND_LIB=%CPATH%\%%F.lib
-  if not defined FOUND_LIB if exist "build_dtlv\%%F.lib" set FOUND_LIB=build_dtlv\%%F.lib
   if not defined FOUND_LIB if exist "build_dtlv\Release\%%F.lib" set FOUND_LIB=build_dtlv\Release\%%F.lib
+  if not defined FOUND_LIB if exist "build_dtlv\%%F.lib" set FOUND_LIB=build_dtlv\%%F.lib
   if defined FOUND_LIB (
     echo Using %%F from !FOUND_LIB! -> %CPATH%\%%F.lib
     if /I not "!FOUND_LIB!"=="%CPATH%\%%F.lib" copy /Y "!FOUND_LIB!" %CPATH%\%%F.lib
   ) else (
-    echo ERROR: %%F.lib not found under build_dtlv. Failing.
+    echo ERROR: %%F.lib not found in install prefix or build_dtlv. Failing.
     exit /b 1
   )
 )
