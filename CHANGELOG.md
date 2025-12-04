@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.14.0
 ### Added
 - Tight integration of usearch with DLMDB with a WAL/checkpoint approach to
   ensure ACID of vector index.
