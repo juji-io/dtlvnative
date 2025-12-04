@@ -26,6 +26,23 @@ cmake --build build_dtlv --config Release --target install
 
 dir build_dtlv
 
+if exist build_dtlv\Release (
+  echo --- build_dtlv\Release contents ---
+  dir build_dtlv\Release
+)
+if exist build_dtlv\install (
+  echo --- build_dtlv\install contents ---
+  dir build_dtlv\install
+)
+if exist build_dtlv\install\Release (
+  echo --- build_dtlv\install\Release contents ---
+  dir build_dtlv\install\Release
+)
+if exist build_dtlv\install\lib (
+  echo --- build_dtlv\install\lib contents ---
+  dir build_dtlv\install\lib
+)
+
 set TEST_CPP=build_dtlv\usearch_static_c_build\cpp\Release\test_cpp.exe
 set TEST_C=build_dtlv\usearch_static_c_build\c\Release\test_c.exe
 if exist "%TEST_CPP%" "%TEST_CPP%"
@@ -36,18 +53,21 @@ if exist "%TEST_DTLV%" "%TEST_DTLV%"
 REM Copy built static libs where JavaCPP expects them (search build_dtlv first, then src)
 setlocal enabledelayedexpansion
 set INSTALL_DIR=%CPATH%\build_dtlv\install
+set INSTALL_LIB_DIR=%INSTALL_DIR%\lib
 for %%F in (dtlv lmdb usearch_static_c) do (
   set FOUND_LIB=
-  if exist "%CPATH%\%%F.lib" set FOUND_LIB=%CPATH%\%%F.lib
+  if exist "build_dtlv\Release\%%F.lib" set FOUND_LIB=build_dtlv\Release\%%F.lib
+  if not defined FOUND_LIB if exist "build_dtlv\%%F.lib" set FOUND_LIB=build_dtlv\%%F.lib
   if not defined FOUND_LIB if exist "%INSTALL_DIR%\%%F.lib" set FOUND_LIB=%INSTALL_DIR%\%%F.lib
   if not defined FOUND_LIB if exist "%INSTALL_DIR%\Release\%%F.lib" set FOUND_LIB=%INSTALL_DIR%\Release\%%F.lib
-  if not defined FOUND_LIB if exist "build_dtlv\Release\%%F.lib" set FOUND_LIB=build_dtlv\Release\%%F.lib
-  if not defined FOUND_LIB if exist "build_dtlv\%%F.lib" set FOUND_LIB=build_dtlv\%%F.lib
+  if not defined FOUND_LIB if exist "%INSTALL_LIB_DIR%\%%F.lib" set FOUND_LIB=%INSTALL_LIB_DIR%\%%F.lib
+  if not defined FOUND_LIB if exist "%INSTALL_LIB_DIR%\Release\%%F.lib" set FOUND_LIB=%INSTALL_LIB_DIR%\Release\%%F.lib
+  if not defined FOUND_LIB if exist "%CPATH%\%%F.lib" set FOUND_LIB=%CPATH%\%%F.lib
   if defined FOUND_LIB (
     echo Using %%F from !FOUND_LIB! -> %CPATH%\%%F.lib
     if /I not "!FOUND_LIB!"=="%CPATH%\%%F.lib" copy /Y "!FOUND_LIB!" %CPATH%\%%F.lib
   ) else (
-    echo ERROR: %%F.lib not found in install prefix or build_dtlv. Failing.
+    echo ERROR: %%F.lib not found in build outputs. Failing.
     exit /b 1
   )
 )

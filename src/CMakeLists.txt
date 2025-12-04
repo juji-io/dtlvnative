@@ -31,6 +31,7 @@ add_library(lmdb STATIC
 set_target_properties(lmdb PROPERTIES
     OUTPUT_NAME lmdb
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}
 )
 
 # Install only the .lib file for the static library
@@ -52,6 +53,7 @@ target_link_libraries(dtlv PRIVATE lmdb)
 set_target_properties(dtlv PROPERTIES
     OUTPUT_NAME dtlv
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}
 )
 
 # Install the static library
@@ -76,9 +78,9 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
 set_target_properties(usearch_static_c PROPERTIES
     OUTPUT_NAME usearch_static_c
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}
 )
 
-target_link_options(dtlv PRIVATE "/WHOLEARCHIVE:usearch_static_c")
 target_link_libraries(dtlv PRIVATE usearch_static_c)
 
 install(TARGETS usearch_static_c
@@ -94,8 +96,6 @@ if(BUILD_TEST)
     if(APPLE)
         target_link_libraries(dtlv_usearch_checkpoint_test PRIVATE c++)
     elseif(UNIX)
-        target_link_libraries(dtlv_usearch_checkpoint_test PRIVATE stdc++)
-    elseif(WIN32)
         target_link_libraries(dtlv_usearch_checkpoint_test PRIVATE stdc++)
     endif()
     add_test(NAME dtlv_usearch_checkpoint_test COMMAND dtlv_usearch_checkpoint_test)
