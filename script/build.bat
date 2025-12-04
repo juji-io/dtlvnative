@@ -83,19 +83,36 @@ copy src\*.lib windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
 dir windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
 
 REM Bundle OpenMP runtime (vcomp) so users do not need VC redist installed for OpenMP
+echo VCToolsRedistDir=%VCToolsRedistDir%
 set OMP_DLL=
 if defined VCToolsRedistDir (
-  for %%F in ("%VCToolsRedistDir%x64\Microsoft.VC*.OpenMP\vcomp*.dll") do (
-    if exist "%%~fF" set OMP_DLL=%%~fF
+  for /d %%D in ("%VCToolsRedistDir%x64\Microsoft.VC*.OpenMP") do (
+    if exist "%%D\vcomp140.dll" set OMP_DLL=%%D\vcomp140.dll
   )
 )
+
 if not defined OMP_DLL (
-  for /r "%ProgramFiles(x86)%\Microsoft Visual Studio" %%F in (vcomp140.dll) do (
-    if not defined OMP_DLL set OMP_DLL=%%~fF
+  set "VS_DIR=%ProgramFiles(x86)%\Microsoft Visual Studio"
+  if exist "!VS_DIR!" (
+    for /r "!VS_DIR!" %%F in (vcomp140.dll) do (
+      if not defined OMP_DLL set OMP_DLL=%%~fF
+    )
   )
 )
+
+if not defined OMP_DLL (
+  set "VS_DIR=%ProgramFiles%\Microsoft Visual Studio"
+  if exist "!VS_DIR!" (
+    for /r "!VS_DIR!" %%F in (vcomp140.dll) do (
+      if not defined OMP_DLL set OMP_DLL=%%~fF
+    )
+  )
+)
+
 if defined OMP_DLL (
+  echo Found OpenMP DLL at: %OMP_DLL%
   copy "%OMP_DLL%" windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
 ) else (
-  echo OpenMP runtime vcomp140.dll not found; runtime must be present on target system.
+  echo ERROR: OpenMP runtime vcomp140.dll not found.
+  exit /b 1
 )
