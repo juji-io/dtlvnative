@@ -20,7 +20,7 @@ cmake -G "Visual Studio 17 2022" ^
       -DUSEARCH_BUILD_TEST_C=ON ^
       -DUSEARCH_BUILD_LIB_C=ON ^
       -DCMAKE_BUILD_TYPE=Release ^
-      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
+      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL ^
       -DCMAKE_INSTALL_PREFIX=%CPATH% ^
       -B build_dtlv
 
