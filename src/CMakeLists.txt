@@ -74,6 +74,7 @@ set(BUILD_SHARED_LIBS          OFF CACHE BOOL "Build statically" FORCE)
 set(USEARCH_BUILD_LIB_C        ON CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_TEST_C       ON CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_TEST_CPP     ON CACHE BOOL "" FORCE)
+set(USEARCH_BUILD_JNI          ON CACHE BOOL "" FORCE)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
 

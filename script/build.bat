@@ -19,12 +19,13 @@ cmake -G "Visual Studio 17 2022" ^
       -DUSEARCH_BUILD_TEST_CPP=ON ^
       -DUSEARCH_BUILD_TEST_C=ON ^
       -DUSEARCH_BUILD_LIB_C=ON ^
+      -DUSEARCH_BUILD_JNI=ON ^
       -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
       -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
       -DCMAKE_INSTALL_PREFIX=%CPATH% ^
       -B build_dtlv
 
-cmake --build build_dtlv --config Release --target usearch_static_c lmdb dtlv install
+cmake --build build_dtlv --config Release --target usearch_static_c lmdb dtlv usearch_jni install
 
 pushd build_dtlv\usearch_static_c_build
 ctest --output-on-failure --build-config Release
@@ -37,26 +38,41 @@ popd
 
 dir build_dtlv
 
-set TEST_CPP=build_dtlv\usearch_static_c_build\cpp\Release\test_cpp.exe
-set TEST_C=build_dtlv\usearch_static_c_build\c\Release\test_c.exe
-if exist "%TEST_CPP%" (
-  "%TEST_CPP%"
-  if errorlevel 1 exit /b 1
-) else (
-  echo ERROR: usearch C++ test binary not found. && exit /b 1
-)
-if exist "%TEST_C%" (
-  "%TEST_C%"
-  if errorlevel 1 exit /b 1
-) else (
-  echo ERROR: usearch C test binary not found. && exit /b 1
-)
 set TEST_DTLV=build_dtlv\Release\dtlv_usearch_checkpoint_test.exe
 if exist "%TEST_DTLV%" (
   "%TEST_DTLV%"
   if errorlevel 1 exit /b 1
 ) else (
   echo ERROR: dtlv checkpoint test binary not found. && exit /b 1
+)
+
+REM Build and run USearch Java binding smoke test to verify JNI wiring
+for /r "build_dtlv" %%F in (*usearch_jni*.dll) do (
+  if not defined USEARCH_JNI_DLL set USEARCH_JNI_DLL=%%F
+)
+if not defined USEARCH_JNI_DLL (
+  echo ERROR: usearch JNI library not found. && exit /b 1
+)
+
+set USEARCH_JAVA_TEST_DIR=build_dtlv\java_test
+if exist "%USEARCH_JAVA_TEST_DIR%" rmdir /S /Q "%USEARCH_JAVA_TEST_DIR%"
+mkdir "%USEARCH_JAVA_TEST_DIR%"
+
+copy /Y "%USEARCH_JNI_DLL%" "%USEARCH_JAVA_TEST_DIR%\usearch.dll"
+copy /Y "%USEARCH_JNI_DLL%" "%USEARCH_JAVA_TEST_DIR%\libusearch_jni.dll"
+
+javac -d "%USEARCH_JAVA_TEST_DIR%" src\usearch\java\cloud\unum\usearch\*.java tests\usearch_java\IndexSmoke.java
+if errorlevel 1 (
+  echo ERROR: Failed to compile USearch Java bindings. && exit /b 1
+)
+
+set "JAVA_TEST_CP=%USEARCH_JAVA_TEST_DIR%"
+set "JAVA_TEST_LIB_PATH=%USEARCH_JAVA_TEST_DIR%"
+set PATH=%JAVA_TEST_LIB_PATH%;%PATH%
+
+java -Djava.library.path=%JAVA_TEST_LIB_PATH% -cp "%JAVA_TEST_CP%" IndexSmoke
+if errorlevel 1 (
+  echo ERROR: Usearch Java smoke test failed. && exit /b 1
 )
 
 REM Copy built static libs into src for JavaCPP linking
