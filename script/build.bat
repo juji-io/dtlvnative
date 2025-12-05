@@ -14,12 +14,12 @@ cmake -G "Visual Studio 17 2022" ^
       -DCLOSE_WARNING=on ^
       %BUILD_TEST_FLAG% ^
       -DUSEARCH_USE_FP16LIB=ON ^
-      -DUSEARCH_USE_OPENMP=OFF ^
+      -DUSEARCH_USE_OPENMP=ON ^
       -DUSEARCH_USE_SIMSIMD=ON ^
       -DUSEARCH_BUILD_TEST_CPP=ON ^
       -DUSEARCH_BUILD_TEST_C=ON ^
       -DUSEARCH_BUILD_LIB_C=ON ^
-      -DCMAKE_BUILD_TYPE=Release ^
+      -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
       -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL ^
       -DCMAKE_INSTALL_PREFIX=%CPATH% ^
       -B build_dtlv
