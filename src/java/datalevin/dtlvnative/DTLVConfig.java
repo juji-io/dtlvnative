@@ -9,14 +9,14 @@ import org.bytedeco.javacpp.tools.*;
                 @Platform( // Common
                            includepath = {
                               "../../src/lmdb/libraries/liblmdb/",
+                              "../../src/usearch/include/",
                               "../../src/usearch/c/",
                               "../../src/" },
-                           include = { "lmdb.h", "usearch.h", "dtlv.h" },
+                           include = { "lmdb.h", "usearch.h", "dtlv.h", "dtlv_usearch_jni_bridge.h" },
                            linkpath = { "../../src/" }
                            ),
                 @Platform( // Windows
                            value = "windows",
-                           options = { "/MD" },
                            link = { "lmdb", "usearch_static_c", "dtlv", "Advapi32" },
                            preload = { "vcomp140" }
                            ),

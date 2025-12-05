@@ -2664,6 +2664,13 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
             @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
+     * C++-side initializer mirroring the upstream JNI binding, used as a safer
+     * path on platforms where the C wrapper crashes.
+     */
+    public static native @Cast("usearch_index_t") usearch_index_t dtlv_usearch_init_cpp(
+            usearch_init_options_t options, @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+
+    /**
      * Safe initializer that forces a non-zero thread pool and a tiny reserve to
      * avoid zero-capacity internal rings on platforms that report 0 hardware threads
      * (seen on some Windows hosts).
@@ -2671,9 +2678,17 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static usearch_index_t usearch_init_safe(usearch_init_options_t options,
             PointerPointer<BytePointer> error) {
         error.put(0, (BytePointer) null);
-        usearch_index_t index = usearch_init(options, error);
-        if (index == null || error.get(0) != null) {
+        usearch_index_t index = dtlv_usearch_init_cpp(options, error);
+        if (index == null && error.get(0) != null) {
             return index;
+        }
+
+        if (index == null) {
+            error.put(0, (BytePointer) null);
+            index = usearch_init(options, error);
+            if (index == null || error.get(0) != null) {
+                return index;
+            }
         }
 
         long threads = Runtime.getRuntime().availableProcessors();
