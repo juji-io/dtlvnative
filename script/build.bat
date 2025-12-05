@@ -31,6 +31,30 @@ if errorlevel 1 (
 )
 popd
 
+REM Locate the built USearch JNI library from the standalone build
+set USEARCH_JNI_DLL=
+for %%N in (libusearch_jni.dll usearch_jni.dll) do (
+  if not defined USEARCH_JNI_DLL (
+    if exist "%USEARCH_TEST_BUILD%\%%N" set USEARCH_JNI_DLL=%USEARCH_TEST_BUILD%\%%N
+  )
+)
+if not defined USEARCH_JNI_DLL (
+  for %%N in (libusearch_jni.dll usearch_jni.dll) do (
+    if not defined USEARCH_JNI_DLL (
+      if exist "%USEARCH_TEST_BUILD%\Release\%%N" set USEARCH_JNI_DLL=%USEARCH_TEST_BUILD%\Release\%%N
+    )
+  )
+)
+if not defined USEARCH_JNI_DLL (
+  for /r "%USEARCH_TEST_BUILD%" %%F in (*usearch_jni*.dll) do (
+    if not defined USEARCH_JNI_DLL set USEARCH_JNI_DLL=%%F
+  )
+)
+if not defined USEARCH_JNI_DLL (
+  echo ERROR: usearch JNI library not found in %USEARCH_TEST_BUILD%.
+  exit /b 1
+)
+
 cd %PWD%
 
 cd %CPATH%
@@ -70,13 +94,6 @@ if not defined TEST_DTLV (
 if errorlevel 1 exit /b 1
 
 REM Build and run USearch Java binding smoke test to verify JNI wiring
-for /r "%USEARCH_TEST_BUILD%" %%F in (*usearch_jni*.dll) do (
-  if not defined USEARCH_JNI_DLL set USEARCH_JNI_DLL=%%F
-)
-if not defined USEARCH_JNI_DLL (
-  echo ERROR: usearch JNI library not found. && exit /b 1
-)
-
 set USEARCH_JAVA_TEST_DIR=build_dtlv\java_test
 if exist "%USEARCH_JAVA_TEST_DIR%" rmdir /S /Q "%USEARCH_JAVA_TEST_DIR%"
 mkdir "%USEARCH_JAVA_TEST_DIR%"
