@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(dtlv VERSION 0.11.3 LANGUAGES C)
+project(dtlv VERSION 0.11.3 LANGUAGES C CXX)
 
 set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "" FORCE)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded" CACHE STRING "" FORCE)
@@ -12,6 +12,7 @@ option(BUILD_TEST "Build test program, default off" OFF)
 include_directories(
     ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/lmdb/libraries/liblmdb
+    ${PROJECT_SOURCE_DIR}/usearch/include
 )
 
 if(WIN32)
@@ -46,6 +47,7 @@ add_library(dtlv STATIC
     dtlv_crc32c.c
     dtlv_usearch.c
     dtlv_usearch_wal.c
+    dtlv_usearch_jni_bridge.cpp
 )
 
 # Link the LMDB static to DTLV

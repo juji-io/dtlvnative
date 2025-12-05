@@ -41,7 +41,7 @@ static inline unum::usearch::scalar_kind_t dtlv_scalar_kind_to_cpp(usearch_scala
   }
 }
 
-static inline usearch_index_t dtlv_usearch_init_cpp(usearch_init_options_t* options, usearch_error_t* error) {
+static inline usearch_index_t dtlv_usearch_init_cpp_impl(usearch_init_options_t* options, usearch_error_t* error) {
   using namespace unum::usearch;
 
   if (!options) {
@@ -94,3 +94,6 @@ static inline usearch_index_t dtlv_usearch_init_cpp(usearch_init_options_t* opti
 
   return result_ptr;
 }
+
+/* External symbol loaded by JavaCPP bindings. Implemented in dtlv_usearch_jni_bridge.cpp. */
+extern "C" usearch_index_t dtlv_usearch_init_cpp(usearch_init_options_t* options, usearch_error_t* error);
