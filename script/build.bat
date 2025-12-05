@@ -27,16 +27,40 @@ cmake -G "Visual Studio 17 2022" ^
 
 cmake --build build_dtlv --config Release --target usearch_static_c lmdb dtlv usearch_jni test_cpp test_c dtlv_usearch_checkpoint_test install
 
+REM Ensure the Usearch tests are built in the subproject tree (VS sometimes skips them on the parent build)
+cmake --build build_dtlv\usearch_static_c_build --config Release --target test_cpp test_c
+
 dir build_dtlv
 
-pushd build_dtlv
-ctest -C Release --output-on-failure
-if errorlevel 1 (
-  echo CTest reported failures.
-  popd
-  exit /b 1
+set TEST_CPP=
+for /r "build_dtlv" %%F in (test_cpp.exe) do (
+  if not defined TEST_CPP set TEST_CPP=%%F
 )
-popd
+if not defined TEST_CPP (
+  echo ERROR: usearch C++ test binary not found. && exit /b 1
+)
+"%TEST_CPP%"
+if errorlevel 1 exit /b 1
+
+set TEST_C=
+for /r "build_dtlv" %%F in (test_c.exe) do (
+  if not defined TEST_C set TEST_C=%%F
+)
+if not defined TEST_C (
+  echo ERROR: usearch C test binary not found. && exit /b 1
+)
+"%TEST_C%"
+if errorlevel 1 exit /b 1
+
+set TEST_DTLV=
+for /r "build_dtlv" %%F in (dtlv_usearch_checkpoint_test.exe) do (
+  if not defined TEST_DTLV set TEST_DTLV=%%F
+)
+if not defined TEST_DTLV (
+  echo ERROR: dtlv checkpoint test binary not found. && exit /b 1
+)
+"%TEST_DTLV%"
+if errorlevel 1 exit /b 1
 
 REM Build and run USearch Java binding smoke test to verify JNI wiring
 for /r "build_dtlv" %%F in (*usearch_jni*.dll) do (
