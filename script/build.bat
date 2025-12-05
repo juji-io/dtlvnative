@@ -25,7 +25,7 @@ cmake -G "Visual Studio 17 2022" ^
       -DCMAKE_INSTALL_PREFIX=%CPATH% ^
       -B build_dtlv
 
-cmake --build build_dtlv --config Release --target usearch_static_c lmdb dtlv usearch_jni install
+cmake --build build_dtlv --config Release --target usearch_static_c lmdb dtlv usearch_jni test_cpp test_c dtlv_usearch_checkpoint_test install
 
 pushd build_dtlv\usearch_static_c_build
 ctest --output-on-failure --build-config Release
