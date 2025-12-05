@@ -33,9 +33,9 @@
   } while (0)
 
 #ifdef _WIN32
-#include <direct.h>
-#include <shellapi.h>
 #include <windows.h>
+#include <shellapi.h>
+#include <direct.h>
 #else
 #include <dirent.h>
 #include <fcntl.h>
