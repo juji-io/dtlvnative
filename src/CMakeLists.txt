@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(dtlv VERSION 0.11.3 LANGUAGES C)
 
 set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "" FORCE)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded" CACHE STRING "" FORCE)
 
 # Options for compilation
 option(CLOSE_WARNING "Close warnings, default off" OFF)

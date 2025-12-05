@@ -20,7 +20,7 @@ cmake -G "Visual Studio 17 2022" ^
       -DUSEARCH_BUILD_TEST_C=ON ^
       -DUSEARCH_BUILD_LIB_C=ON ^
       -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
-      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL ^
+      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
       -DCMAKE_INSTALL_PREFIX=%CPATH% ^
       -B build_dtlv
 
@@ -68,6 +68,7 @@ java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.12\javacpp-1.5.
     -Dorg.bytedeco.javacpp.buildtype=Release ^
     -Dplatform.compiler.linkpath="%CPATH%" ^
     -Dplatform.linkpath="%CPATH%" ^
+    -Dplatform.compiler.options=/MT ^
     datalevin/dtlvnative/DTLV.java
 
 dir datalevin\dtlvnative\windows-x86_64
