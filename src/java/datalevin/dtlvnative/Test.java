@@ -1647,7 +1647,7 @@ public class Test {
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
 
         error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
         System.out.println("called init");
         expect(index != null, "Failed to init index");
 
@@ -1656,7 +1656,7 @@ public class Test {
         expectNoError(error, "Fail to free index");
 
         error.put(0, (BytePointer) null);
-        index = DTLV.usearch_init(opts, error);
+        index = DTLV.usearch_init_safe(opts, error);
         expect(index != null, "Failed to init index");
 
         error.put(0, (BytePointer) null);
@@ -1721,7 +1721,7 @@ public class Test {
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
 
         error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
@@ -1763,7 +1763,7 @@ public class Test {
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
         error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
@@ -1800,7 +1800,7 @@ public class Test {
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         opts.multi(true);
         error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
         error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
@@ -1834,7 +1834,7 @@ public class Test {
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
         error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
@@ -1869,7 +1869,7 @@ public class Test {
                 .metric_kind(DTLV.usearch_metric_pearson_k)
                 .quantization(DTLV.usearch_scalar_f64_k);
         error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init(weird_opts, error);
+        DTLV.usearch_index_t index = DTLV.usearch_init_safe(weird_opts, error);
         error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
@@ -1891,7 +1891,7 @@ public class Test {
         DTLV.usearch_free(index, error);
 
         error.put(0, (BytePointer) null);
-        index = DTLV.usearch_init(weird_opts, error);
+        index = DTLV.usearch_init_safe(weird_opts, error);
         expectNoError(error, "Fail to init");
 
         error.put(0, (BytePointer) null);
@@ -1946,7 +1946,7 @@ public class Test {
 
         DTLV.usearch_init_options_t opts = createOpts(dimensions);
         error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init(opts, error);
+        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
         error.put(0, (BytePointer) null);
         DTLV.usearch_reserve(index, collSize, error);
 
@@ -1969,7 +1969,7 @@ public class Test {
         DTLV.usearch_free(index, error);
 
         error.put(0, (BytePointer) null);
-        index = DTLV.usearch_init(opts, error);
+        index = DTLV.usearch_init_safe(opts, error);
 
         error.put(0, (BytePointer) null);
         DTLV.usearch_view(index, dir, error);
@@ -2018,7 +2018,7 @@ public class Test {
         PointerPointer<BytePointer> error = new PointerPointer<>(1);
         DTLV.usearch_init_options_t snapshotOpts = createOpts(8);
         error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init(snapshotOpts, error);
+        DTLV.usearch_index_t index = DTLV.usearch_init_safe(snapshotOpts, error);
         expectNoError(error, "Failed to init snapshot index");
 
         error.put(0, (BytePointer) null);

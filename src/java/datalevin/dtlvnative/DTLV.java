@@ -2664,6 +2664,31 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
             @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     /**
+     * Safe initializer that forces a non-zero thread pool and a tiny reserve to
+     * avoid zero-capacity internal rings on platforms that report 0 hardware threads
+     * (seen on some Windows hosts).
+     */
+    public static usearch_index_t usearch_init_safe(usearch_init_options_t options,
+            PointerPointer<BytePointer> error) {
+        error.put(0, (BytePointer) null);
+        usearch_index_t index = usearch_init(options, error);
+        if (index == null || error.get(0) != null) {
+            return index;
+        }
+
+        long threads = Runtime.getRuntime().availableProcessors();
+        if (threads <= 0) threads = 1;
+
+        error.put(0, (BytePointer) null);
+        usearch_change_threads_add(index, threads, error);
+        error.put(0, (BytePointer) null);
+        usearch_change_threads_search(index, threads, error);
+        error.put(0, (BytePointer) null);
+        usearch_reserve(index, 16, error);
+        return index;
+    }
+
+    /**
      * \brief Frees the resources associated with the index.
      *
      * @param index [inout] The handle to the USearch index to be freed.
