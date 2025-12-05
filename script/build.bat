@@ -26,14 +26,38 @@ cmake -G "Visual Studio 17 2022" ^
 
 cmake --build build_dtlv --config Release --target usearch_static_c lmdb dtlv install
 
+pushd build_dtlv\usearch_static_c_build
+ctest --output-on-failure --build-config Release
+if errorlevel 1 (
+  echo Usearch C/C++ tests failed.
+  popd
+  exit /b 1
+)
+popd
+
 dir build_dtlv
 
 set TEST_CPP=build_dtlv\usearch_static_c_build\cpp\Release\test_cpp.exe
 set TEST_C=build_dtlv\usearch_static_c_build\c\Release\test_c.exe
-if exist "%TEST_CPP%" "%TEST_CPP%"
-if exist "%TEST_C%" "%TEST_C%"
+if exist "%TEST_CPP%" (
+  "%TEST_CPP%"
+  if errorlevel 1 exit /b 1
+) else (
+  echo ERROR: usearch C++ test binary not found. && exit /b 1
+)
+if exist "%TEST_C%" (
+  "%TEST_C%"
+  if errorlevel 1 exit /b 1
+) else (
+  echo ERROR: usearch C test binary not found. && exit /b 1
+)
 set TEST_DTLV=build_dtlv\Release\dtlv_usearch_checkpoint_test.exe
-if exist "%TEST_DTLV%" "%TEST_DTLV%"
+if exist "%TEST_DTLV%" (
+  "%TEST_DTLV%"
+  if errorlevel 1 exit /b 1
+) else (
+  echo ERROR: dtlv checkpoint test binary not found. && exit /b 1
+)
 
 REM Copy built static libs into src for JavaCPP linking
 if exist "build_dtlv\dtlv.lib" (
