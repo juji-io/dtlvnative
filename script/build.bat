@@ -4,6 +4,41 @@ set PWD=%cd%
 set CPATH=%PWD%\src
 set BUILD_TEST_FLAG=-DBUILD_TEST=ON
 
+REM Locate or install Gradle early so we fail fast if unavailable
+set GRADLE_BIN=
+if exist "%GRADLE_HOME%\bin\gradle.bat" set GRADLE_BIN=%GRADLE_HOME%\bin\gradle.bat
+if not defined GRADLE_BIN (
+  for %%G in (gradle.bat gradle) do (
+    for /f "delims=" %%P in ('where %%G 2^>NUL') do (
+      if not defined GRADLE_BIN set GRADLE_BIN=%%P
+    )
+  )
+)
+set GRADLE_VERSION=6.9
+if not defined GRADLE_BIN (
+  set GRADLE_BASE=%CPATH%\usearch\tools\gradle-%GRADLE_VERSION%
+  set GRADLE_ZIP=%GRADLE_BASE%.zip
+  if not exist "%GRADLE_BASE%\bin\gradle.bat" (
+    echo Gradle not found; downloading %GRADLE_VERSION% to %GRADLE_BASE% ...
+    if not exist "%CPATH%\usearch\tools" mkdir "%CPATH%\usearch\tools"
+    powershell -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri \"https://services.gradle.org/distributions/gradle-%GRADLE_VERSION%-bin.zip\" -OutFile \"%GRADLE_ZIP%\" -MaximumRedirection 5 -UseBasicParsing"
+    if errorlevel 1 (
+      echo ERROR: Failed to download Gradle %GRADLE_VERSION%.
+      exit /b 1
+    )
+    powershell -Command "Expand-Archive -Force \"%GRADLE_ZIP%\" \"%CPATH%\usearch\tools\""
+    if errorlevel 1 (
+      echo ERROR: Failed to extract Gradle %GRADLE_VERSION%.
+      exit /b 1
+    )
+  )
+  if exist "%GRADLE_BASE%\bin\gradle.bat" set GRADLE_BIN=%GRADLE_BASE%\bin\gradle.bat
+)
+if not defined GRADLE_BIN (
+  echo ERROR: Gradle not found in PATH/GRADLE_HOME and download failed.
+  exit /b 1
+)
+
 REM Build and run USearch C/C++ tests standalone to validate JNI-independent bits
 set USEARCH_TEST_BUILD=%CPATH%\usearch\build_tests
 if exist "%USEARCH_TEST_BUILD%" rmdir /S /Q "%USEARCH_TEST_BUILD%"
@@ -41,42 +76,6 @@ popd
 
 REM Run Usearch Java tests via Gradle (fetches its own dependencies)
 pushd "%CPATH%\usearch"
-set GRADLE_BIN=
-if exist "%GRADLE_HOME%\bin\gradle.bat" set GRADLE_BIN=%GRADLE_HOME%\bin\gradle.bat
-if not defined GRADLE_BIN (
-  for %%G in (gradle.bat gradle) do (
-    for /f "delims=" %%P in ('where %%G 2^>NUL') do (
-      if not defined GRADLE_BIN set GRADLE_BIN=%%P
-    )
-  )
-)
-if not defined GRADLE_BIN (
-  set GRADLE_VERSION=6.9
-  set GRADLE_BASE=%CPATH%\usearch\tools\gradle-%GRADLE_VERSION%
-  set GRADLE_ZIP=%GRADLE_BASE%.zip
-  if not exist "%GRADLE_BASE%\bin\gradle.bat" (
-    echo Gradle not found; downloading %GRADLE_VERSION% to %GRADLE_BASE% ...
-    if not exist "%CPATH%\usearch\tools" mkdir "%CPATH%\usearch\tools"
-    powershell -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri \"https://services.gradle.org/distributions/gradle-%GRADLE_VERSION%-bin.zip\" -OutFile \"%GRADLE_ZIP%\" -MaximumRedirection 5 -UseBasicParsing"
-    if errorlevel 1 (
-      echo ERROR: Failed to download Gradle %GRADLE_VERSION%.
-      popd
-      exit /b 1
-    )
-    powershell -Command "Expand-Archive -Force \"%GRADLE_ZIP%\" \"%CPATH%\usearch\tools\""
-    if errorlevel 1 (
-      echo ERROR: Failed to extract Gradle %GRADLE_VERSION%.
-      popd
-      exit /b 1
-    )
-  )
-  if exist "%GRADLE_BASE%\bin\gradle.bat" set GRADLE_BIN=%GRADLE_BASE%\bin\gradle.bat
-)
-if not defined GRADLE_BIN (
-  echo ERROR: Gradle not found in PATH or GRADLE_HOME. Please install Gradle to run Usearch Java tests.
-  popd
-  exit /b 1
-)
 "%GRADLE_BIN%" --no-daemon test
 if errorlevel 1 (
   echo ERROR: Usearch Java tests failed (Gradle).
