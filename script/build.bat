@@ -51,6 +51,28 @@ if not defined GRADLE_BIN (
   )
 )
 if not defined GRADLE_BIN (
+  set GRADLE_VERSION=8.5
+  set GRADLE_BASE=%CPATH%\usearch\tools\gradle-%GRADLE_VERSION%
+  set GRADLE_ZIP=%GRADLE_BASE%.zip
+  if not exist "%GRADLE_BASE%\bin\gradle.bat" (
+    echo Gradle not found; downloading %GRADLE_VERSION% to %GRADLE_BASE% ...
+    if not exist "%CPATH%\usearch\tools" mkdir "%CPATH%\usearch\tools"
+    powershell -Command "Invoke-WebRequest -Uri https://services.gradle.org/distributions/gradle-%GRADLE_VERSION%-bin.zip -OutFile '%GRADLE_ZIP%'"
+    if errorlevel 1 (
+      echo ERROR: Failed to download Gradle %GRADLE_VERSION%.
+      popd
+      exit /b 1
+    )
+    powershell -Command "Expand-Archive -Force '%GRADLE_ZIP%' '%CPATH%\usearch\tools'"
+    if errorlevel 1 (
+      echo ERROR: Failed to extract Gradle %GRADLE_VERSION%.
+      popd
+      exit /b 1
+    )
+  )
+  if exist "%GRADLE_BASE%\bin\gradle.bat" set GRADLE_BIN=%GRADLE_BASE%\bin\gradle.bat
+)
+if not defined GRADLE_BIN (
   echo ERROR: Gradle not found in PATH or GRADLE_HOME. Please install Gradle to run Usearch Java tests.
   popd
   exit /b 1
