@@ -9,6 +9,7 @@ set USEARCH_TEST_BUILD=%CPATH%\usearch\build_tests
 if exist "%USEARCH_TEST_BUILD%" rmdir /S /Q "%USEARCH_TEST_BUILD%"
 
 cmake -G "Visual Studio 17 2022" ^
+      -A x64 ^
       -D CMAKE_BUILD_TYPE=Release ^
       -D USEARCH_USE_FP16LIB=ON ^
       -D USEARCH_USE_OPENMP=ON ^
@@ -16,7 +17,6 @@ cmake -G "Visual Studio 17 2022" ^
       -D USEARCH_BUILD_TEST_CPP=ON ^
       -D USEARCH_BUILD_TEST_C=ON ^
       -D USEARCH_BUILD_LIB_C=ON ^
-      -D USEARCH_BUILD_JNI=ON ^
       -B "%USEARCH_TEST_BUILD%" ^
       -S "%CPATH%\usearch"
 if errorlevel 1 (
@@ -24,9 +24,9 @@ if errorlevel 1 (
   exit /b 1
 )
 
-cmake --build "%USEARCH_TEST_BUILD%" --config Release --target test_cpp test_c usearch_jni
+cmake --build "%USEARCH_TEST_BUILD%" --config Release --target test_cpp test_c
 if errorlevel 1 (
-  echo ERROR: Failed to build USearch tests/JNI.
+  echo ERROR: Failed to build USearch C/C++ tests.
   exit /b 1
 )
 
@@ -39,64 +39,29 @@ if errorlevel 1 (
 )
 popd
 
-REM Locate the built USearch JNI library from the standalone build
-set USEARCH_JNI_DLL=
-for %%N in (libusearch_jni.dll usearch_jni.dll) do (
-  if not defined USEARCH_JNI_DLL (
-    if exist "%USEARCH_TEST_BUILD%\%%N" set USEARCH_JNI_DLL=%USEARCH_TEST_BUILD%\%%N
-  )
-)
-if not defined USEARCH_JNI_DLL (
-  for %%N in (libusearch_jni.dll usearch_jni.dll) do (
-    if not defined USEARCH_JNI_DLL (
-      if exist "%USEARCH_TEST_BUILD%\Release\%%N" set USEARCH_JNI_DLL=%USEARCH_TEST_BUILD%\Release\%%N
+REM Run Usearch Java tests via Gradle (fetches its own dependencies)
+pushd "%CPATH%\usearch"
+set GRADLE_BIN=
+if exist "%GRADLE_HOME%\bin\gradle.bat" set GRADLE_BIN=%GRADLE_HOME%\bin\gradle.bat
+if not defined GRADLE_BIN (
+  for %%G in (gradle.bat gradle) do (
+    for /f "delims=" %%P in ('where %%G 2^>NUL') do (
+      if not defined GRADLE_BIN set GRADLE_BIN=%%P
     )
   )
 )
-if not defined USEARCH_JNI_DLL (
-  for /r "%USEARCH_TEST_BUILD%" %%F in (*usearch_jni*.dll) do (
-    if not defined USEARCH_JNI_DLL set USEARCH_JNI_DLL=%%F
-  )
-)
-if not defined USEARCH_JNI_DLL (
-  echo JNI DLL not found after initial search, rebuilding usearch_jni target...
-  cmake --build "%USEARCH_TEST_BUILD%" --config Release --target usearch_jni
-  if errorlevel 1 (
-    echo ERROR: Rebuild of usearch_jni failed.
-    exit /b 1
-  )
-  for /r "%USEARCH_TEST_BUILD%" %%F in (*usearch_jni*.dll) do (
-    if not defined USEARCH_JNI_DLL set USEARCH_JNI_DLL=%%F
-  )
-)
-if not defined USEARCH_JNI_DLL (
-  echo ERROR: usearch JNI library not found in %USEARCH_TEST_BUILD%. Contents:
-  dir "%USEARCH_TEST_BUILD%"
-  dir "%USEARCH_TEST_BUILD%\Release"
+if not defined GRADLE_BIN (
+  echo ERROR: Gradle not found in PATH or GRADLE_HOME. Please install Gradle to run Usearch Java tests.
+  popd
   exit /b 1
 )
-
-REM Compile and run USearch Java smoke test against the standalone JNI build
-set USEARCH_JAVA_TEST_DIR=%USEARCH_TEST_BUILD%\java_test
-if exist "%USEARCH_JAVA_TEST_DIR%" rmdir /S /Q "%USEARCH_JAVA_TEST_DIR%"
-mkdir "%USEARCH_JAVA_TEST_DIR%"
-
-copy /Y "%USEARCH_JNI_DLL%" "%USEARCH_JAVA_TEST_DIR%\usearch.dll"
-copy /Y "%USEARCH_JNI_DLL%" "%USEARCH_JAVA_TEST_DIR%\libusearch_jni.dll"
-
-javac -d "%USEARCH_JAVA_TEST_DIR%" src\usearch\java\cloud\unum\usearch\*.java tests\usearch_java\IndexSmoke.java
+"%GRADLE_BIN%" --no-daemon test
 if errorlevel 1 (
-  echo ERROR: Failed to compile USearch Java bindings. && exit /b 1
+  echo ERROR: Usearch Java tests failed (Gradle).
+  popd
+  exit /b 1
 )
-
-set "JAVA_TEST_CP=%USEARCH_JAVA_TEST_DIR%"
-set "JAVA_TEST_LIB_PATH=%USEARCH_JAVA_TEST_DIR%"
-set PATH=%JAVA_TEST_LIB_PATH%;%PATH%
-
-java -Djava.library.path=%JAVA_TEST_LIB_PATH% -cp "%JAVA_TEST_CP%" IndexSmoke
-if errorlevel 1 (
-  echo ERROR: Usearch Java smoke test failed. && exit /b 1
-)
+popd
 
 cd %PWD%
 
@@ -105,6 +70,7 @@ cd %CPATH%
 if exist build_dtlv rmdir /S /Q build_dtlv
 
 cmake -G "Visual Studio 17 2022" ^
+      -A x64 ^
       -DCLOSE_WARNING=on ^
       %BUILD_TEST_FLAG% ^
       -DUSEARCH_USE_FP16LIB=ON ^
