@@ -3,6 +3,9 @@ set PWD=%cd%
 
 set CPATH=%PWD%\src
 set BUILD_TEST_FLAG=-DBUILD_TEST=ON
+set GRADLE_VERSION=6.9
+set GRADLE_BASE=%CPATH%\usearch\tools\gradle-%GRADLE_VERSION%
+set GRADLE_ZIP=%GRADLE_BASE%.zip
 
 REM Locate or install Gradle early so we fail fast if unavailable
 set GRADLE_BIN=
@@ -14,10 +17,7 @@ if not defined GRADLE_BIN (
     )
   )
 )
-set GRADLE_VERSION=6.9
 if not defined GRADLE_BIN (
-  set GRADLE_BASE=%CPATH%\usearch\tools\gradle-%GRADLE_VERSION%
-  set GRADLE_ZIP=%GRADLE_BASE%.zip
   if not exist "%GRADLE_BASE%\bin\gradle.bat" (
     echo Gradle not found; downloading %GRADLE_VERSION% to %GRADLE_BASE% ...
     if not exist "%CPATH%\usearch\tools" mkdir "%CPATH%\usearch\tools"
