@@ -16,10 +16,11 @@ cmake -G "Visual Studio 17 2022" ^
       -D USEARCH_BUILD_TEST_CPP=ON ^
       -D USEARCH_BUILD_TEST_C=ON ^
       -D USEARCH_BUILD_LIB_C=ON ^
+      -D USEARCH_BUILD_JNI=ON ^
       -B "%USEARCH_TEST_BUILD%" ^
       -S "%CPATH%\usearch"
 
-cmake --build "%USEARCH_TEST_BUILD%" --config Release --target test_cpp test_c
+cmake --build "%USEARCH_TEST_BUILD%" --config Release --target test_cpp test_c usearch_jni
 
 pushd "%USEARCH_TEST_BUILD%"
 ctest -C Release --output-on-failure
@@ -45,16 +46,12 @@ cmake -G "Visual Studio 17 2022" ^
       -DUSEARCH_BUILD_TEST_CPP=ON ^
       -DUSEARCH_BUILD_TEST_C=ON ^
       -DUSEARCH_BUILD_LIB_C=ON ^
-      -DUSEARCH_BUILD_JNI=ON ^
       -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
       -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
       -DCMAKE_INSTALL_PREFIX=%CPATH% ^
       -B build_dtlv
 
-cmake --build build_dtlv --config Release --target usearch_static_c lmdb dtlv usearch_jni test_cpp test_c dtlv_usearch_checkpoint_test install
-
-REM Ensure the Usearch tests are built in the subproject tree (VS sometimes skips them on the parent build)
-cmake --build build_dtlv\usearch_static_c_build --config Release --target test_cpp test_c
+cmake --build build_dtlv --config Release --target usearch_static_c lmdb dtlv dtlv_usearch_checkpoint_test install
 
 dir build_dtlv
 
@@ -69,7 +66,7 @@ if not defined TEST_DTLV (
 if errorlevel 1 exit /b 1
 
 REM Build and run USearch Java binding smoke test to verify JNI wiring
-for /r "build_dtlv" %%F in (*usearch_jni*.dll) do (
+for /r "%USEARCH_TEST_BUILD%" %%F in (*usearch_jni*.dll) do (
   if not defined USEARCH_JNI_DLL set USEARCH_JNI_DLL=%%F
 )
 if not defined USEARCH_JNI_DLL (
