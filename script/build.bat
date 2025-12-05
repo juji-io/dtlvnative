@@ -9,6 +9,12 @@ set GRADLE_ZIP=%GRADLE_BASE%.zip
 
 REM Locate or install Gradle early so we fail fast if unavailable
 set GRADLE_BIN=
+if not defined JAVA_HOME_17_X64 (
+  if exist "C:\Program Files\Java\jdk17" set JAVA_HOME_17_X64=C:\Program Files\Java\jdk17
+  if not defined JAVA_HOME_17_X64 if exist "C:\Program Files\Java\jdk-17" set JAVA_HOME_17_X64=C:\Program Files\Java\jdk-17
+  if not defined JAVA_HOME_17_X64 if exist "C:\Program Files\Java\jdk-17.0.2" set JAVA_HOME_17_X64=C:\Program Files\Java\jdk-17.0.2
+  if not defined JAVA_HOME_17_X64 if exist "C:\Program Files\Java\jdk-17.0.10" set JAVA_HOME_17_X64=C:\Program Files\Java\jdk-17.0.10
+)
 if exist "%GRADLE_HOME%\bin\gradle.bat" set GRADLE_BIN=%GRADLE_HOME%\bin\gradle.bat
 if not defined GRADLE_BIN (
   for %%G in (gradle.bat gradle) do (
@@ -81,9 +87,10 @@ popd
 REM Run Usearch Java tests via Gradle (fetches its own dependencies)
 pushd "%CPATH%\usearch"
 "%GRADLE_BIN%" --version
-"%GRADLE_BIN%" --no-daemon test
+"%GRADLE_BIN%" --no-daemon test -Dorg.gradle.java.home=%JAVA_HOME_17_X64%
+"%GRADLE_BIN%" --stop
 if errorlevel 1 (
-  echo ERROR: Usearch Java tests failed (Gradle).
+  echo ERROR: Usearch Java tests failed (Gradle with Java 17).
   popd
   exit /b 1
 )
