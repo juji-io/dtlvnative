@@ -2680,11 +2680,15 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
         if (threads <= 0) threads = 1;
 
         error.put(0, (BytePointer) null);
+        usearch_reserve(index, 16, error);
+        if (error.get(0) != null) return index;
+
+        error.put(0, (BytePointer) null);
         usearch_change_threads_add(index, threads, error);
+        if (error.get(0) != null) return index;
+
         error.put(0, (BytePointer) null);
         usearch_change_threads_search(index, threads, error);
-        error.put(0, (BytePointer) null);
-        usearch_reserve(index, 16, error);
         return index;
     }
 
