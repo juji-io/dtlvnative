@@ -55,6 +55,15 @@ int dtlv_usearch_activate(dtlv_usearch_domain *domain, dtlv_usearch_handle **han
 void dtlv_usearch_deactivate(dtlv_usearch_handle *handle);
 
 usearch_index_t dtlv_usearch_handle_index(const dtlv_usearch_handle *handle);
+size_t dtlv_usearch_handle_size(dtlv_usearch_handle *handle, usearch_error_t *error);
+bool dtlv_usearch_handle_contains(dtlv_usearch_handle *handle, usearch_key_t key, usearch_error_t *error);
+size_t dtlv_usearch_handle_search(dtlv_usearch_handle *handle,
+                                  const void *vector,
+                                  usearch_scalar_kind_t kind,
+                                  size_t count,
+                                  usearch_key_t *keys,
+                                  usearch_distance_t *distances,
+                                  usearch_error_t *error);
 
 int dtlv_usearch_refresh(dtlv_usearch_handle *handle, MDB_txn *txn);
 

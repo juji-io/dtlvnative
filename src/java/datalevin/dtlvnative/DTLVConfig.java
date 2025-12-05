@@ -12,7 +12,7 @@ import org.bytedeco.javacpp.tools.*;
                               "../../src/usearch/include/",
                               "../../src/usearch/c/",
                               "../../src/" },
-                           include = { "lmdb.h", "usearch.h", "dtlv.h", "dtlv_usearch_jni_bridge.h" },
+                           include = { "lmdb.h", "usearch.h", "dtlv.h" },
                            linkpath = { "../../src/" }
                            ),
                 @Platform( // Windows

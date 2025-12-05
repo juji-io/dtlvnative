@@ -47,7 +47,6 @@ add_library(dtlv STATIC
     dtlv_crc32c.c
     dtlv_usearch.c
     dtlv_usearch_wal.c
-    dtlv_usearch_jni_bridge.cpp
 )
 
 # Link the LMDB static to DTLV
@@ -85,6 +84,9 @@ set_target_properties(usearch_static_c PROPERTIES
 )
 
 target_link_libraries(dtlv PRIVATE usearch_static_c)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 install(TARGETS usearch_static_c
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}

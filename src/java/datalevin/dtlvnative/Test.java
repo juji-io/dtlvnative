@@ -1632,481 +1632,6 @@ public class Test {
         }
     }
 
-    static void testUsearchInit(int collSize, int dimensions) {
-
-        DTLV.usearch_init_options_t opts = createOpts(dimensions);
-
-        expect(opts.metric_kind() == DTLV.usearch_metric_ip_k, "fail to get metric_kind");
-        expect(opts.quantization() == DTLV.usearch_scalar_f32_k, "fail to get quantization");
-        expect(opts.connectivity() == 3, "fail to get connectivity");
-        expect(opts.dimensions() == dimensions, "fail to get dimensions");
-        expect(opts.expansion_add() == 40, "fail to get expansion_add");
-        expect(opts.expansion_search() == 16, "fail to get expansion_search");
-        expect(opts.multi() == false, "fail to get multi");
-
-        PointerPointer<BytePointer> error = new PointerPointer<>(1);
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
-        System.out.println("called init");
-        expect(index != null, "Failed to init index");
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-        expectNoError(error, "Fail to free index");
-
-        error.put(0, (BytePointer) null);
-        index = DTLV.usearch_init_safe(opts, error);
-        expect(index != null, "Failed to init index");
-
-        error.put(0, (BytePointer) null);
-        long size = DTLV.usearch_size(index, error);
-        expect(size == 0, "Failed to get index size");
-
-        error.put(0, (BytePointer) null);
-        long capacity = DTLV.usearch_capacity(index, error);
-        expect(capacity == 0, "Failed to get index capacity");
-
-        error.put(0, (BytePointer) null);
-        long dims = DTLV.usearch_dimensions(index, error);
-        expect(dimensions == dims, "Failed to get index dimensions");
-
-        error.put(0, (BytePointer) null);
-        long connectivity = DTLV.usearch_connectivity(index, error);
-        expect(connectivity == opts.connectivity(),
-                "Failed to get index connectivity");
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_reserve(index, collSize, error);
-        expectNoError(error, "Fail to reserve");
-
-        error.put(0, (BytePointer) null);
-        size = DTLV.usearch_size(index, error);
-        expect(size == 0, "Failed to get index size");
-
-        error.put(0, (BytePointer) null);
-        capacity = DTLV.usearch_capacity(index, error);
-        expect(capacity >= collSize, "Failed to get index capacity");
-
-        error.put(0, (BytePointer) null);
-        dims = DTLV.usearch_dimensions(index, error);
-        expect(dimensions == dims, "Failed to get index dimensions");
-
-        error.put(0, (BytePointer) null);
-        connectivity = DTLV.usearch_connectivity(index, error);
-        expect(connectivity == opts.connectivity(),
-                "Failed to get index connectivity");
-
-        error.put(0, (BytePointer) null);
-        BytePointer hardware = DTLV.usearch_hardware_acceleration(index, error);
-        expectNoError(error, "Fail to get hardware");
-        System.out.println("SIMD Hardware ISA Name is: " + hardware.getString());
-
-        error.put(0, (BytePointer) null);
-        long memory = DTLV.usearch_memory_usage(index, error);
-        expect(memory > 0, "Failed to get memory usage");
-        System.out.println("Memory Usage is: " + memory);
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-        expectNoError(error, "Fail to free index");
-
-        pass("Passed init.");
-    }
-
-
-    static void testUsearchAdd(int collSize, int dimensions) {
-
-        PointerPointer<BytePointer> error = new PointerPointer<>(1);
-
-        DTLV.usearch_init_options_t opts = createOpts(dimensions);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_reserve(index, collSize, error);
-
-        float[][] data = randomVectors(collSize, dimensions);
-
-        for (int i = 0; i < collSize; i++) {
-            FloatPointer vecPtr = new FloatPointer(data[i]);
-            error.put(0, (BytePointer) null);
-            DTLV.usearch_add(index, (long)i, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expectNoError(error, "Fail to add vector");
-        }
-
-        error.put(0, (BytePointer) null);
-        long size = DTLV.usearch_size(index, error);
-        expect(size == collSize, "Failed to get index size");
-
-        error.put(0, (BytePointer) null);
-        long capacity = DTLV.usearch_capacity(index, error);
-        expect(capacity >= collSize, "Failed to get index capacity");
-
-        for (int i = 0; i < collSize; i++) {
-            error.put(0, (BytePointer) null);
-            expect(DTLV.usearch_contains(index, (long) i, error),
-                    "Failed to find key in index");
-        }
-        error.put(0, (BytePointer) null);
-        expect(!DTLV.usearch_contains(index, (long) -1, error),
-                "Found non existing key in index");
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-        pass("Passed add.");
-    }
-
-    static void testUsearchFind(int collSize, int dimensions) {
-
-        PointerPointer<BytePointer> error = new PointerPointer<>(1);
-
-        DTLV.usearch_init_options_t opts = createOpts(dimensions);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_reserve(index, collSize, error);
-
-        float[][] data = randomVectors(collSize, dimensions);
-
-        for (int i = 0; i < collSize; i++) {
-            FloatPointer vecPtr = new FloatPointer(data[i]);
-            error.put(0, (BytePointer) null);
-            DTLV.usearch_add(index, (long) i, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expectNoError(error, "Fail to add vector");
-        }
-
-        LongPointer keys = new LongPointer(new long[collSize]);
-        FloatPointer distances = new FloatPointer(new float[collSize]);
-
-        for (int i = 0; i < collSize; i++) {
-            FloatPointer vecPtr = new FloatPointer(data[i]);
-            error.put(0, (BytePointer) null);
-            long found = DTLV.usearch_search(index, vecPtr, DTLV.usearch_scalar_f32_k,
-                                             (long)collSize, keys, distances, error);
-            expectNoError(error, "Fail to search");
-            expect(found >= 1 && found <= collSize, "Vector cannot be found");
-        }
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-        pass("Passed find.");
-    }
-
-    static void testUsearchGet(int collSize, int dimensions) {
-
-        PointerPointer<BytePointer> error = new PointerPointer<>(1);
-
-        DTLV.usearch_init_options_t opts = createOpts(dimensions);
-        opts.multi(true);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_reserve(index, collSize, error);
-
-        float[][] data = randomVectors(collSize, dimensions);
-
-        long key = 1;
-        for (int i = 0; i < collSize; i++) {
-            FloatPointer vecPtr = new FloatPointer(data[i]);
-            error.put(0, (BytePointer) null);
-            DTLV.usearch_add(index, key, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expectNoError(error, "Fail to add vector");
-        }
-
-        float[] vectors = new float[collSize * dimensions];
-        FloatPointer vPtr= new FloatPointer(vectors);
-        error.put(0, (BytePointer) null);
-        long found = DTLV.usearch_get(index, key, (long) collSize, vPtr,
-                                      DTLV.usearch_scalar_f32_k, error);
-        expectNoError(error, "Fail to get");
-        expect(found == collSize, "Key is missing");
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-
-        pass("Passed get.");
-    }
-
-    static void testUsearchRemove(int collSize, int dimensions) {
-
-        PointerPointer<BytePointer> error = new PointerPointer<>(1);
-
-        DTLV.usearch_init_options_t opts = createOpts(dimensions);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_reserve(index, collSize, error);
-
-        float[][] data = randomVectors(collSize, dimensions);
-
-        for (int i = 0; i < collSize; i++) {
-            FloatPointer vecPtr = new FloatPointer(data[i]);
-            error.put(0, (BytePointer) null);
-            DTLV.usearch_add(index, (long)i, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expectNoError(error, "Fail to add");
-        }
-
-        for (int i = 0; i < collSize; i++) {
-            error.put(0, (BytePointer) null);
-            DTLV.usearch_remove(index, (long) i, error);
-            expectNoError(error, "Fail to remove");
-        }
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-        pass("Passed remove.");
-    }
-
-    static void testUsearchLoad(int collSize, int dimensions) {
-
-        PointerPointer<BytePointer> error = new PointerPointer<>(1);
-
-        DTLV.usearch_init_options_t weird_opts = createOpts(dimensions);
-        weird_opts.connectivity(11)
-                .expansion_add(15)
-                .expansion_search(19)
-                .metric_kind(DTLV.usearch_metric_pearson_k)
-                .quantization(DTLV.usearch_scalar_f64_k);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init_safe(weird_opts, error);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_reserve(index, collSize, error);
-
-        float[][] data = randomVectors(collSize, dimensions);
-
-        for (int i = 0; i < collSize; i++) {
-            FloatPointer vecPtr = new FloatPointer(data[i]);
-            error.put(0, (BytePointer) null);
-            DTLV.usearch_add(index, (long) i, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expectNoError(error, "Fail to add");
-        }
-
-        String dir = "us";
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_save(index, dir, error);
-        expectNoError(error, "Fail to save");
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-
-        error.put(0, (BytePointer) null);
-        index = DTLV.usearch_init_safe(weird_opts, error);
-        expectNoError(error, "Fail to init");
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_load(index, "us", error);
-        expectNoError(error, "Fail to load");
-
-        error.put(0, (BytePointer) null);
-        long size = DTLV.usearch_size(index, error);
-        expect(size == collSize, "Failed to get index size");
-        error.put(0, (BytePointer) null);
-        long capacity = DTLV.usearch_capacity(index, error);
-        expect(capacity == collSize, "Failed to get index capacity");
-        error.put(0, (BytePointer) null);
-        long dims = DTLV.usearch_dimensions(index, error);
-        expect(dimensions == dims, "Failed to get index dimensions");
-        error.put(0, (BytePointer) null);
-        long connectivity = DTLV.usearch_connectivity(index, error);
-        expect(connectivity == weird_opts.connectivity(),
-                "Failed to get index connectivity" + weird_opts.connectivity());
-
-        for (int i = 0; i < collSize; i++) {
-            error.put(0, (BytePointer) null);
-            expect(DTLV.usearch_contains(index, (long)i, error),
-                   "Fail to find key in index");
-        }
-
-        LongPointer keys = new LongPointer(new long[collSize]);
-        FloatPointer distances = new FloatPointer(new float[collSize]);
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_change_threads_search(index, 1, error);
-        for (int i = 0; i < collSize; i++) {
-            FloatPointer vecPtr = new FloatPointer(data[i]);
-            error.put(0, (BytePointer) null);
-            long found = DTLV.usearch_search(index, vecPtr, DTLV.usearch_scalar_f32_k,
-                                             (long)collSize, keys, distances, error);
-            expectNoError(error, "Fail to search");
-            expect(found >= 1 && found <= collSize, "Vector cannot be found");
-        }
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-
-        deleteDirectoryFiles(dir);
-
-        pass("Passed load.");
-    }
-
-    static void testUsearchView(int collSize, int dimensions) {
-
-        PointerPointer<BytePointer> error = new PointerPointer<>(1);
-
-        DTLV.usearch_init_options_t opts = createOpts(dimensions);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init_safe(opts, error);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_reserve(index, collSize, error);
-
-        float[][] data = randomVectors(collSize, dimensions);
-
-        for (int i = 0; i < collSize; i++) {
-            FloatPointer vecPtr = new FloatPointer(data[i]);
-            error.put(0, (BytePointer) null);
-            DTLV.usearch_add(index, (long)i, vecPtr, DTLV.usearch_scalar_f32_k, error);
-            expectNoError(error, "Fail to add");
-        }
-
-        String dir = "us";
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_save(index, dir, error);
-        expectNoError(error, "Fail to save");
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-
-        error.put(0, (BytePointer) null);
-        index = DTLV.usearch_init_safe(opts, error);
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_view(index, dir, error);
-        expectNoError(error, "Fail to view");
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-
-        deleteDirectoryFiles(dir);
-
-        pass("Passed view.");
-    }
-
-    static void testUsearch() {
-        System.err.println("Testing usearch ...");
-
-        int[] collSizes = { 11, 512 };
-        int[] dims = { 83, 2 };
-
-        for (int i = 0; i < collSizes.length; i++) {
-            for (int j = 0; j < dims.length; j++) {
-                final int collSize = collSizes[i];
-                final int dim = dims[j];
-                System.err.println("Testing " + collSize + " " + dim);
-                String suffix = collSize + "x" + dim;
-                runTest("usearch init " + suffix, () -> testUsearchInit(collSize, dim));
-                runTest("usearch add " + suffix, () -> testUsearchAdd(collSize, dim));
-                runTest("usearch find " + suffix, () -> testUsearchFind(collSize, dim));
-                runTest("usearch get " + suffix, () -> testUsearchGet(collSize, dim));
-                runTest("usearch remove " + suffix, () -> testUsearchRemove(collSize, dim));
-                runTest("usearch load " + suffix, () -> testUsearchLoad(collSize, dim));
-                runTest("usearch view " + suffix, () -> testUsearchView(collSize, dim));
-            }
-        }
-
-        testUsearchFormatIntrospection();
-        pass("Passed all usearch tests.");
-    }
-
-    static void testUsearchFormatIntrospection() {
-        System.err.println("Testing usearch format-introspection helpers ...");
-
-        String snapshotPath = "usearch-format-introspect.usearch";
-        new File(snapshotPath).delete();
-
-        PointerPointer<BytePointer> error = new PointerPointer<>(1);
-        DTLV.usearch_init_options_t snapshotOpts = createOpts(8);
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_index_t index = DTLV.usearch_init_safe(snapshotOpts, error);
-        expectNoError(error, "Failed to init snapshot index");
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_save(index, snapshotPath, error);
-        expectNoError(error, "Failed to save snapshot index");
-
-        error.put(0, (BytePointer) null);
-        DTLV.usearch_free(index, error);
-        expectNoError(error, "Failed to free snapshot index");
-
-        DTLV.dtlv_usearch_format_info snapshotInfo = new DTLV.dtlv_usearch_format_info();
-        expect(DTLV.dtlv_usearch_probe_filesystem(snapshotPath, snapshotInfo) == 0,
-               "Failed to probe filesystem snapshot");
-        expect(snapshotInfo.metric_kind() == snapshotOpts.metric_kind(),
-               "Snapshot metric mismatch");
-        expect(snapshotInfo.scalar_kind() == snapshotOpts.quantization(),
-               "Snapshot scalar mismatch");
-        expect(snapshotInfo.dimensions() == snapshotOpts.dimensions(),
-               "Snapshot dimension mismatch");
-        expect(!snapshotInfo.multi(), "Snapshot multi flag mismatch");
-        // Connectivity is not persisted by usearch_metadata, so it currently reports zero.
-        expect(snapshotInfo.connectivity() == 0,
-               "Snapshot connectivity should be zero");
-
-        new File(snapshotPath).delete();
-
-        String root = "usearch-format-domain";
-        String envPath = root + "/env";
-        String fsPath = root + "/fs";
-        deleteDirectoryFiles(root);
-        try {
-            Files.createDirectories(Paths.get(envPath));
-            Files.createDirectories(Paths.get(fsPath));
-        } catch (IOException e) {
-            System.err.println("Failed to create paths for format introspection: " + e.getMessage());
-            return;
-        }
-
-        final String domainName = "vectors";
-        DTLV.MDB_env env = new DTLV.MDB_env();
-        DTLV.dtlv_usearch_domain domain = new DTLV.dtlv_usearch_domain();
-        boolean envCreated = false;
-        try {
-            expect(DTLV.mdb_env_create(env) == 0, "Failed to create format env");
-            envCreated = true;
-            expect(DTLV.mdb_env_set_maxdbs(env, 16) == 0, "Failed to set maxdbs for format env");
-            expect(DTLV.mdb_env_open(env, envPath, DTLV.MDB_NOLOCK, 0664) == 0,
-                   "Failed to open format env");
-
-            expect(DTLV.dtlv_usearch_domain_open(env, "format-domain", fsPath, domain) == 0,
-                   "Failed to open format domain");
-
-            DTLV.usearch_init_options_t domainOpts = createOpts(16);
-            DTLV.MDB_txn txn = new DTLV.MDB_txn();
-            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0,
-                   "Failed to begin format init txn");
-            expect(DTLV.dtlv_usearch_store_init_options(domain, txn, domainOpts) == 0,
-                   "Failed to store format init options");
-            expect(DTLV.mdb_txn_commit(txn) == 0, "Failed to commit format init txn");
-
-            DTLV.dtlv_usearch_format_info domainInfo = new DTLV.dtlv_usearch_format_info();
-            expect(DTLV.dtlv_usearch_inspect_domain(domain, null, domainInfo) == 0,
-                   "Failed to inspect usearch domain");
-            expect(domainInfo.metric_kind() == domainOpts.metric_kind(),
-                   "Domain metric mismatch");
-            expect(domainInfo.scalar_kind() == domainOpts.quantization(),
-                   "Domain scalar mismatch");
-            expect(domainInfo.dimensions() == domainOpts.dimensions(),
-                   "Domain dimension mismatch");
-            expect(domainInfo.connectivity() == domainOpts.connectivity(),
-                   "Domain connectivity mismatch");
-            expect(!domainInfo.multi(), "Domain multi mismatch");
-
-        } finally {
-            if (domain != null && !domain.isNull()) {
-                DTLV.dtlv_usearch_domain_close(domain);
-            }
-            if (envCreated) {
-                DTLV.mdb_env_close(env);
-            }
-            deleteDirectoryFiles(fsPath);
-            deleteDirectoryFiles(envPath);
-            deleteDirectoryFiles(root);
-        }
-
-        System.out.println("Passed format-introspection tests.");
-    }
-
     static void testUsearchLMDBIntegration() {
         System.err.println("Testing usearch LMDB integration ...");
         String root = "usearch-lmdb-domain";
@@ -2213,15 +1738,12 @@ public class Test {
                     "Failed to begin refresh txn");
             expect(DTLV.dtlv_usearch_refresh(handle, refreshTxn) == 0, "Failed to refresh handle");
             DTLV.mdb_txn_abort(refreshTxn);
-            DTLV.usearch_index_t index = DTLV.dtlv_usearch_handle_index(handle);
-            expect(index != null && !index.isNull(), "Handle did not expose index");
-
             PointerPointer<BytePointer> error = new PointerPointer<>(1);
             error.put(0, (BytePointer) null);
-            long indexSize = DTLV.usearch_size(index, error);
+            long indexSize = DTLV.dtlv_usearch_handle_size(handle, error);
             expectNoError(error, "usearch_size failed");
             expect(indexSize == 1, "Unexpected index size");
-            boolean contains = DTLV.usearch_contains(index, vectorKey, error);
+            boolean contains = DTLV.dtlv_usearch_handle_contains(handle, vectorKey, error);
             expectNoError(error, "usearch_contains failed");
             FloatPointer query = new FloatPointer(dimensions);
             for (int i = 0; i < dimensions; i++) {
@@ -2230,7 +1752,7 @@ public class Test {
             LongPointer keys = new LongPointer(1);
             FloatPointer distances = new FloatPointer(1);
             error.put(0, (BytePointer) null);
-            long found = DTLV.usearch_search(index, query, DTLV.usearch_scalar_f32_k,
+            long found = DTLV.dtlv_usearch_handle_search(handle, query, DTLV.usearch_scalar_f32_k,
                     1, keys, distances, error);
             expectNoError(error, "usearch_search failed");
             expect(found >= 1, "usearch_search returned no results");
@@ -2271,15 +1793,13 @@ public class Test {
             secondKeyBytes.close();
 
             error.put(0, (BytePointer) null);
-            DTLV.usearch_index_t primaryIndex = DTLV.dtlv_usearch_handle_index(handle);
-            DTLV.usearch_index_t secondaryIndex = DTLV.dtlv_usearch_handle_index(secondaryHandle);
             // Publish applies updates to all activated handles eagerly, so both handles
             // already contain the new vector before refresh. Verify the positive case.
-            expect(DTLV.usearch_contains(primaryIndex, vectorKeyTwo, error),
+            expect(DTLV.dtlv_usearch_handle_contains(handle, vectorKeyTwo, error),
                     "Primary handle failed to observe published vector");
             expectNoError(error, "primary contains check failed");
             error.put(0, (BytePointer) null);
-            expect(DTLV.usearch_contains(secondaryIndex, vectorKeyTwo, error),
+            expect(DTLV.dtlv_usearch_handle_contains(secondaryHandle, vectorKeyTwo, error),
                     "Secondary handle failed to observe published vector");
             expectNoError(error, "secondary contains check failed");
 
@@ -2298,11 +1818,11 @@ public class Test {
             DTLV.mdb_txn_abort(refreshTxnSecondary);
 
             error.put(0, (BytePointer) null);
-            expect(DTLV.usearch_contains(primaryIndex, vectorKeyTwo, error),
+            expect(DTLV.dtlv_usearch_handle_contains(handle, vectorKeyTwo, error),
                     "Primary handle missing refreshed vector");
             expectNoError(error, "primary post-refresh contains failed");
             error.put(0, (BytePointer) null);
-            expect(DTLV.usearch_contains(secondaryIndex, vectorKeyTwo, error),
+            expect(DTLV.dtlv_usearch_handle_contains(secondaryHandle, vectorKeyTwo, error),
                     "Secondary handle missing refreshed vector");
             expectNoError(error, "secondary post-refresh contains failed");
             FloatPointer refreshQuery = new FloatPointer(dimensions);
@@ -2312,13 +1832,13 @@ public class Test {
             LongPointer refreshKeys = new LongPointer(1);
             FloatPointer refreshDistances = new FloatPointer(1);
             error.put(0, (BytePointer) null);
-            long refreshedFound = DTLV.usearch_search(primaryIndex, refreshQuery, DTLV.usearch_scalar_f32_k,
+            long refreshedFound = DTLV.dtlv_usearch_handle_search(handle, refreshQuery, DTLV.usearch_scalar_f32_k,
                     1, refreshKeys, refreshDistances, error);
             expectNoError(error, "primary refresh search failed");
             expect(refreshedFound >= 1, "Primary refresh search returned no results");
             expect(refreshKeys.get(0) == vectorKeyTwo, "Primary refresh search mismatch");
             error.put(0, (BytePointer) null);
-            long refreshedFoundSecondary = DTLV.usearch_search(secondaryIndex, refreshQuery,
+            long refreshedFoundSecondary = DTLV.dtlv_usearch_handle_search(secondaryHandle, refreshQuery,
                     DTLV.usearch_scalar_f32_k, 1, refreshKeys, refreshDistances, error);
             expectNoError(error, "secondary refresh search failed");
             expect(refreshedFoundSecondary >= 1, "Secondary refresh search returned no results");
@@ -2411,6 +1931,64 @@ public class Test {
         DTLV.mdb_txn_abort(refreshTxn);
     }
 
+    static void stageAndPublishUsearchUpdate(DTLV.MDB_env env,
+                                             DTLV.dtlv_usearch_domain domain,
+                                             byte op,
+                                             long key,
+                                             float[] vector,
+                                             int dimensions,
+                                             String description) {
+        DTLV.MDB_txn txn = new DTLV.MDB_txn();
+        expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0,
+                "Failed to begin " + description + " txn");
+        DTLV.dtlv_usearch_update update = new DTLV.dtlv_usearch_update();
+        update.op(op);
+        BytePointer keyBytes = new BytePointer(Long.BYTES);
+        ByteBuffer keyBuffer = keyBytes.position(0).limit(Long.BYTES).asByteBuffer();
+        keyBuffer.order(ByteOrder.BIG_ENDIAN).putLong(key);
+        keyBytes.position(0);
+        update.key(keyBytes);
+        update.key_len(Long.BYTES);
+        FloatPointer payload = null;
+        if (vector != null) {
+            payload = new FloatPointer(dimensions);
+            for (int i = 0; i < dimensions; i++) {
+                payload.put(i, vector[i]);
+            }
+            update.payload(payload);
+            update.payload_len(dimensions * Float.BYTES);
+            update.scalar_kind((byte) DTLV.usearch_scalar_f32_k);
+            update.dimensions((short) dimensions);
+        } else {
+            update.payload(null);
+            update.payload_len(0);
+            update.scalar_kind((byte) DTLV.usearch_scalar_unknown_k);
+            update.dimensions((short) 0);
+        }
+        DTLV.dtlv_usearch_txn_ctx ctx = new DTLV.dtlv_usearch_txn_ctx();
+        expect(DTLV.dtlv_usearch_stage_update(domain, txn, update, ctx) == 0,
+                "Failed to stage " + description + " update");
+        expect(DTLV.dtlv_usearch_apply_pending(ctx) == 0,
+                "Failed to apply pending " + description + " update");
+        expect(DTLV.mdb_txn_commit(txn) == 0,
+                "Failed to commit " + description + " txn");
+        expect(DTLV.dtlv_usearch_publish_log(ctx, 1) == 0,
+                "Failed to publish " + description + " log");
+        DTLV.dtlv_usearch_txn_ctx_close(ctx);
+        if (payload != null) {
+            payload.close();
+        }
+        keyBytes.close();
+    }
+
+    static FloatPointer vectorPointer(float[] vector) {
+        FloatPointer ptr = new FloatPointer(vector.length);
+        for (int i = 0; i < vector.length; i++) {
+            ptr.put(i, vector[i]);
+        }
+        return ptr;
+    }
+
     static void testUsearchMultiDomainIntegration() {
         System.err.println("Testing usearch multi-domain integration ...");
         String root = "usearch-multidomain";
@@ -2470,23 +2048,19 @@ public class Test {
             refreshUsearchHandle(env, domainB, handleB, "domain B refresh txn");
             PointerPointer<BytePointer> error = new PointerPointer<>(1);
             error.put(0, (BytePointer) null);
-            DTLV.usearch_index_t indexA = DTLV.dtlv_usearch_handle_index(handleA);
-            DTLV.usearch_index_t indexB = DTLV.dtlv_usearch_handle_index(handleB);
-            expect(indexA != null && !indexA.isNull(), "Domain A index unavailable");
-            expect(indexB != null && !indexB.isNull(), "Domain B index unavailable");
-            boolean containsA = DTLV.usearch_contains(indexA, keyA, error);
+            boolean containsA = DTLV.dtlv_usearch_handle_contains(handleA, keyA, error);
             expectNoError(error, "domain A contains check failed");
             expect(containsA, "Domain A missing its vector");
             error.put(0, (BytePointer) null);
-            boolean containsAOther = DTLV.usearch_contains(indexA, keyB, error);
+            boolean containsAOther = DTLV.dtlv_usearch_handle_contains(handleA, keyB, error);
             expectNoError(error, "domain A foreign contains check failed");
             expect(!containsAOther, "Domain A unexpectedly contains domain B vector");
             error.put(0, (BytePointer) null);
-            boolean containsB = DTLV.usearch_contains(indexB, keyB, error);
+            boolean containsB = DTLV.dtlv_usearch_handle_contains(handleB, keyB, error);
             expectNoError(error, "domain B contains check failed");
             expect(containsB, "Domain B missing its vector");
             error.put(0, (BytePointer) null);
-            boolean containsBOther = DTLV.usearch_contains(indexB, keyA, error);
+            boolean containsBOther = DTLV.dtlv_usearch_handle_contains(handleB, keyA, error);
             expectNoError(error, "domain B foreign contains check failed");
             expect(!containsBOther, "Domain B unexpectedly contains domain A vector");
             DTLV.dtlv_usearch_deactivate(handleA);
@@ -2509,18 +2083,17 @@ public class Test {
             refreshUsearchHandle(env, domainB, reloadB, "domain B reload refresh");
             error.put(0, (BytePointer) null);
             DTLV.usearch_index_t reloadIndexA = DTLV.dtlv_usearch_handle_index(reloadA);
-            DTLV.usearch_index_t reloadIndexB = DTLV.dtlv_usearch_handle_index(reloadB);
-            expect(DTLV.usearch_contains(reloadIndexA, keyA, error), "Reloaded domain A missing vector");
+            expect(DTLV.dtlv_usearch_handle_contains(reloadA, keyA, error), "Reloaded domain A missing vector");
             expectNoError(error, "Reloaded domain A contains failed");
             error.put(0, (BytePointer) null);
-            expect(!DTLV.usearch_contains(reloadIndexA, keyB, error),
+            expect(!DTLV.dtlv_usearch_handle_contains(reloadA, keyB, error),
                     "Reloaded domain A unexpectedly has domain B vector");
             expectNoError(error, "Reloaded domain A foreign contains failed");
             error.put(0, (BytePointer) null);
-            expect(DTLV.usearch_contains(reloadIndexB, keyB, error), "Reloaded domain B missing vector");
+            expect(DTLV.dtlv_usearch_handle_contains(reloadB, keyB, error), "Reloaded domain B missing vector");
             expectNoError(error, "Reloaded domain B contains failed");
             error.put(0, (BytePointer) null);
-            expect(!DTLV.usearch_contains(reloadIndexB, keyA, error),
+            expect(!DTLV.dtlv_usearch_handle_contains(reloadB, keyA, error),
                     "Reloaded domain B unexpectedly has domain A vector");
             expectNoError(error, "Reloaded domain B foreign contains failed");
             DTLV.dtlv_usearch_deactivate(reloadA);
@@ -2637,31 +2210,27 @@ public class Test {
                     "Failed to activate WAL domain B handle");
             PointerPointer<BytePointer> error = new PointerPointer<>(1);
             error.put(0, (BytePointer) null);
-            DTLV.usearch_index_t indexA = DTLV.dtlv_usearch_handle_index(handleA);
-            DTLV.usearch_index_t indexB = DTLV.dtlv_usearch_handle_index(handleB);
-            expect(indexA != null && !indexA.isNull(), "Reloaded domain A index unavailable");
-            expect(indexB != null && !indexB.isNull(), "Reloaded domain B index unavailable");
-            expect(DTLV.usearch_contains(indexA, 101L, error),
+            expect(DTLV.dtlv_usearch_handle_contains(handleA, 101L, error),
                     "Reloaded domain A missing published vector");
             expectNoError(error, "Reloaded domain A contains failed");
             error.put(0, (BytePointer) null);
-            expect(DTLV.usearch_contains(indexA, 102L, error),
+            expect(DTLV.dtlv_usearch_handle_contains(handleA, 102L, error),
                     "Reloaded domain A missing pending vector");
             expectNoError(error, "Reloaded domain A pending contains failed");
             error.put(0, (BytePointer) null);
-            expect(!DTLV.usearch_contains(indexA, 303L, error),
+            expect(!DTLV.dtlv_usearch_handle_contains(handleA, 303L, error),
                     "Domain A index leaked domain B vector");
             expectNoError(error, "Domain A cross-domain contains failed");
             error.put(0, (BytePointer) null);
-            expect(DTLV.usearch_contains(indexB, 303L, error),
+            expect(DTLV.dtlv_usearch_handle_contains(handleB, 303L, error),
                     "Reloaded domain B missing published vector");
             expectNoError(error, "Reloaded domain B contains failed");
             error.put(0, (BytePointer) null);
-            expect(DTLV.usearch_contains(indexB, 304L, error),
+            expect(DTLV.dtlv_usearch_handle_contains(handleB, 304L, error),
                     "Reloaded domain B missing pending vector");
             expectNoError(error, "Reloaded domain B pending contains failed");
             error.put(0, (BytePointer) null);
-            expect(!DTLV.usearch_contains(indexB, 101L, error),
+            expect(!DTLV.dtlv_usearch_handle_contains(handleB, 101L, error),
                     "Domain B index leaked domain A vector");
             expectNoError(error, "Domain B cross-domain contains failed");
         } finally {
@@ -2768,13 +2337,175 @@ public class Test {
         System.out.println("Passed usearch Java multi-process integration test.");
     }
 
+    static void testUsearchFuzz() {
+        System.err.println("Testing usearch LMDB fuzz operations ...");
+        String root = "usearch-fuzz";
+        String envPath = root + "/env";
+        String fsPath = root + "/fs";
+        final String domainName = "fuzz-domain";
+        deleteDirectoryFiles(root);
+        try {
+            Files.createDirectories(Paths.get(envPath));
+            Files.createDirectories(Paths.get(fsPath));
+        } catch (IOException e) {
+            System.err.println("Failed to create directories for fuzz test: " + e.getMessage());
+            return;
+        }
+
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.dtlv_usearch_domain domain = new DTLV.dtlv_usearch_domain();
+        DTLV.dtlv_usearch_handle handle = null;
+        boolean envCreated = false;
+        try {
+            expect(DTLV.mdb_env_create(env) == 0, "Failed to create fuzz env");
+            envCreated = true;
+            expect(DTLV.mdb_env_set_maxdbs(env, 64) == 0, "Failed to set max DBs for fuzz env");
+            expect(DTLV.mdb_env_open(env, envPath, DTLV.MDB_NOLOCK, 0664) == 0, "Failed to open fuzz env");
+            expect(DTLV.dtlv_usearch_domain_open(env, domainName, fsPath, domain) == 0,
+                    "Failed to open fuzz domain");
+
+            final int dimensions = 4;
+            DTLV.usearch_init_options_t opts = createOpts(dimensions);
+            DTLV.MDB_txn initTxn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, initTxn) == 0, "Failed to begin fuzz init txn");
+            expect(DTLV.dtlv_usearch_store_init_options(domain, initTxn, opts) == 0,
+                    "Failed to store fuzz init options");
+            expect(DTLV.mdb_txn_commit(initTxn) == 0, "Failed to commit fuzz init txn");
+
+            handle = new DTLV.dtlv_usearch_handle();
+            expect(DTLV.dtlv_usearch_activate(domain, handle) == 0, "Failed to activate fuzz handle");
+
+            Map<Long, float[]> expected = new HashMap<>();
+            Random rnd = new Random(1234);
+            int iterations = 100;
+            for (int i = 0; i < iterations; i++) {
+                int choice = expected.isEmpty() ? 0 : rnd.nextInt(3);
+                if (choice == 0) { // add
+                    long key;
+                    do {
+                        key = Math.abs(rnd.nextLong() % 1_000_000L);
+                    } while (expected.containsKey(key));
+                    float[] vec = new float[dimensions];
+                    for (int d = 0; d < dimensions; d++) {
+                        vec[d] = rnd.nextFloat();
+                    }
+                    stageAndPublishUsearchUpdate(env, domain, (byte) DTLV.DTLV_USEARCH_OP_ADD, key, vec, dimensions,
+                            "fuzz add");
+                    expected.put(key, vec);
+                } else if (choice == 1 && !expected.isEmpty()) { // replace
+                    long key = expected.keySet().stream().skip(rnd.nextInt(expected.size())).findFirst().orElse(0L);
+                    float[] vec = new float[dimensions];
+                    for (int d = 0; d < dimensions; d++) {
+                        vec[d] = rnd.nextFloat();
+                    }
+                    stageAndPublishUsearchUpdate(env, domain, (byte) DTLV.DTLV_USEARCH_OP_REPLACE, key, vec,
+                            dimensions, "fuzz replace");
+                    expected.put(key, vec);
+                } else if (choice == 2 && !expected.isEmpty()) { // delete
+                    long key = expected.keySet().stream().skip(rnd.nextInt(expected.size())).findFirst().orElse(0L);
+                    stageAndPublishUsearchUpdate(env, domain, (byte) DTLV.DTLV_USEARCH_OP_DELETE, key, null,
+                            dimensions, "fuzz delete");
+                    expected.remove(key);
+                }
+
+                if (i % 10 == 0 || i == iterations - 1) {
+                    refreshUsearchHandle(env, domain, handle, "fuzz handle");
+                    PointerPointer<BytePointer> err = new PointerPointer<>(1);
+                    err.put(0, (BytePointer) null);
+                    long size = DTLV.dtlv_usearch_handle_size(handle, err);
+                    expectNoError(err, "fuzz size check failed");
+                    expect(size == expected.size(), "Fuzz size mismatch: expected " + expected.size() + " got " + size);
+
+                    int checks = Math.min(3, expected.size());
+                    Iterator<Map.Entry<Long, float[]>> it = expected.entrySet().iterator();
+                    for (int c = 0; c < checks && it.hasNext(); c++) {
+                        Map.Entry<Long, float[]> entry = it.next();
+                        long key = entry.getKey();
+                        float[] vec = entry.getValue();
+                        err.put(0, (BytePointer) null);
+                        boolean contains = DTLV.dtlv_usearch_handle_contains(handle, key, err);
+                        expectNoError(err, "fuzz contains check failed");
+                        expect(contains, "Handle missing expected key " + key);
+                        // Exact search over expected dataset to get the true nearest key.
+                        if (expected.size() > 0) {
+                            long[] keyOrder = new long[expected.size()];
+                            FloatPointer dataset = new FloatPointer((long) expected.size() * dimensions);
+                            int idx = 0;
+                            for (Map.Entry<Long, float[]> e : expected.entrySet()) {
+                                keyOrder[idx] = e.getKey();
+                                float[] v = e.getValue();
+                                long base = (long) idx * dimensions;
+                                for (int d = 0; d < dimensions; d++) {
+                                    dataset.put(base + d, v[d]);
+                                }
+                                idx++;
+                            }
+                            FloatPointer query = vectorPointer(vec);
+                            LongPointer exactKeys = new LongPointer(1);
+                            FloatPointer exactDistances = new FloatPointer(1);
+                            err.put(0, (BytePointer) null);
+                            long strideBytes = (long) dimensions * Float.BYTES;
+                            DTLV.usearch_exact_search(dataset, expected.size(), strideBytes,
+                                    query, 1, strideBytes,
+                                    DTLV.usearch_scalar_f32_k, dimensions,
+                                    DTLV.usearch_metric_ip_k, 1, 1,
+                                    exactKeys, Long.BYTES,
+                                    exactDistances, Float.BYTES,
+                                    err);
+                            expectNoError(err, "fuzz exact search failed");
+                            long exactIdx = exactKeys.get(0);
+                            expect(exactIdx >= 0 && exactIdx < keyOrder.length,
+                                    "fuzz exact search returned invalid index");
+                            long exactKey = keyOrder[(int) exactIdx];
+
+                            // Approximate search on handle and ensure exact top-1 is present.
+                            int approxK = Math.min(Math.max(1, expected.size()), 32);
+                            LongPointer keys = new LongPointer(approxK);
+                            FloatPointer distances = new FloatPointer(approxK);
+                            err.put(0, (BytePointer) null);
+                            long found = DTLV.dtlv_usearch_handle_search(handle, query, DTLV.usearch_scalar_f32_k,
+                                    approxK, keys, distances, err);
+                            expectNoError(err, "fuzz approx search failed");
+                            expect(found > 0, "fuzz approx search returned no results for key " + key);
+                            boolean matched = false;
+                            for (int j = 0; j < found; j++) {
+                                if (keys.get(j) == exactKey) {
+                                    matched = true;
+                                    break;
+                                }
+                            }
+                            expect(matched, "fuzz approx search missing exact top-1 key " + exactKey);
+
+                            dataset.close();
+                            query.close();
+                            exactKeys.close();
+                            exactDistances.close();
+                            keys.close();
+                            distances.close();
+                        }
+                    }
+                }
+            }
+
+            DTLV.dtlv_usearch_deactivate(handle);
+            DTLV.dtlv_usearch_domain_close(domain);
+        } finally {
+            if (envCreated) {
+                DTLV.mdb_env_close(env);
+            }
+            deleteDirectoryFiles(fsPath);
+            deleteDirectoryFiles(envPath);
+            deleteDirectoryFiles(root);
+        }
+        System.out.println("Passed usearch fuzz test.");
+    }
+
     public static void main(String[] args) {
         runTest("LMDB suite", Test::testLMDB);
         System.out.println("----");
-        runTest("usearch suite", Test::testUsearch);
-        testUsearch();
-        System.out.println("----");
         testUsearchLMDBIntegration();
+        System.out.println("----");
+        testUsearchFuzz();
         System.out.println("----");
         testUsearchMultiDomainIntegration();
         System.out.println("----");
@@ -2930,11 +2661,9 @@ public class Test {
             DTLV.dtlv_usearch_handle handle = new DTLV.dtlv_usearch_handle();
             expect(DTLV.dtlv_usearch_activate(domain, handle) == 0,
                     "reader activate failed");
-            DTLV.usearch_index_t index = DTLV.dtlv_usearch_handle_index(handle);
-            expect(index != null && !index.isNull(), "reader missing index");
             PointerPointer<BytePointer> error = new PointerPointer<>(1);
             error.put(0, (BytePointer) null);
-            expect(DTLV.usearch_contains(index, key, error),
+            expect(DTLV.dtlv_usearch_handle_contains(handle, key, error),
                     "reader missing key " + key);
             expectNoError(error, "reader contains error");
             DTLV.dtlv_usearch_deactivate(handle);

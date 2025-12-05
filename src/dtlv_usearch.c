@@ -2365,6 +2365,36 @@ usearch_index_t dtlv_usearch_handle_index(const dtlv_usearch_handle *handle) {
   return handle ? handle->index : NULL;
 }
 
+size_t dtlv_usearch_handle_size(dtlv_usearch_handle *handle, usearch_error_t *error) {
+  if (!handle) {
+    if (error) *error = "Null handle";
+    return 0;
+  }
+  return usearch_size(handle->index, error);
+}
+
+bool dtlv_usearch_handle_contains(dtlv_usearch_handle *handle, usearch_key_t key, usearch_error_t *error) {
+  if (!handle) {
+    if (error) *error = "Null handle";
+    return false;
+  }
+  return usearch_contains(handle->index, key, error);
+}
+
+size_t dtlv_usearch_handle_search(dtlv_usearch_handle *handle,
+                                  const void *vector,
+                                  usearch_scalar_kind_t kind,
+                                  size_t count,
+                                  usearch_key_t *keys,
+                                  usearch_distance_t *distances,
+                                  usearch_error_t *error) {
+  if (!handle) {
+    if (error) *error = "Null handle";
+    return 0;
+  }
+  return usearch_search(handle->index, vector, kind, count, keys, distances, error);
+}
+
 int dtlv_usearch_store_init_options(dtlv_usearch_domain *domain,
                                     MDB_txn *txn,
                                     const usearch_init_options_t *opts) {
