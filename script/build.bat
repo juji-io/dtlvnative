@@ -3,7 +3,7 @@ set PWD=%cd%
 
 set CPATH=%PWD%\src
 set BUILD_TEST_FLAG=-DBUILD_TEST=ON
-set GRADLE_VERSION=6.9
+set GRADLE_VERSION=9.2.1
 set GRADLE_BASE=%CPATH%\usearch\tools\gradle-%GRADLE_VERSION%
 set GRADLE_ZIP=%GRADLE_BASE%.zip
 
@@ -80,6 +80,7 @@ popd
 
 REM Run Usearch Java tests via Gradle (fetches its own dependencies)
 pushd "%CPATH%\usearch"
+"%GRADLE_BIN%" --version
 "%GRADLE_BIN%" --no-daemon test
 if errorlevel 1 (
   echo ERROR: Usearch Java tests failed (Gradle).
