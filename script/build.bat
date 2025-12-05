@@ -56,8 +56,12 @@ cmake --build build_dtlv --config Release --target usearch_static_c lmdb dtlv dt
 dir build_dtlv
 
 set TEST_DTLV=
-for /r "build_dtlv" %%F in (dtlv_usearch_checkpoint_test.exe) do (
-  if not defined TEST_DTLV set TEST_DTLV=%%F
+if exist "build_dtlv\Release\dtlv_usearch_checkpoint_test.exe" (
+  set TEST_DTLV=build_dtlv\Release\dtlv_usearch_checkpoint_test.exe
+) else (
+  for /r "build_dtlv" %%F in (dtlv_usearch_checkpoint_test.exe) do (
+    if not defined TEST_DTLV set TEST_DTLV=%%F
+  )
 )
 if not defined TEST_DTLV (
   echo ERROR: dtlv checkpoint test binary not found. && exit /b 1
