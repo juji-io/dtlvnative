@@ -4,6 +4,32 @@ set PWD=%cd%
 set CPATH=%PWD%\src
 set BUILD_TEST_FLAG=-DBUILD_TEST=ON
 
+REM Build and run USearch C/C++ tests standalone to validate JNI-independent bits
+set USEARCH_TEST_BUILD=%CPATH%\usearch\build_tests
+if exist "%USEARCH_TEST_BUILD%" rmdir /S /Q "%USEARCH_TEST_BUILD%"
+
+cmake -G "Visual Studio 17 2022" ^
+      -D CMAKE_BUILD_TYPE=Release ^
+      -D USEARCH_USE_FP16LIB=ON ^
+      -D USEARCH_USE_OPENMP=ON ^
+      -D USEARCH_USE_SIMSIMD=ON ^
+      -D USEARCH_BUILD_TEST_CPP=ON ^
+      -D USEARCH_BUILD_TEST_C=ON ^
+      -D USEARCH_BUILD_LIB_C=ON ^
+      -B "%USEARCH_TEST_BUILD%" ^
+      -S "%CPATH%\usearch"
+
+cmake --build "%USEARCH_TEST_BUILD%" --config Release --target test_cpp test_c
+
+pushd "%USEARCH_TEST_BUILD%"
+ctest -C Release --output-on-failure
+if errorlevel 1 (
+  echo Usearch standalone C/C++ tests failed.
+  popd
+  exit /b 1
+)
+popd
+
 cd %PWD%
 
 cd %CPATH%
@@ -31,26 +57,6 @@ REM Ensure the Usearch tests are built in the subproject tree (VS sometimes skip
 cmake --build build_dtlv\usearch_static_c_build --config Release --target test_cpp test_c
 
 dir build_dtlv
-
-set TEST_CPP=
-for /r "build_dtlv" %%F in (test_cpp.exe) do (
-  if not defined TEST_CPP set TEST_CPP=%%F
-)
-if not defined TEST_CPP (
-  echo ERROR: usearch C++ test binary not found. && exit /b 1
-)
-"%TEST_CPP%"
-if errorlevel 1 exit /b 1
-
-set TEST_C=
-for /r "build_dtlv" %%F in (test_c.exe) do (
-  if not defined TEST_C set TEST_C=%%F
-)
-if not defined TEST_C (
-  echo ERROR: usearch C test binary not found. && exit /b 1
-)
-"%TEST_C%"
-if errorlevel 1 exit /b 1
 
 set TEST_DTLV=
 for /r "build_dtlv" %%F in (dtlv_usearch_checkpoint_test.exe) do (
