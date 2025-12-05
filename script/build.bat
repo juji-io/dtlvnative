@@ -26,7 +26,11 @@ if not defined GRADLE_BIN (
       echo ERROR: Failed to download Gradle %GRADLE_VERSION%.
       exit /b 1
     )
-    powershell -Command "Expand-Archive -Force '\"%GRADLE_ZIP%\"' '%CPATH%\usearch\tools'"
+    if not exist "%GRADLE_ZIP%" (
+      echo ERROR: Gradle archive not found at %GRADLE_ZIP%.
+      exit /b 1
+    )
+    powershell -Command "Expand-Archive -Force '%GRADLE_ZIP%' '%CPATH%\usearch\tools'"
     if errorlevel 1 (
       echo ERROR: Failed to extract Gradle %GRADLE_VERSION%.
       exit /b 1
