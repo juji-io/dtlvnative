@@ -188,6 +188,7 @@ struct dtlv_usearch_handle {
   dtlv_usearch_domain *domain;
   usearch_index_t index;
   usearch_scalar_kind_t scalar_kind;
+  uint32_t dimensions;
   uint64_t snapshot_seq;
   uint64_t log_seq;
   struct dtlv_usearch_handle *next;
@@ -1983,6 +1984,7 @@ int dtlv_usearch_activate(dtlv_usearch_domain *domain, dtlv_usearch_handle **han
   handle->domain = domain;
   handle->index = index;
   handle->scalar_kind = init_opts.quantization;
+  handle->dimensions = (uint32_t)init_opts.dimensions;
   handle->snapshot_seq = snapshot_seq;
   handle->log_seq = log_seq;
   dtlv_domain_register_handle(domain, handle);
@@ -2015,6 +2017,7 @@ int dtlv_usearch_refresh(dtlv_usearch_handle *handle, MDB_txn *txn) {
     usearch_index_t old_index = handle->index;
     handle->index = new_index;
     handle->scalar_kind = init_opts.quantization;
+    handle->dimensions = (uint32_t)init_opts.dimensions;
     handle->snapshot_seq = snapshot_seq;
     handle->log_seq = log_seq;
     if (old_index) {
@@ -2373,12 +2376,44 @@ size_t dtlv_usearch_handle_size(dtlv_usearch_handle *handle, usearch_error_t *er
   return usearch_size(handle->index, error);
 }
 
+size_t dtlv_usearch_handle_capacity(dtlv_usearch_handle *handle, usearch_error_t *error) {
+  if (!handle) {
+    if (error) *error = "Null handle";
+    return 0;
+  }
+  return usearch_capacity(handle->index, error);
+}
+
 bool dtlv_usearch_handle_contains(dtlv_usearch_handle *handle, usearch_key_t key, usearch_error_t *error) {
   if (!handle) {
     if (error) *error = "Null handle";
     return false;
   }
   return usearch_contains(handle->index, key, error);
+}
+
+uint32_t dtlv_usearch_handle_dimensions(const dtlv_usearch_handle *handle) {
+  return handle ? handle->dimensions : 0;
+}
+
+usearch_scalar_kind_t dtlv_usearch_handle_scalar_kind(const dtlv_usearch_handle *handle) {
+  return handle ? handle->scalar_kind : usearch_scalar_unknown_k;
+}
+
+const char *dtlv_usearch_handle_hardware(dtlv_usearch_handle *handle, usearch_error_t *error) {
+  if (!handle) {
+    if (error) *error = "Null handle";
+    return NULL;
+  }
+  return usearch_hardware_acceleration(handle->index, error);
+}
+
+size_t dtlv_usearch_handle_memory(dtlv_usearch_handle *handle, usearch_error_t *error) {
+  if (!handle) {
+    if (error) *error = "Null handle";
+    return 0;
+  }
+  return usearch_memory_usage(handle->index, error);
 }
 
 size_t dtlv_usearch_handle_search(dtlv_usearch_handle *handle,
@@ -2393,6 +2428,28 @@ size_t dtlv_usearch_handle_search(dtlv_usearch_handle *handle,
     return 0;
   }
   return usearch_search(handle->index, vector, kind, count, keys, distances, error);
+}
+
+size_t dtlv_usearch_handle_get(dtlv_usearch_handle *handle,
+                               usearch_key_t key,
+                               void *vector,
+                               usearch_error_t *error) {
+  if (!handle) {
+    if (error) *error = "Null handle";
+    return 0;
+  }
+  if (!vector) {
+    if (error) *error = "Null output buffer";
+    return 0;
+  }
+  usearch_scalar_kind_t kind = handle->scalar_kind;
+  size_t per_vector_bytes = 0;
+  int rc = dtlv_scalar_payload_bytes(kind, handle->dimensions, &per_vector_bytes);
+  if (rc != 0) {
+    if (error) *error = "Invalid scalar kind or dimensions";
+    return 0;
+  }
+  return usearch_get(handle->index, key, 1, vector, kind, error);
 }
 
 int dtlv_usearch_store_init_options(dtlv_usearch_domain *domain,
@@ -2896,6 +2953,52 @@ int dtlv_usearch_stage_update(dtlv_usearch_domain *domain,
   ctx->frames_appended = ordinal;
   ctx->last_log_seq = ctx->log_seq_head + ordinal;
   return 0;
+}
+
+int dtlv_usearch_stage_add(dtlv_usearch_domain *domain,
+                           MDB_txn *txn,
+                           const void *key,
+                           size_t key_len,
+                           const void *payload,
+                           size_t payload_len,
+                           dtlv_usearch_txn_ctx **ctx_inout) {
+  if (!payload || payload_len == 0) return EINVAL;
+  dtlv_usearch_update update = {0};
+  update.op = DTLV_USEARCH_OP_ADD;
+  update.key = key;
+  update.key_len = key_len;
+  update.payload = payload;
+  update.payload_len = payload_len;
+  return dtlv_usearch_stage_update(domain, txn, &update, ctx_inout);
+}
+
+int dtlv_usearch_stage_replace(dtlv_usearch_domain *domain,
+                               MDB_txn *txn,
+                               const void *key,
+                               size_t key_len,
+                               const void *payload,
+                               size_t payload_len,
+                               dtlv_usearch_txn_ctx **ctx_inout) {
+  if (!payload || payload_len == 0) return EINVAL;
+  dtlv_usearch_update update = {0};
+  update.op = DTLV_USEARCH_OP_REPLACE;
+  update.key = key;
+  update.key_len = key_len;
+  update.payload = payload;
+  update.payload_len = payload_len;
+  return dtlv_usearch_stage_update(domain, txn, &update, ctx_inout);
+}
+
+int dtlv_usearch_stage_delete(dtlv_usearch_domain *domain,
+                              MDB_txn *txn,
+                              const void *key,
+                              size_t key_len,
+                              dtlv_usearch_txn_ctx **ctx_inout) {
+  dtlv_usearch_update update = {0};
+  update.op = DTLV_USEARCH_OP_DELETE;
+  update.key = key;
+  update.key_len = key_len;
+  return dtlv_usearch_stage_update(domain, txn, &update, ctx_inout);
 }
 
 int dtlv_usearch_apply_pending(dtlv_usearch_txn_ctx *ctx) {

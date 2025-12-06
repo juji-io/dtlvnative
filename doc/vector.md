@@ -9,11 +9,58 @@ domains, staging mutations, and coordinating multi-process recovery.
 - The native `dtlv_usearch` shared library must be built and available on the
   library path. Running `./script/build` (Linux) or `./script/build-macos`
   produces the requisite artifacts.
+- Windows builds currently skip the upstream USearch C/C++/Java test suites in
+  CI; the `dtlv_usearch_checkpoint_test` still runs, but treat Windows vector
+  support as experimental and plan to validate manually before production use.
 - Java clients link against the generated `DTLV` JavaCPP bindings under
   `src/java/datalevin/dtlvnative/DTLV.java`.
+- The upstream USearch Java binding (`cloud.unum.usearch.Index`) is no longer
+  exposed or packaged by Datalevin; Java callers should only use the
+  `dtlv_usearch_*` entry points generated in `DTLV` and rely on LMDB-backed
+  domains for vector storage.
 - An LMDB environment must exist (created via `DTLV.mdb_env_create`,
   `mdb_env_open`, etc.) and configured with `mdb_env_set_maxdbs` large enough
   to hold the per-domain `usearch-*` DBIs.
+
+## Key `dtlv_usearch_*` Entry Points
+
+Initialization and metadata
+- `dtlv_usearch_domain_open(env, name, filesystem_root, domain_out)` / `dtlv_usearch_domain_close(domain)`: bind a vector domain to LMDB + filesystem paths.
+- `dtlv_usearch_store_init_options(domain, txn, opts)` / `dtlv_usearch_load_init_options(domain, txn, opts, found)`: persist or retrieve metric/scalar/dimension settings; expect to run once per domain.
+- `dtlv_usearch_inspect_domain(domain, txn, info)` / `dtlv_usearch_probe_filesystem(path, info)`: read stored format info and sanity-check filesystem state.
+
+Handle lifecycle
+- `dtlv_usearch_activate(domain, handle_out)` / `dtlv_usearch_deactivate(handle)`: materialize or drop an in-memory USearch handle.
+- `dtlv_usearch_refresh(handle, read_txn)`: catch the handle up to the LMDB snapshot of a read transaction.
+- `dtlv_usearch_handle_index(handle)`: obtain the underlying `usearch_index_t` for direct search calls.
+- `dtlv_usearch_handle_size(handle, error)` / `dtlv_usearch_handle_contains(handle, key, error)`: lightweight queries on the active handle.
+
+Staging and applying writes
+- `dtlv_usearch_stage_add/replace/delete(domain, write_txn, key, key_len, payload, payload_len, ctx_inout)`: convenience wrappers that stage inserts/overwrites/deletes into the WAL/delta log within the caller’s LMDB write transaction.
+- `dtlv_usearch_stage_update(domain, write_txn, update, ctx_inout)`: lower-level entry if you want to build the `dtlv_usearch_update` struct yourself.
+- `dtlv_usearch_apply_pending(ctx)` (before commit) and `dtlv_usearch_publish_log(ctx, log_seq)` (after commit): finalize WAL, then fan out to in-process handles.
+- `dtlv_usearch_txn_ctx_abort/close(ctx)`: clean up staged state on failure paths.
+
+Checkpointing and compaction
+- `dtlv_usearch_checkpoint_write_snapshot(domain, index, snapshot_seq, writer_uuid, chunk_count_out)`: serialize the current index into chunked LMDB entries.
+- `dtlv_usearch_checkpoint_finalize(domain, snapshot_seq, prune_log_seq)`: mark snapshot complete and prune sealed deltas.
+- `dtlv_usearch_checkpoint_recover(domain)`: clean up torn checkpoints/WALs at startup.
+- `dtlv_usearch_compact(domain, upto_seq)`: request WAL/delta compaction when readers have advanced.
+- `dtlv_usearch_set_checkpoint_chunk_batch(domain, batch)` / `dtlv_usearch_get_checkpoint_chunk_batch(domain, batch_out)`: tune snapshot chunking.
+
+Reader pins (optional coordination)
+- `dtlv_usearch_pin_handle(domain, txn_ctx)` / `dtlv_usearch_touch_pin(domain, txn_ctx)` / `dtlv_usearch_release_pin(domain, txn_ctx)`: track long-lived readers so checkpoints/compaction can respect pinned snapshots.
+
+Search helpers
+- `dtlv_usearch_handle_search(handle, kind, keys_out, distances_out, error)` and `dtlv_usearch_handle_size/contains` are thin wrappers over the active index to run queries without re-activating.
+- `dtlv_usearch_handle_capacity(handle)` reports reserved capacity.
+- `dtlv_usearch_handle_hardware(handle)` and `dtlv_usearch_handle_memory(handle)` expose hardware acceleration info and current memory usage from the active index.
+- `dtlv_usearch_handle_get(handle, key, buffer, error)` returns the vector bytes for a key into a caller-provided buffer sized to `dimensions * sizeof(scalar)` using the domain’s scalar kind/dimensions.
+- `dtlv_usearch_handle_dimensions(handle)` / `dtlv_usearch_handle_scalar_kind(handle)` expose the handle’s configured shape so callers can size buffers correctly.
+- Adds/replaces/deletes flow through staged updates:
+  - `dtlv_usearch_stage_add` or `_replace` to insert/overwrite payload bytes matching the domain’s scalar kind/dimensions.
+  - `dtlv_usearch_stage_delete` to remove by key.
+  - Batch changes are staged via repeated stage calls in the same LMDB write txn before `dtlv_usearch_apply_pending/publish_log`.
 
 ## Clojure Integration Points
 

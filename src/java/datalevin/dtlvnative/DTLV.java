@@ -3532,8 +3532,22 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native @Cast("size_t") long dtlv_usearch_handle_size(dtlv_usearch_handle handle,
             @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
+    public static native @Cast("size_t") long dtlv_usearch_handle_capacity(dtlv_usearch_handle handle,
+            @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+
     public static native @Cast("bool") boolean dtlv_usearch_handle_contains(dtlv_usearch_handle handle,
             @Cast("usearch_key_t") long key,
+            @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+
+    public static native @Cast("uint32_t") long dtlv_usearch_handle_dimensions(@Const dtlv_usearch_handle handle);
+
+    public static native @Cast("usearch_scalar_kind_t") int dtlv_usearch_handle_scalar_kind(
+            @Const dtlv_usearch_handle handle);
+
+    public static native @Cast("const char*") BytePointer dtlv_usearch_handle_hardware(dtlv_usearch_handle handle,
+            @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+
+    public static native @Cast("size_t") long dtlv_usearch_handle_memory(dtlv_usearch_handle handle,
             @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
     public static native @Cast("size_t") long dtlv_usearch_handle_search(dtlv_usearch_handle handle,
@@ -3544,6 +3558,11 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
             @Cast("usearch_distance_t*") FloatPointer distances,
             @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
+    public static native @Cast("size_t") long dtlv_usearch_handle_get(dtlv_usearch_handle handle,
+            @Cast("usearch_key_t") long key,
+            @Cast("void*") Pointer vector,
+            @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
+
     public static native int dtlv_usearch_refresh(dtlv_usearch_handle handle, MDB_txn txn);
 
     public static native int dtlv_usearch_stage_update(dtlv_usearch_domain domain,
@@ -3552,6 +3571,34 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
 
     public static native int dtlv_usearch_stage_update(dtlv_usearch_domain domain,
             MDB_txn txn, dtlv_usearch_update update,
+            @ByPtrPtr dtlv_usearch_txn_ctx ctx_inout);
+
+    public static native int dtlv_usearch_stage_add(dtlv_usearch_domain domain,
+            MDB_txn txn, @Cast("const void*") Pointer key, @Cast("size_t") long key_len,
+            @Cast("const void*") Pointer payload, @Cast("size_t") long payload_len,
+            @Cast("dtlv_usearch_txn_ctx**") PointerPointer ctx_inout);
+
+    public static native int dtlv_usearch_stage_add(dtlv_usearch_domain domain,
+            MDB_txn txn, @Cast("const void*") Pointer key, @Cast("size_t") long key_len,
+            @Cast("const void*") Pointer payload, @Cast("size_t") long payload_len,
+            @ByPtrPtr dtlv_usearch_txn_ctx ctx_inout);
+
+    public static native int dtlv_usearch_stage_replace(dtlv_usearch_domain domain,
+            MDB_txn txn, @Cast("const void*") Pointer key, @Cast("size_t") long key_len,
+            @Cast("const void*") Pointer payload, @Cast("size_t") long payload_len,
+            @Cast("dtlv_usearch_txn_ctx**") PointerPointer ctx_inout);
+
+    public static native int dtlv_usearch_stage_replace(dtlv_usearch_domain domain,
+            MDB_txn txn, @Cast("const void*") Pointer key, @Cast("size_t") long key_len,
+            @Cast("const void*") Pointer payload, @Cast("size_t") long payload_len,
+            @ByPtrPtr dtlv_usearch_txn_ctx ctx_inout);
+
+    public static native int dtlv_usearch_stage_delete(dtlv_usearch_domain domain,
+            MDB_txn txn, @Cast("const void*") Pointer key, @Cast("size_t") long key_len,
+            @Cast("dtlv_usearch_txn_ctx**") PointerPointer ctx_inout);
+
+    public static native int dtlv_usearch_stage_delete(dtlv_usearch_domain domain,
+            MDB_txn txn, @Cast("const void*") Pointer key, @Cast("size_t") long key_len,
             @ByPtrPtr dtlv_usearch_txn_ctx ctx_inout);
 
     public static native int dtlv_usearch_store_init_options(dtlv_usearch_domain domain,

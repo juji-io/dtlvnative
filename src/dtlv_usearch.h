@@ -57,6 +57,11 @@ void dtlv_usearch_deactivate(dtlv_usearch_handle *handle);
 usearch_index_t dtlv_usearch_handle_index(const dtlv_usearch_handle *handle);
 size_t dtlv_usearch_handle_size(dtlv_usearch_handle *handle, usearch_error_t *error);
 bool dtlv_usearch_handle_contains(dtlv_usearch_handle *handle, usearch_key_t key, usearch_error_t *error);
+uint32_t dtlv_usearch_handle_dimensions(const dtlv_usearch_handle *handle);
+usearch_scalar_kind_t dtlv_usearch_handle_scalar_kind(const dtlv_usearch_handle *handle);
+size_t dtlv_usearch_handle_capacity(dtlv_usearch_handle *handle, usearch_error_t *error);
+const char *dtlv_usearch_handle_hardware(dtlv_usearch_handle *handle, usearch_error_t *error);
+size_t dtlv_usearch_handle_memory(dtlv_usearch_handle *handle, usearch_error_t *error);
 size_t dtlv_usearch_handle_search(dtlv_usearch_handle *handle,
                                   const void *vector,
                                   usearch_scalar_kind_t kind,
@@ -64,12 +69,35 @@ size_t dtlv_usearch_handle_search(dtlv_usearch_handle *handle,
                                   usearch_key_t *keys,
                                   usearch_distance_t *distances,
                                   usearch_error_t *error);
+size_t dtlv_usearch_handle_get(dtlv_usearch_handle *handle,
+                               usearch_key_t key,
+                               void *vector,
+                               usearch_error_t *error);
 
 int dtlv_usearch_refresh(dtlv_usearch_handle *handle, MDB_txn *txn);
 
 int dtlv_usearch_stage_update(dtlv_usearch_domain *domain,
                               MDB_txn *txn,
                               const dtlv_usearch_update *update,
+                              dtlv_usearch_txn_ctx **ctx_inout);
+int dtlv_usearch_stage_add(dtlv_usearch_domain *domain,
+                           MDB_txn *txn,
+                           const void *key,
+                           size_t key_len,
+                           const void *payload,
+                           size_t payload_len,
+                           dtlv_usearch_txn_ctx **ctx_inout);
+int dtlv_usearch_stage_replace(dtlv_usearch_domain *domain,
+                               MDB_txn *txn,
+                               const void *key,
+                               size_t key_len,
+                               const void *payload,
+                               size_t payload_len,
+                               dtlv_usearch_txn_ctx **ctx_inout);
+int dtlv_usearch_stage_delete(dtlv_usearch_domain *domain,
+                              MDB_txn *txn,
+                              const void *key,
+                              size_t key_len,
                               dtlv_usearch_txn_ctx **ctx_inout);
 
 int dtlv_usearch_store_init_options(dtlv_usearch_domain *domain,

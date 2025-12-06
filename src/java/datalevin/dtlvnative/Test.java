@@ -1868,6 +1868,174 @@ public class Test {
         }
     }
 
+    static void testUsearchHandleMetadataAndConvenience() {
+        System.err.println("Testing usearch handle metadata and convenience helpers ...");
+        String root = "usearch-handle-meta";
+        String envPath = root + "/env";
+        String fsPath = root + "/fs";
+        final String domainName = "vectors-meta";
+        deleteDirectoryFiles(root);
+        try {
+            Files.createDirectories(Paths.get(envPath));
+            Files.createDirectories(Paths.get(fsPath));
+        } catch (IOException e) {
+            System.err.println("Failed to create directories for handle metadata test: " + e.getMessage());
+            return;
+        }
+
+        DTLV.MDB_env env = new DTLV.MDB_env();
+        DTLV.dtlv_usearch_domain domain = new DTLV.dtlv_usearch_domain();
+        DTLV.dtlv_usearch_handle handle = null;
+        try {
+            expect(DTLV.mdb_env_create(env) == 0, "Failed to create LMDB env (meta)");
+            expect(DTLV.mdb_env_set_maxdbs(env, 32) == 0, "Failed to set max DBs (meta)");
+            expect(DTLV.mdb_env_open(env, envPath, DTLV.MDB_NOLOCK, 0664) == 0, "Failed to open LMDB env (meta)");
+            expect(DTLV.dtlv_usearch_domain_open(env, domainName, fsPath, domain) == 0,
+                    "Failed to open usearch domain (meta)");
+
+            final int dimensions = 4;
+            DTLV.usearch_init_options_t opts = createOpts(dimensions);
+            DTLV.MDB_txn initTxn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, initTxn) == 0, "Failed to begin init txn (meta)");
+            expect(DTLV.dtlv_usearch_store_init_options(domain, initTxn, opts) == 0,
+                    "Failed to store init options (meta)");
+            expect(DTLV.mdb_txn_commit(initTxn) == 0, "Failed to commit init txn (meta)");
+
+            handle = new DTLV.dtlv_usearch_handle();
+            expect(DTLV.dtlv_usearch_activate(domain, handle) == 0, "Failed to activate handle (meta)");
+
+            PointerPointer<BytePointer> error = new PointerPointer<>(1);
+            error.put(0, (BytePointer) null);
+            expect(DTLV.dtlv_usearch_handle_dimensions(handle) == dimensions, "Dimensions mismatch on handle");
+            expect(DTLV.dtlv_usearch_handle_scalar_kind(handle) == DTLV.usearch_scalar_f32_k,
+                    "Scalar kind mismatch on handle");
+            long cap = DTLV.dtlv_usearch_handle_capacity(handle, error);
+            expectNoError(error, "handle_capacity failed");
+            expect(cap >= 0, "Capacity negative");
+            BytePointer hw = DTLV.dtlv_usearch_handle_hardware(handle, error);
+            expectNoError(error, "handle_hardware failed");
+            if (hw != null) {
+                hw.getString(); // ensure readable
+            }
+            long mem = DTLV.dtlv_usearch_handle_memory(handle, error);
+            expectNoError(error, "handle_memory failed");
+            expect(mem >= 0, "Memory usage negative");
+
+            // Stage add via convenience helper.
+            float[] vector = new float[] { 1.0f, 2.0f, 3.0f, 4.0f };
+            long vectorKey = 7L;
+            DTLV.dtlv_usearch_txn_ctx ctx = new DTLV.dtlv_usearch_txn_ctx();
+            DTLV.MDB_txn txn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0, "Failed to begin add txn");
+            BytePointer keyBytes = new BytePointer(Long.BYTES);
+            ByteBuffer keyBuffer = keyBytes.position(0).limit(Long.BYTES).asByteBuffer();
+            keyBuffer.order(ByteOrder.BIG_ENDIAN).putLong(vectorKey);
+            keyBytes.position(0);
+            FloatPointer payload = new FloatPointer(dimensions);
+            for (int i = 0; i < dimensions; i++) {
+                payload.put(i, vector[i]);
+            }
+            expect(DTLV.dtlv_usearch_stage_add(domain, txn, keyBytes, Long.BYTES,
+                    payload, dimensions * Float.BYTES, ctx) == 0, "Stage add failed");
+            expect(DTLV.dtlv_usearch_apply_pending(ctx) == 0, "Apply pending add failed");
+            expect(DTLV.mdb_txn_commit(txn) == 0, "Commit add txn failed");
+            expect(DTLV.dtlv_usearch_publish_log(ctx, 1) == 0, "Publish add failed");
+            DTLV.dtlv_usearch_txn_ctx_close(ctx);
+            payload.close();
+            keyBytes.close();
+
+            refreshUsearchHandle(env, domain, handle, "handle add refresh");
+            error.put(0, (BytePointer) null);
+            expect(DTLV.dtlv_usearch_handle_contains(handle, vectorKey, error),
+                    "Handle missing added vector");
+            expectNoError(error, "handle_contains after add failed");
+            FloatPointer out = new FloatPointer(dimensions);
+            long got = DTLV.dtlv_usearch_handle_get(handle, vectorKey, out, error);
+            expectNoError(error, "handle_get after add failed");
+            expect(got == 1, "handle_get did not return a vector");
+            for (int i = 0; i < dimensions; i++) {
+                expect(Math.abs(out.get(i) - vector[i]) < 1e-6, "Retrieved vector mismatch (add)");
+            }
+            out.close();
+
+            // Replace via helper.
+            float[] replacement = new float[] { 9.0f, 8.0f, 7.0f, 6.0f };
+            ctx = new DTLV.dtlv_usearch_txn_ctx();
+            txn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0, "Failed to begin replace txn");
+            FloatPointer replacementPayload = new FloatPointer(dimensions);
+            for (int i = 0; i < dimensions; i++) {
+                replacementPayload.put(i, replacement[i]);
+            }
+            keyBytes = new BytePointer(Long.BYTES);
+            keyBuffer = keyBytes.position(0).limit(Long.BYTES).asByteBuffer();
+            keyBuffer.order(ByteOrder.BIG_ENDIAN).putLong(vectorKey);
+            keyBytes.position(0);
+            expect(DTLV.dtlv_usearch_stage_replace(domain, txn, keyBytes, Long.BYTES,
+                    replacementPayload, dimensions * Float.BYTES, ctx) == 0, "Stage replace failed");
+            expect(DTLV.dtlv_usearch_apply_pending(ctx) == 0, "Apply pending replace failed");
+            expect(DTLV.mdb_txn_commit(txn) == 0, "Commit replace txn failed");
+            expect(DTLV.dtlv_usearch_publish_log(ctx, 1) == 0, "Publish replace failed");
+            DTLV.dtlv_usearch_txn_ctx_close(ctx);
+            replacementPayload.close();
+            keyBytes.close();
+
+            refreshUsearchHandle(env, domain, handle, "handle replace refresh");
+            out = new FloatPointer(dimensions);
+            error.put(0, (BytePointer) null);
+            got = DTLV.dtlv_usearch_handle_get(handle, vectorKey, out, error);
+            expectNoError(error, "handle_get after replace failed");
+            expect(got == 1, "handle_get replace returned unexpected count");
+            for (int i = 0; i < dimensions; i++) {
+                expect(Math.abs(out.get(i) - replacement[i]) < 1e-6, "Retrieved vector mismatch (replace)");
+            }
+            out.close();
+
+            // Delete via helper.
+            ctx = new DTLV.dtlv_usearch_txn_ctx();
+            txn = new DTLV.MDB_txn();
+            expect(DTLV.mdb_txn_begin(env, null, 0, txn) == 0, "Failed to begin delete txn");
+            keyBytes = new BytePointer(Long.BYTES);
+            keyBuffer = keyBytes.position(0).limit(Long.BYTES).asByteBuffer();
+            keyBuffer.order(ByteOrder.BIG_ENDIAN).putLong(vectorKey);
+            keyBytes.position(0);
+            expect(DTLV.dtlv_usearch_stage_delete(domain, txn, keyBytes, Long.BYTES, ctx) == 0,
+                    "Stage delete failed");
+            expect(DTLV.dtlv_usearch_apply_pending(ctx) == 0, "Apply pending delete failed");
+            expect(DTLV.mdb_txn_commit(txn) == 0, "Commit delete txn failed");
+            expect(DTLV.dtlv_usearch_publish_log(ctx, 1) == 0, "Publish delete failed");
+            DTLV.dtlv_usearch_txn_ctx_close(ctx);
+            keyBytes.close();
+
+            refreshUsearchHandle(env, domain, handle, "handle delete refresh");
+            error.put(0, (BytePointer) null);
+            expect(!DTLV.dtlv_usearch_handle_contains(handle, vectorKey, error),
+                    "Handle still contains deleted vector");
+            expectNoError(error, "handle_contains after delete failed");
+            long finalSize = DTLV.dtlv_usearch_handle_size(handle, error);
+            expectNoError(error, "handle_size after delete failed");
+            expect(finalSize == 0, "Handle size not zero after delete");
+            out = new FloatPointer(dimensions);
+            got = DTLV.dtlv_usearch_handle_get(handle, vectorKey, out, error);
+            expect(got == 0, "handle_get returned vector after delete");
+            out.close();
+        } finally {
+            if (handle != null && !handle.isNull()) {
+                DTLV.dtlv_usearch_deactivate(handle);
+            }
+            if (domain != null && !domain.isNull()) {
+                DTLV.dtlv_usearch_domain_close(domain);
+            }
+            if (env != null && !env.isNull()) {
+                DTLV.mdb_env_close(env);
+            }
+            deleteDirectoryFiles(fsPath);
+            deleteDirectoryFiles(envPath);
+            deleteDirectoryFiles(root);
+        }
+        System.out.println("Passed usearch handle metadata and convenience helper test.");
+    }
+
     static void stageDomainVector(DTLV.MDB_env env,
                                   DTLV.dtlv_usearch_domain domain,
                                   long vectorKey,
@@ -2504,6 +2672,8 @@ public class Test {
         runTest("LMDB suite", Test::testLMDB);
         System.out.println("----");
         testUsearchLMDBIntegration();
+        System.out.println("----");
+        testUsearchHandleMetadataAndConvenience();
         System.out.println("----");
         testUsearchFuzz();
         System.out.println("----");
