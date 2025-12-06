@@ -32,8 +32,8 @@ Initialization and metadata
 Handle lifecycle
 - `dtlv_usearch_activate(domain, handle_out)` / `dtlv_usearch_deactivate(handle)`: materialize or drop an in-memory USearch handle.
 - `dtlv_usearch_refresh(handle, read_txn)`: catch the handle up to the LMDB snapshot of a read transaction.
-- `dtlv_usearch_handle_index(handle)`: obtain the underlying `usearch_index_t` for direct search calls.
 - `dtlv_usearch_handle_size(handle, error)` / `dtlv_usearch_handle_contains(handle, key, error)`: lightweight queries on the active handle.
+- `dtlv_usearch_handle_dimensions(handle)` / `dtlv_usearch_handle_scalar_kind(handle)`: inspect handle shape for buffer sizing.
 
 Staging and applying writes
 - `dtlv_usearch_stage_add/replace/delete(domain, write_txn, key, key_len, payload, payload_len, ctx_inout)`: convenience wrappers that stage inserts/overwrites/deletes into the WAL/delta log within the caller’s LMDB write transaction.
@@ -43,6 +43,7 @@ Staging and applying writes
 
 Checkpointing and compaction
 - `dtlv_usearch_checkpoint_write_snapshot(domain, index, snapshot_seq, writer_uuid, chunk_count_out)`: serialize the current index into chunked LMDB entries.
+- `dtlv_usearch_checkpoint_write_snapshot_handle(handle, snapshot_seq, writer_uuid, chunk_count_out)`: handle-safe snapshot writer (no `usearch_index_t` exposure).
 - `dtlv_usearch_checkpoint_finalize(domain, snapshot_seq, prune_log_seq)`: mark snapshot complete and prune sealed deltas.
 - `dtlv_usearch_checkpoint_recover(domain)`: clean up torn checkpoints/WALs at startup.
 - `dtlv_usearch_compact(domain, upto_seq)`: request WAL/delta compaction when readers have advanced.
@@ -125,10 +126,11 @@ expect(DTLV.mdb_txn_commit(txn) == 0, "Failed to commit init opts");
 DTLV.dtlv_usearch_handle handle = new DTLV.dtlv_usearch_handle();
 expect(DTLV.dtlv_usearch_activate(domain, handle) == 0, "activate failed");
 
-DTLV.usearch_index_t index = DTLV.dtlv_usearch_handle_index(handle);
 PointerPointer<BytePointer> error = new PointerPointer<>(1);
 error.put(0, (BytePointer) null);
-long found = DTLV.usearch_search(index,
+LongPointer keysPointer = new LongPointer(k);
+FloatPointer distancesPointer = new FloatPointer(k);
+long found = DTLV.dtlv_usearch_handle_search(handle,
         queryVector,
         DTLV.usearch_scalar_f32_k,
         k,
@@ -186,6 +188,8 @@ DTLV.dtlv_usearch_txn_ctx_close(ctx);
 
 - `dtlv_usearch_checkpoint_write_snapshot(domain, index, snapshotSeq, writerUuid, chunkCountOut)`
   serializes the current USearch index into chunked LMDB entries.
+- `dtlv_usearch_checkpoint_write_snapshot_handle(handle, snapshotSeq, writerUuid, chunkCountOut)`
+  is the handle-safe variant for callers that do not expose `usearch_index_t`.
 - `dtlv_usearch_checkpoint_finalize(domain, snapshotSeq, pruneLogSeq)`
   atomically updates metadata, prunes deltas ≤ `pruneLogSeq`, and removes the
   `checkpoint_pending` key.

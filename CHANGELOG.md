@@ -1,5 +1,10 @@
 # Change Log
 
+## WIP
+### Changed
+- All vector operations go through dlmdb integration, no longer expose
+  usearch_index_t
+
 ## 0.14.0
 ### Added
 - Tight integration of usearch with DLMDB with a WAL/checkpoint approach to

@@ -2630,6 +2630,18 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
   return rc;
 }
 
+int dtlv_usearch_checkpoint_write_snapshot_handle(dtlv_usearch_handle *handle,
+                                                  uint64_t snapshot_seq,
+                                                  const dtlv_uuid128 *writer_uuid,
+                                                  size_t *chunk_count_out) {
+  if (!handle || !handle->domain) return EINVAL;
+  return dtlv_usearch_checkpoint_write_snapshot(handle->domain,
+                                                handle->index,
+                                                snapshot_seq,
+                                                writer_uuid,
+                                                chunk_count_out);
+}
+
 int dtlv_usearch_checkpoint_finalize(dtlv_usearch_domain *domain,
                                      uint64_t snapshot_seq,
                                      uint64_t prune_log_seq) {

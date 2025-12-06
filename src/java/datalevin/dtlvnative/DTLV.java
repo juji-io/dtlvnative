@@ -3526,9 +3526,6 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
 
     public static native void dtlv_usearch_deactivate(dtlv_usearch_handle handle);
 
-    public static native @Cast("usearch_index_t") usearch_index_t dtlv_usearch_handle_index(
-            @Const dtlv_usearch_handle handle);
-
     public static native @Cast("size_t") long dtlv_usearch_handle_size(dtlv_usearch_handle handle,
             @ByPtr @Cast("usearch_error_t*") PointerPointer<BytePointer> error);
 
@@ -3609,6 +3606,11 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
 
     public static native int dtlv_usearch_checkpoint_write_snapshot(
             dtlv_usearch_domain domain, usearch_index_t index,
+            @Cast("uint64_t") long snapshot_seq, @Const dtlv_uuid128 writer_uuid,
+            @Cast("size_t*") SizeTPointer chunk_count_out);
+
+    public static native int dtlv_usearch_checkpoint_write_snapshot_handle(
+            dtlv_usearch_handle handle,
             @Cast("uint64_t") long snapshot_seq, @Const dtlv_uuid128 writer_uuid,
             @Cast("size_t*") SizeTPointer chunk_count_out);
 

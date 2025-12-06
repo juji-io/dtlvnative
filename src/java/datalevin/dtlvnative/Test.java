@@ -2250,7 +2250,6 @@ public class Test {
             refreshUsearchHandle(env, domainA, reloadA, "domain A reload refresh");
             refreshUsearchHandle(env, domainB, reloadB, "domain B reload refresh");
             error.put(0, (BytePointer) null);
-            DTLV.usearch_index_t reloadIndexA = DTLV.dtlv_usearch_handle_index(reloadA);
             expect(DTLV.dtlv_usearch_handle_contains(reloadA, keyA, error), "Reloaded domain A missing vector");
             expectNoError(error, "Reloaded domain A contains failed");
             error.put(0, (BytePointer) null);
@@ -2798,16 +2797,13 @@ public class Test {
                 DTLV.dtlv_usearch_handle handle = new DTLV.dtlv_usearch_handle();
                 expect(DTLV.dtlv_usearch_activate(domain, handle) == 0,
                         "checkpoint activate failed");
-                DTLV.usearch_index_t index = DTLV.dtlv_usearch_handle_index(handle);
-                expect(index != null && !index.isNull(), "checkpoint index missing");
                 long currentSnapshot = readDomainMetaU64(env, domainName, "snapshot_seq");
                 long targetSeq = currentSnapshot + 1;
                 DTLV.dtlv_uuid128 writerUuid = new DTLV.dtlv_uuid128();
                 writerUuid.hi(System.nanoTime());
                 writerUuid.lo(Thread.currentThread().getId());
                 SizeTPointer chunkCount = new SizeTPointer(1);
-                expect(DTLV.dtlv_usearch_checkpoint_write_snapshot(domain,
-                        index,
+                expect(DTLV.dtlv_usearch_checkpoint_write_snapshot_handle(handle,
                         targetSeq,
                         writerUuid,
                         chunkCount) == 0,

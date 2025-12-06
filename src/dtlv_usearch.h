@@ -114,6 +114,10 @@ int dtlv_usearch_checkpoint_write_snapshot(dtlv_usearch_domain *domain,
                                            uint64_t snapshot_seq,
                                            const dtlv_uuid128 *writer_uuid,
                                            size_t *chunk_count_out);
+int dtlv_usearch_checkpoint_write_snapshot_handle(dtlv_usearch_handle *handle,
+                                                  uint64_t snapshot_seq,
+                                                  const dtlv_uuid128 *writer_uuid,
+                                                  size_t *chunk_count_out);
 
 int dtlv_usearch_checkpoint_finalize(dtlv_usearch_domain *domain,
                                      uint64_t snapshot_seq,
