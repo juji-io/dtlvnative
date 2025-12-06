@@ -3,51 +3,6 @@ set PWD=%cd%
 
 set CPATH=%PWD%\src
 set BUILD_TEST_FLAG=-DBUILD_TEST=ON
-set GRADLE_VERSION=6.9
-set GRADLE_BASE=%CPATH%\usearch\tools\gradle-%GRADLE_VERSION%
-set GRADLE_ZIP=%GRADLE_BASE%.zip
-
-REM Locate or install Gradle early so we fail fast if unavailable
-set GRADLE_BIN=
-if not defined JAVA_HOME_17_X64 (
-  if exist "C:\Program Files\Java\jdk17" set JAVA_HOME_17_X64=C:\Program Files\Java\jdk17
-  if not defined JAVA_HOME_17_X64 if exist "C:\Program Files\Java\jdk-17" set JAVA_HOME_17_X64=C:\Program Files\Java\jdk-17
-  if not defined JAVA_HOME_17_X64 if exist "C:\Program Files\Java\jdk-17.0.2" set JAVA_HOME_17_X64=C:\Program Files\Java\jdk-17.0.2
-  if not defined JAVA_HOME_17_X64 if exist "C:\Program Files\Java\jdk-17.0.10" set JAVA_HOME_17_X64=C:\Program Files\Java\jdk-17.0.10
-)
-if exist "%GRADLE_HOME%\bin\gradle.bat" set GRADLE_BIN=%GRADLE_HOME%\bin\gradle.bat
-if not defined GRADLE_BIN (
-  for %%G in (gradle.bat gradle) do (
-    for /f "delims=" %%P in ('where %%G 2^>NUL') do (
-      if not defined GRADLE_BIN set GRADLE_BIN=%%P
-    )
-  )
-)
-if not defined GRADLE_BIN (
-  if not exist "%GRADLE_BASE%\bin\gradle.bat" (
-    echo Gradle not found; downloading %GRADLE_VERSION% to %GRADLE_BASE% ...
-    if not exist "%CPATH%\usearch\tools" mkdir "%CPATH%\usearch\tools"
-    powershell -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri \"https://services.gradle.org/distributions/gradle-%GRADLE_VERSION%-bin.zip\" -OutFile \"%GRADLE_ZIP%\" -MaximumRedirection 5 -UseBasicParsing"
-    if errorlevel 1 (
-      echo ERROR: Failed to download Gradle %GRADLE_VERSION%.
-      exit /b 1
-    )
-    if not exist "%GRADLE_ZIP%" (
-      echo ERROR: Gradle archive not found at %GRADLE_ZIP%.
-      exit /b 1
-    )
-    powershell -Command "Expand-Archive -Force '%GRADLE_ZIP%' '%CPATH%\usearch\tools'"
-    if errorlevel 1 (
-      echo ERROR: Failed to extract Gradle %GRADLE_VERSION%.
-      exit /b 1
-    )
-  )
-  if exist "%GRADLE_BASE%\bin\gradle.bat" set GRADLE_BIN=%GRADLE_BASE%\bin\gradle.bat
-)
-if not defined GRADLE_BIN (
-  echo ERROR: Gradle not found in PATH/GRADLE_HOME and download failed.
-  exit /b 1
-)
 
 REM Build and run USearch C/C++ tests standalone to validate JNI-independent bits
 set USEARCH_TEST_BUILD=%CPATH%\usearch\build_tests
@@ -84,17 +39,103 @@ if errorlevel 1 (
 )
 popd
 
-REM Run Usearch Java tests via Gradle (fetches its own dependencies)
-pushd "%CPATH%\usearch"
-"%GRADLE_BIN%" --version
-"%GRADLE_BIN%" --no-daemon -PskipNative=true test -Dorg.gradle.java.home=%JAVA_HOME_17_X64%
-"%GRADLE_BIN%" --stop
+REM Build USearch JNI via CMake to produce usearch_jni.dll
+set USEARCH_JNI_BUILD=%CPATH%\usearch\build_jni
+if exist "%USEARCH_JNI_BUILD%" rmdir /S /Q "%USEARCH_JNI_BUILD%"
+
+cmake -G "Visual Studio 17 2022" ^
+      -A x64 ^
+      -D CMAKE_BUILD_TYPE=Release ^
+      -D USEARCH_USE_FP16LIB=ON ^
+      -D USEARCH_USE_OPENMP=ON ^
+      -D USEARCH_USE_SIMSIMD=ON ^
+      -D USEARCH_BUILD_JNI=ON ^
+      -D USEARCH_BUILD_TEST_CPP=OFF ^
+      -D USEARCH_BUILD_TEST_C=OFF ^
+      -D USEARCH_BUILD_LIB_C=ON ^
+      -B "%USEARCH_JNI_BUILD%" ^
+      -S "%CPATH%\usearch"
 if errorlevel 1 (
-  echo ERROR: Usearch Java tests failed (Gradle with Java 17).
-  popd
+  echo ERROR: Failed to configure USearch JNI build.
   exit /b 1
 )
-popd
+
+cmake --build "%USEARCH_JNI_BUILD%" --config Release --target usearch_jni
+if errorlevel 1 (
+  echo ERROR: Failed to build USearch JNI.
+  exit /b 1
+)
+
+set USEARCH_JNI_DLL=
+for %%N in (libusearch_jni.dll usearch_jni.dll) do (
+  if not defined USEARCH_JNI_DLL (
+    if exist "%USEARCH_JNI_BUILD%\%%N" set USEARCH_JNI_DLL=%USEARCH_JNI_BUILD%\%%N
+  )
+)
+if not defined USEARCH_JNI_DLL (
+  for %%N in (libusearch_jni.dll usearch_jni.dll) do (
+    if not defined USEARCH_JNI_DLL (
+      if exist "%USEARCH_JNI_BUILD%\Release\%%N" set USEARCH_JNI_DLL=%USEARCH_JNI_BUILD%\Release\%%N
+    )
+  )
+)
+if not defined USEARCH_JNI_DLL (
+  for /r "%USEARCH_JNI_BUILD%" %%F in (*usearch_jni*.dll) do (
+    if not defined USEARCH_JNI_DLL set USEARCH_JNI_DLL=%%F
+  )
+)
+if not defined USEARCH_JNI_DLL (
+  echo ERROR: usearch JNI library not found in %USEARCH_JNI_BUILD%.
+  exit /b 1
+)
+
+REM Compile and run USearch Java IndexTest directly (JUnit 4) against built JNI
+set USEARCH_JAVA_TEST_DIR=%USEARCH_JNI_BUILD%\java_test
+if exist "%USEARCH_JAVA_TEST_DIR%" rmdir /S /Q "%USEARCH_JAVA_TEST_DIR%"
+mkdir "%USEARCH_JAVA_TEST_DIR%"
+
+copy /Y "%USEARCH_JNI_DLL%" "%USEARCH_JAVA_TEST_DIR%\usearch.dll"
+copy /Y "%USEARCH_JNI_DLL%" "%USEARCH_JAVA_TEST_DIR%\libusearch_jni.dll"
+
+set JUNIT_JAR=%USERPROFILE%\.m2\repository\junit\junit\4.13.2\junit-4.13.2.jar
+set HAMCREST_JAR=%USERPROFILE%\.m2\repository\org\hamcrest\hamcrest-core\1.3\hamcrest-core-1.3.jar
+set JUNIT_DIR=%USERPROFILE%\.m2\repository\junit\junit\4.13.2
+set HAMCREST_DIR=%USERPROFILE%\.m2\repository\org\hamcrest\hamcrest-core\1.3
+if not exist "%JUNIT_JAR%" (
+  echo junit-4.13.2.jar not found; downloading...
+  if not exist "%JUNIT_DIR%" mkdir "%JUNIT_DIR%"
+  powershell -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri 'https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar' -OutFile '%JUNIT_JAR%' -UseBasicParsing"
+  if errorlevel 1 (
+    echo ERROR: Failed to download junit-4.13.2.jar.
+    exit /b 1
+  )
+)
+if not exist "%HAMCREST_JAR%" (
+  echo hamcrest-core-1.3.jar not found; downloading...
+  if not exist "%HAMCREST_DIR%" mkdir "%HAMCREST_DIR%"
+  powershell -Command "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri 'https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar' -OutFile '%HAMCREST_JAR%' -UseBasicParsing"
+  if errorlevel 1 (
+    echo ERROR: Failed to download hamcrest-core-1.3.jar.
+    exit /b 1
+  )
+)
+
+javac -cp "%JUNIT_JAR%;%HAMCREST_JAR%" ^
+      -d "%USEARCH_JAVA_TEST_DIR%" ^
+      src\usearch\java\cloud\unum\usearch\*.java ^
+      src\usearch\java\test\IndexTest.java
+if errorlevel 1 (
+  echo ERROR: Failed to compile USearch Java bindings/tests. && exit /b 1
+)
+
+set "JAVA_TEST_CP=%USEARCH_JAVA_TEST_DIR%;%JUNIT_JAR%;%HAMCREST_JAR%"
+set "JAVA_TEST_LIB_PATH=%USEARCH_JAVA_TEST_DIR%"
+set PATH=%JAVA_TEST_LIB_PATH%;%PATH%
+
+java -Djava.library.path=%JAVA_TEST_LIB_PATH% -cp "%JAVA_TEST_CP%" org.junit.runner.JUnitCore IndexTest
+if errorlevel 1 (
+  echo ERROR: Usearch Java IndexTest failed. && exit /b 1
+)
 
 cd %PWD%
 
