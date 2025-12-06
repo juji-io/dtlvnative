@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.14.4
 ### Changed
 - All vector operations go through dlmdb integration, no longer expose
   usearch_index_t
