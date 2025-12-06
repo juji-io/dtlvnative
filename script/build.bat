@@ -87,7 +87,7 @@ popd
 REM Run Usearch Java tests via Gradle (fetches its own dependencies)
 pushd "%CPATH%\usearch"
 "%GRADLE_BIN%" --version
-"%GRADLE_BIN%" --no-daemon test -Dorg.gradle.java.home=%JAVA_HOME_17_X64%
+"%GRADLE_BIN%" --no-daemon -PskipNative=true test -Dorg.gradle.java.home=%JAVA_HOME_17_X64%
 "%GRADLE_BIN%" --stop
 if errorlevel 1 (
   echo ERROR: Usearch Java tests failed (Gradle with Java 17).
