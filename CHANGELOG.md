@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.15.0
 ### Changed
 - Minimum Java is 21
 
