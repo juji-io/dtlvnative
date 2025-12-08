@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Changed
+- Minimum Java is 21
+
 ## 0.13.23
 ### Added
 - Key range full value iterator

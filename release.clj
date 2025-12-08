@@ -56,7 +56,7 @@
       )
 
   (sh "git" "commit" "-m" (str "Version " new-v))
-  (sh "git" "tag" "-l" new-v)
+  (sh "git" "tag" "--no-sign" new-v)
   (sh "git" "push" "origin" "master"))
 
 (defn- str->json [s]

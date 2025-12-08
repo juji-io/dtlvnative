@@ -5,8 +5,6 @@
  *  Datalevin works with LMDB, a Btree based key value store. This library
  *  provides an iterator interface to LMDB.
  *
- *  Datalevin uses usearch to provide vector similarity search.
- *
  *	@author	Huahai Yang
  *
  *	@copyright Copyright 2020-2025. Huahai Yang. All rights reserved.
@@ -16,7 +14,6 @@
 
 #include "lmdb/libraries/liblmdb/lmdb.h"
 #include "usearch/c/usearch.h"
-#include "dtlv_usearch.h"
 
 #ifdef __cplusplus
 extern "C" {

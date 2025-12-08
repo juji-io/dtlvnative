@@ -10,10 +10,9 @@ In addition to JavaCPP's JNI library, these native libraries are included:
 * [`dlmdb`](https://github.com/huahaiy/dlmdb) a fork of
   [LMDB](https://www.symas.com/mdb) key value storage library.
 * [`usearch`](https://github.com/unum-cloud/USearch) a vector indexing and
-  similarity search library.
-* `dtlv` wraps DLMDB and usearch. It implements Datalevin iterators, counters
-and samplers. It also handles integration of usearch with DLMDB to ensure ACID
-storage of vectors in DLMDB.
+  similarity search library that is exposed directly for callers.
+* `dtlv` wraps DLMDB. It implements Datalevin iterators, counters and
+  samplers.
 
 The following platforms are currently supported:
 
