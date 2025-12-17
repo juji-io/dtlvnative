@@ -998,12 +998,13 @@ int dtlv_key_rank_sample_iter_has_next(dtlv_key_rank_sample_iter *iter) {
       iter->range_empty = DTLV_TRUE;
       return DTLV_FALSE;
     }
-    if (rc == MDB_BAD_VALSIZE) {
-      iter->range_empty = DTLV_TRUE;
-      return DTLV_FALSE;
-    }
+    /* Any error during resync (including BAD_VALSIZE) means we can't continue reliably. */
+    iter->range_empty = DTLV_TRUE;
+    return DTLV_FALSE;
   }
-  return rc;
+  /* For any other unexpected error, mark the range as empty and stop iteration gracefully. */
+  iter->range_empty = DTLV_TRUE;
+  return DTLV_FALSE;
 }
 
 void dtlv_key_rank_sample_iter_destroy(dtlv_key_rank_sample_iter *iter) {
