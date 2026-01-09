@@ -24,23 +24,24 @@ The following platforms are currently supported:
 The name of the released JAR is `org.clojars.huahaiy/dtlvnative-PLATFORM`, where
 `PLATFORM` is one of the above.
 
+Vector support using usearch on Windows is experimental.
+
 ## Additional dependencies
 
 Right now, the included shared libraries depend on some system libraries.
 
 * `libc`
-* `libomp` or `libgomp`
 * `libmvec`
+* `libomp` or `libgomp`
 
-On systems that these are not available by default, you will have to install
-them yourself. For example, on Ubuntu/Debian, `apt install libgomp1`, or `apt
-install gcc-12 g++-12`; on MacOS, `brew install libomp libllvm`
-
-Building these into our jars statically is a future work. PR is always welcome.
+We bundle `libomp` in the Jar. However, on systems that the bundled library is
+not working, or `libc` is not available, you will have to install them yourself.
+For example, on Ubuntu/Debian, `apt install libgomp1`, or `apt install gcc-12
+g++-12`; on MacOS, `brew install libomp libllvm`
 
 ## License
 
-Copyright © 2021-2025 Juji, Inc.
+Copyright © 2021-2026 Huahai Yang
 
 This program and the accompanying materials are made available under the
 terms of the Eclipse Public License 2.0 which is available at
