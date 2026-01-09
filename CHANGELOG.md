@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.15.4
+### Fixed
+- install library on macOS [Thx: rriehle]
+- DLMDB handles signals more robustly.
+
 ## 0.15.0
 ### Changed
 - Minimum Java is 21
