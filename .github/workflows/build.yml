@@ -62,7 +62,7 @@ jobs:
             install_name_tool -change libdtlv.dylib @loader_path/libdtlv.dylib libjniDTLV.dylib
             codesign -f -s - libjniDTLV.dylib
 
-            cd ../../..
+            cd ../../../../..
             cp src/java/datalevin/dtlvnative/macosx-arm64/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
 
             cd macosx-arm64
