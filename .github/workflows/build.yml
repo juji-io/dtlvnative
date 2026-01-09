@@ -56,7 +56,13 @@ jobs:
             cd ../src/java
             java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.12/javacpp-1.5.12.jar datalevin/dtlvnative/DTLV.java
 
-            cd ../..
+            # Fix libjniDTLV.dylib to use @loader_path for libdtlv.dylib reference
+            # Without this fix, dlopen fails when libraries are extracted to temp directory
+            cd datalevin/dtlvnative/macosx-arm64
+            install_name_tool -change libdtlv.dylib @loader_path/libdtlv.dylib libjniDTLV.dylib
+            codesign -f -s - libjniDTLV.dylib
+
+            cd ../../..
             cp src/java/datalevin/dtlvnative/macosx-arm64/*.dylib macosx-arm64/resources/datalevin/dtlvnative/macosx-arm64/
 
             cd macosx-arm64
