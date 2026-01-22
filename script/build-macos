@@ -31,7 +31,11 @@ export PATH="${LLVM_PREFIX}/bin:$PATH"
 export LDFLAGS="${LDFLAGS:+$LDFLAGS }-L${LLVM_PREFIX}/lib -L${LIBOMP_PREFIX}/lib -L/opt/homebrew/opt/llvm/lib -L/opt/homebrew/opt/libomp/lib -L/usr/local/opt/llvm/lib -L/usr/local/opt/libomp/lib"
 export CPPFLAGS="${CPPFLAGS:+$CPPFLAGS }-I${LLVM_PREFIX}/include -I${LIBOMP_PREFIX}/include -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/opt/libomp/include -I/usr/local/opt/llvm/include -I/usr/local/opt/libomp/include"
 
+# Get macOS SDK path for Homebrew LLVM
+SDKROOT="$(xcrun --show-sdk-path)"
+
 cmake \
+    -D CMAKE_OSX_SYSROOT="${SDKROOT}" \
     -D CMAKE_BUILD_TYPE=Release \
     -D CMAKE_C_COMPILER="$(brew --prefix llvm)/bin/clang" \
     -D CMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++" \

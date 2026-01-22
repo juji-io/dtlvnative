@@ -8,8 +8,16 @@ export SOEXT=.so
 
 cd src/usearch
 
+# Use x86-64-v3 (AVX2) baseline for portable binaries on x86_64
+ARCH_FLAGS=""
+if [ "$(uname -m)" = "x86_64" ]; then
+    ARCH_FLAGS="-march=x86-64-v3"
+fi
+
 cmake \
     -D CMAKE_BUILD_TYPE=Release \
+    ${ARCH_FLAGS:+-D CMAKE_CXX_FLAGS="$ARCH_FLAGS"} \
+    ${ARCH_FLAGS:+-D CMAKE_C_FLAGS="$ARCH_FLAGS"} \
     -D USEARCH_USE_FP16LIB=1 \
     -D USEARCH_USE_OPENMP=1 \
     -D USEARCH_USE_SIMSIMD=1 \
