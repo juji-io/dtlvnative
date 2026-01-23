@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.15.7
 ### Improved
 - do not bubble up bad_val error in sampler, treat that as end
 
