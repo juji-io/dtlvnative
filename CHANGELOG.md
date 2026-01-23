@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Improved
+- do not bubble up bad_val error in sampler, treat that as end
+
 ## 0.15.4
 ### Fixed
 - install library on macOS [Thx: rriehle]

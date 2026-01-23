@@ -1231,7 +1231,7 @@ int dtlv_list_sample_iter_has_next(dtlv_list_sample_iter *iter) {
         && ((current_time_millis() - iter->start) > iter->budget))
       return DTLV_FALSE;
   }
-  if (rc == DTLV_FALSE) return DTLV_FALSE;
+  if (rc == DTLV_FALSE || rc == MDB_BAD_VALSIZE) return DTLV_FALSE;
   return rc;
 }
 
@@ -1305,7 +1305,7 @@ int dtlv_key_sample_iter_has_next(dtlv_key_sample_iter *iter) {
         && ((current_time_millis() - iter->start) > iter->budget))
       return DTLV_FALSE;
   }
-  if (rc == DTLV_FALSE) return DTLV_FALSE;
+  if (rc == DTLV_FALSE || rc == MDB_BAD_VALSIZE) return DTLV_FALSE;
   return rc;
 }
 
@@ -1492,6 +1492,10 @@ int dtlv_list_rank_sample_iter_has_next(dtlv_list_rank_sample_iter *iter) {
     return DTLV_TRUE;
   }
   if (rc == MDB_NOTFOUND) return DTLV_FALSE;
+  if (rc == MDB_BAD_VALSIZE) {
+    iter->range_empty = DTLV_TRUE;
+    return DTLV_FALSE;
+  }
   return rc;
 }
 
