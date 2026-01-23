@@ -89,7 +89,7 @@
     (sh "curl" "-u" GITHUB_AUTH
         "-X" "POST"
         "--data" (map->json request)
-        "https://api.github.com/repos/juji-io/dtlvnative/releases")))
+        "https://api.github.com/repos/datalevin/dtlvnative/releases")))
 
 (defn -main []
   (update-version)
