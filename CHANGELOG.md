@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.15.10
+### Fixed
+- Revert DLMDB incorrect forward seek optimization.
+
 ## 0.15.9
 ### Improved
 - DLMDB forward seek optimization.
