@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.15.9
+### Improved
+- DLMDB forward seek optimization.
+
 ## 0.15.7
 ### Improved
 - do not bubble up bad_val error in sampler, treat that as end
