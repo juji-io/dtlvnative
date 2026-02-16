@@ -25,7 +25,10 @@ import org.bytedeco.javacpp.tools.*;
                 @Platform( // macOS
                            value = { "macosx" },
                            link = { "dtlv" },
-                           preload = { "omp" })
+                           preload = { "omp" }),
+                @Platform( // FreeBSD
+                           value = { "freebsd" },
+                           link = { "dtlv", "usearch" })
             },
             target = "datalevin.dtlvnative.DTLV"
             )

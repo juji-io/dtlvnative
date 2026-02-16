@@ -1,0 +1,59 @@
+#!/bin/sh -x
+
+set -eou pipefail
+
+export SOEXT=.so
+
+# build usearch
+
+cd src/usearch
+
+# Copied from linux build file
+ARCH_FLAGS=""
+if [ "$(uname -m)" = "amd64" ]; then
+    ARCH_FLAGS="-march=x86-64-v3"
+fi
+
+cmake \
+    -D CMAKE_BUILD_TYPE=Release \
+    ${ARCH_FLAGS:+-D CMAKE_CXX_FLAGS="$ARCH_FLAGS"} \
+    ${ARCH_FLAGS:+-D CMAKE_C_FLAGS="$ARCH_FLAGS"} \
+    -D USEARCH_USE_FP16LIB=1 \
+    -D USEARCH_USE_OPENMP=1 \
+    -D USEARCH_USE_SIMSIMD=1 \
+    -D USEARCH_BUILD_TEST_CPP=1 \
+    -D USEARCH_BUILD_TEST_C=1 \
+    -D USEARCH_BUILD_LIB_C=1 \
+    -B build_release
+
+cmake --build build_release --config Release
+
+build_release/test_cpp
+build_release/test_c
+
+## build lmdb and dtlv
+
+export OMP_LIB="-lomp"
+export USEARCH_LIB="-Wl,-Bstatic -lusearch -Wl,-Bdynamic"
+export LDFLAGS="-L/usr/lib -L/lib/"
+
+cd ..
+gmake clean
+gmake CC=cc CXX=c++
+
+# FreeBSD has libgomp and libomp in base
+
+mkdir -p ../freebsd-x86_64/resources/datalevin/dtlvnative/freebsd-x86_64/
+cp *.so ../freebsd-x86_64/resources/datalevin/dtlvnative/freebsd-x86_64/
+
+cd java
+java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.13-freebsd-1/javacpp-1.5.13-freebsd-1.jar datalevin/dtlvnative/DTLV.java
+
+cd ../..
+cp src/java/datalevin/dtlvnative/freebsd-x86_64/*.so freebsd-x86_64/resources/datalevin/dtlvnative/freebsd-x86_64/
+
+cd freebsd-x86_64
+lein clean
+lein deps
+lein run
+lein jar
