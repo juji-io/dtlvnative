@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.15.12
+### Fixed
+- DLMDB fast list iterator handles subdatabase case.
+
 ## 0.15.10
 ### Fixed
 - Revert DLMDB incorrect forward seek optimization.
