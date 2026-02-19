@@ -39,6 +39,7 @@
         old->new #(str/replace % old-v new-v)]
     (update-file "CHANGELOG.md" #(str/replace % "# WIP" (str "# " new-v)))
 
+    (update-file "freebsd-x86_64/project.clj" old->new)
     (update-file "linux-arm64/project.clj" old->new)
     (update-file "linux-x86_64/project.clj" old->new)
     (update-file "macosx-arm64/project.clj" old->new)
