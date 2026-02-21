@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Removed
+- Counters and samplers that do O(n) iterations.
+
 ## 0.15.12
 ### Fixed
 - DLMDB fast list iterator handles subdatabase case.
