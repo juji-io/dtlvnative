@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.16.0
 ### Removed
 - Counters and samplers that do O(n) iterations.
 ### Added
