@@ -3,6 +3,8 @@
 ## WIP
 ### Removed
 - Counters and samplers that do O(n) iterations.
+### Added
+- DLMDB in-memory mode.
 
 ## 0.15.12
 ### Fixed

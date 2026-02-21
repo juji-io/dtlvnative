@@ -456,6 +456,10 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static final int MDB_NORDAHEAD = 0x800000;
     /** don't initialize malloc'd memory before writing to datafile */
     public static final int MDB_NOMEMINIT = 0x1000000;
+    /** use the previous snapshot rather than the latest one */
+    public static final int MDB_PREVSNAPSHOT = 0x2000000;
+    /** use an anonymous memory map only (no datafile/lockfile path) */
+    public static final int MDB_INMEMORY = 0x4000000;
     /** \} */
 
     /**
@@ -863,7 +867,8 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *
      * @param env   [in] An environment handle returned by #mdb_env_create()
      * @param path  [in] The directory in which the database files reside. This
-     *              directory must already exist and be writable.
+     *              directory must already exist and be writable. With
+     *              #MDB_INMEMORY, this parameter is ignored and may be null.
      * @param flags [in] Special options for this environment. This parameter
      *              must be set to 0 or by bitwise OR'ing together one or more of
      *              the
@@ -1008,6 +1013,11 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
      *              caller is expected to overwrite all of the memory that was
      *              reserved in that case.
      *              This flag may be changed at any time using #mdb_env_set_flags().
+     *              <li>#MDB_INMEMORY
+     *              Use anonymous memory only, with no datafile or lockfile path.
+     *              When enabled, the environment is process-local and non-durable;
+     *              all data is lost when the environment is closed. The path
+     *              parameter is ignored and may be null.
      *              </ul>
      * @param mode  [in] The UNIX permissions to set on created files and
      *              semaphores.
