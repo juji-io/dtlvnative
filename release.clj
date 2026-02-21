@@ -54,6 +54,7 @@
       "linux-x86_64/project.clj"
       "macosx-arm64/project.clj"
       "windows-x86_64/project.clj"
+      "freebsd-x86_64/project.clj"
       )
 
   (sh "git" "commit" "-m" (str "Version " new-v))
