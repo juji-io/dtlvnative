@@ -12,7 +12,7 @@
  *  This code is released under Eclipse Public License 2.0.
  */
 
-#include "lmdb/libraries/liblmdb/lmdb.h"
+#include "lmdb/libraries/liblmdb/dlmdb.h"
 #include "usearch/c/usearch.h"
 
 #ifdef __cplusplus
