@@ -4,7 +4,7 @@
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url  "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.12.3"]
-                 [org.bytedeco/javacpp "1.5.13-SNAPSHOT"]]
+                 [org.bytedeco/javacpp "1.5.13"]]
   :java-source-paths ["../src/java"]
   :jar-exclusions [#"\.java"]
   :javac-options ["-Xlint:unchecked" "-Xlint:-options" "--release" "21"]
