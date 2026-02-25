@@ -11,12 +11,12 @@ import org.bytedeco.javacpp.tools.*;
                               "../../src/lmdb/libraries/liblmdb/",
                               "../../src/usearch/c/",
                               "../../src/" },
-                           include = { "lmdb.h", "usearch.h", "dtlv.h" },
+                           include = { "dlmdb.h", "usearch.h", "dtlv.h" },
                            linkpath = { "../../src/" }
                            ),
                 @Platform( // Windows
                            value = "windows",
-                           link = { "lmdb", "libusearch_static_c", "dtlv", "Advapi32" }
+                           link = { "dlmdb", "libusearch_static_c", "dtlv", "Advapi32" }
                            ),
                 @Platform( // Linux
                            value = { "linux" },
