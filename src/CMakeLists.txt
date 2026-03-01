@@ -65,6 +65,16 @@ set(USEARCH_BUILD_TEST_CPP     ON CACHE BOOL "" FORCE)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
 
+if(WIN32)
+    foreach(target usearch_c usearch_static_c test_c test_cpp)
+        if(TARGET ${target})
+            # USearch compares mmap return values against MAP_FAILED even on Windows.
+            # Provide the POSIX sentinel without modifying the submodule sources.
+            target_compile_definitions(${target} PRIVATE "MAP_FAILED=((void*)-1)")
+        endif()
+    endforeach()
+endif()
+
 set_target_properties(usearch_static_c PROPERTIES
     OUTPUT_NAME usearch_static_c
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
