@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Fixed
+- DLMDB prefix compression key size inflation
+
 ## 0.16.1
 ### Changed
 - Change lmdb name to dlmdb and add FreeBSD support [Thx @markusalbertgraf]
