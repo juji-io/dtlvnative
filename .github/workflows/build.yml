@@ -69,7 +69,7 @@ jobs:
           lein deps
 
           cd ../src/java
-          java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.12/javacpp-1.5.12.jar datalevin/dtlvnative/DTLV.java
+          java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.13/javacpp-1.5.13.jar datalevin/dtlvnative/DTLV.java
 
           # Fix libjniDTLV.dylib to use @loader_path for libdtlv.dylib reference
           cd datalevin/dtlvnative/macosx-arm64
@@ -103,7 +103,7 @@ jobs:
           lein deps
 
           cd ../src/java
-          java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.12/javacpp-1.5.12.jar datalevin/dtlvnative/DTLV.java
+          java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.13/javacpp-1.5.13.jar datalevin/dtlvnative/DTLV.java
 
           cd ../..
           cp src/java/datalevin/dtlvnative/linux-x86_64/*.so linux-x86_64/resources/datalevin/dtlvnative/linux-x86_64/
@@ -132,7 +132,7 @@ jobs:
           lein deps
 
           cd ../src/java
-          java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.12/javacpp-1.5.12.jar datalevin/dtlvnative/DTLV.java
+          java -jar ~/.m2/repository/org/bytedeco/javacpp/1.5.13/javacpp-1.5.13.jar datalevin/dtlvnative/DTLV.java
 
           cd ../..
           cp src/java/datalevin/dtlvnative/linux-arm64/*.so linux-arm64/resources/datalevin/dtlvnative/linux-arm64/

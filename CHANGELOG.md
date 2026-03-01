@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.16.1
+### Changed
+- Change lmdb name to dlmdb and add FreeBSD support [Thx @markusalbertgraf]
+### Fixed
+- Some prefix compression bug fixes in DLMDB
+
 ## 0.16.0
 ### Removed
 - Counters and samplers that do O(n) iterations.
@@ -24,7 +30,7 @@
 
 ## 0.15.4
 ### Fixed
-- install library on macOS [Thx: rriehle]
+- install library on macOS [Thx @rriehle]
 - DLMDB handles signals more robustly.
 
 ## 0.15.0
