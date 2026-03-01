@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.16.4
 ### Improved
 - Address DLMDB performance regression introduced by 0.16.3
 
