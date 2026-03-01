@@ -17,19 +17,20 @@ if(CLOSE_WARNING)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
-# LMDB static
-add_library(lmdb STATIC
+# DLMDB static
+add_library(dlmdb STATIC
     lmdb/libraries/liblmdb/mdb.c
     lmdb/libraries/liblmdb/midl.c
 )
 
-set_target_properties(lmdb PROPERTIES
-    OUTPUT_NAME lmdb
+set_target_properties(dlmdb PROPERTIES
+    OUTPUT_NAME dlmdb
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_INSTALL_PREFIX}
 )
 
 # Install only the .lib file for the static library
-install(TARGETS lmdb
+install(TARGETS dlmdb
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
 
@@ -38,12 +39,13 @@ add_library(dtlv STATIC
     dtlv.c
 )
 
-# Link the LMDB static to DTLV
-target_link_libraries(dtlv PRIVATE lmdb)
+# Link the DLMDB static to DTLV
+target_link_libraries(dtlv PRIVATE dlmdb)
 
 set_target_properties(dtlv PROPERTIES
     OUTPUT_NAME dtlv
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_INSTALL_PREFIX}
 )
 
 # Install the static library
@@ -66,6 +68,7 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
 set_target_properties(usearch_static_c PROPERTIES
     OUTPUT_NAME usearch_static_c
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_INSTALL_PREFIX}
 )
 
 target_link_options(dtlv PRIVATE "/WHOLEARCHIVE:usearch_static_c")

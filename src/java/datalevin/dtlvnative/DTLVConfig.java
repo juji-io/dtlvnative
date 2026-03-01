@@ -16,6 +16,10 @@ import org.bytedeco.javacpp.tools.*;
                            ),
                 @Platform( // Windows
                            value = "windows",
+                           linkpath = {
+                              "../../src/",
+                              "../../src/Release/",
+                              "../../src/build_dtlv/Release/" },
                            link = { "dlmdb", "libusearch_static_c", "dtlv", "Advapi32" }
                            ),
                 @Platform( // Linux
