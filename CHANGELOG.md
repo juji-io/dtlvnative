@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Improved
+- Address DLMDB performance regression introduced by 0.16.3
+
 ## 0.16.3
 ### Fixed
 - DLMDB prefix compression key size inflation
