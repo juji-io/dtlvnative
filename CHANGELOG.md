@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.16.5
 ### Improved
 - DLMDB enable inmemory on Windows
 
