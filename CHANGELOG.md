@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.16.6
+### Fixed
+- DLMDB mdb_get_rank returns wrong key
+
 ## 0.16.5
 ### Improved
 - DLMDB enable inmemory on Windows
