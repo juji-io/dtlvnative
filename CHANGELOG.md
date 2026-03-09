@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Added
+- llama.cpp integration to support a default text embedding path in DB
+
 ## 0.16.6
 ### Fixed
 - DLMDB mdb_get_rank returns wrong key

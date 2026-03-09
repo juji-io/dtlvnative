@@ -1,0 +1,124 @@
+#!/bin/sh
+
+set -eou pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+JAVA_CPP_JAR="${JAVA_CPP_JAR:-$HOME/.m2/repository/org/bytedeco/javacpp/1.5.13/javacpp-1.5.13.jar}"
+MODEL_PATH="${1:-}"
+
+require_cmd() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "missing required command: $1" >&2
+        exit 1
+    fi
+}
+
+platform_setup() {
+    os="$(uname -s)"
+    arch="$(uname -m)"
+
+    case "$os" in
+        Darwin)
+            BUILD_SCRIPT="script/build-macos"
+            PLATFORM_OS="macosx"
+            LIB_EXT="dylib"
+            ;;
+        Linux)
+            BUILD_SCRIPT="script/build"
+            PLATFORM_OS="linux"
+            LIB_EXT="so"
+            ;;
+        FreeBSD)
+            BUILD_SCRIPT="script/build-freebsd"
+            PLATFORM_OS="freebsd"
+            LIB_EXT="so"
+            ;;
+        *)
+            echo "unsupported operating system: $os" >&2
+            exit 1
+            ;;
+    esac
+
+    case "$arch" in
+        arm64|aarch64)
+            PLATFORM_ARCH="arm64"
+            ;;
+        x86_64|amd64)
+            PLATFORM_ARCH="x86_64"
+            ;;
+        *)
+            echo "unsupported architecture: $arch" >&2
+            exit 1
+            ;;
+    esac
+
+    PLATFORM="${PLATFORM_OS}-${PLATFORM_ARCH}"
+    JNI_DIR="$ROOT/src/java/datalevin/dtlvnative/$PLATFORM"
+    JNI_LIB="$JNI_DIR/libjniDTLVEmbed.$LIB_EXT"
+    EMBED_LIB="$JNI_DIR/libdtlv_embed.$LIB_EXT"
+}
+
+build_embed_stack() {
+    echo "building native libraries with $BUILD_SCRIPT"
+    (
+        cd "$ROOT"
+        "./$BUILD_SCRIPT"
+    )
+
+    echo "generating JavaCPP JNI bindings for DTLVEmbed"
+    (
+        cd "$ROOT/src/java"
+        java -jar "$JAVA_CPP_JAR" datalevin/dtlvnative/DTLVEmbed.java
+    )
+
+    mkdir -p "$JNI_DIR"
+    cp "$ROOT/src/libdtlv_embed.$LIB_EXT" "$EMBED_LIB"
+}
+
+compile_test() {
+    javac -cp "$JAVA_CPP_JAR:$ROOT/src/java" \
+          "$ROOT/src/java/datalevin/dtlvnative/DTLVEmbedConfig.java" \
+          "$ROOT/src/java/datalevin/dtlvnative/DTLVEmbed.java" \
+          "$ROOT/src/java/datalevin/dtlvnative/EmbedTest.java"
+}
+
+run_test() {
+    if [ -n "$MODEL_PATH" ]; then
+        java \
+            --enable-native-access=ALL-UNNAMED \
+            --add-opens=java.base/java.nio=ALL-UNNAMED \
+            --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+            -cp "$ROOT/src/java:$JAVA_CPP_JAR" \
+            datalevin.dtlvnative.EmbedTest "$MODEL_PATH"
+    else
+        java \
+            --enable-native-access=ALL-UNNAMED \
+            --add-opens=java.base/java.nio=ALL-UNNAMED \
+            --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+            -cp "$ROOT/src/java:$JAVA_CPP_JAR" \
+            datalevin.dtlvnative.EmbedTest
+    fi
+}
+
+require_cmd java
+require_cmd javac
+require_cmd cmake
+
+if [ ! -f "$JAVA_CPP_JAR" ]; then
+    echo "javacpp jar not found: $JAVA_CPP_JAR" >&2
+    exit 1
+fi
+
+platform_setup
+
+if [ "${DTLV_EMBED_SKIP_BUILD:-0}" != "1" ]; then
+    build_embed_stack
+else
+    if [ ! -f "$JNI_LIB" ] || [ ! -f "$EMBED_LIB" ]; then
+        echo "missing built embed libraries; unset DTLV_EMBED_SKIP_BUILD or build them first" >&2
+        exit 1
+    fi
+fi
+
+compile_test
+run_test

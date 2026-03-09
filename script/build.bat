@@ -30,7 +30,7 @@ dir %CPATH%
 cd java
 
 java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.13\javacpp-1.5.13.jar" ^
-    datalevin/dtlvnative/DTLV.java
+    datalevin/dtlvnative/DTLV.java datalevin/dtlvnative/DTLVEmbed.java
 
 dir datalevin\dtlvnative\windows-x86_64
 

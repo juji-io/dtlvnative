@@ -31,11 +31,37 @@ cmake --build build_release --config Release
 build_release/test_cpp
 build_release/test_c
 
+# build llama.cpp
+
+cd ../llama.cpp
+
+cmake \
+    -D CMAKE_BUILD_TYPE=Release \
+    ${ARCH_FLAGS:+-D CMAKE_CXX_FLAGS="$ARCH_FLAGS"} \
+    ${ARCH_FLAGS:+-D CMAKE_C_FLAGS="$ARCH_FLAGS"} \
+    -D BUILD_SHARED_LIBS=OFF \
+    -D LLAMA_BUILD_COMMON=OFF \
+    -D LLAMA_BUILD_TESTS=OFF \
+    -D LLAMA_BUILD_TOOLS=OFF \
+    -D LLAMA_BUILD_EXAMPLES=OFF \
+    -D LLAMA_BUILD_SERVER=OFF \
+    -D LLAMA_OPENSSL=OFF \
+    -D GGML_BACKEND_DL=OFF \
+    -D GGML_NATIVE=OFF \
+    -D GGML_OPENMP=OFF \
+    -D GGML_BLAS=OFF \
+    -D GGML_ACCELERATE=OFF \
+    -D GGML_METAL=OFF \
+    -B build_release
+
+cmake --build build_release --config Release
+
 # build lmdb and dtlv
 
 export LDFLAGS="${LDFLAGS:+$LDFLAGS }-static-libstdc++ -static-libgcc -Wl,-rpath,'$$ORIGIN'"
 export OMP_LIB="-fopenmp"
 export USEARCH_LIB="-Wl,--whole-archive -lusearch -Wl,--no-whole-archive"
+export LLAMA_EXTRA_LIBS="-ldl -lm"
 
 cd ..
 make clean

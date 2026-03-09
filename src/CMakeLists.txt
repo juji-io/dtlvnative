@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(dtlv VERSION 0.11.3 LANGUAGES C)
+project(dtlv VERSION 0.11.3 LANGUAGES C CXX)
 
 # Options for compilation
 option(CLOSE_WARNING "Close warnings, default off" OFF)
@@ -65,6 +65,21 @@ set(USEARCH_BUILD_TEST_CPP     ON CACHE BOOL "" FORCE)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
 
+set(LLAMA_BUILD_COMMON         OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TESTS          OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TOOLS          OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_EXAMPLES       OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER         OFF CACHE BOOL "" FORCE)
+set(LLAMA_OPENSSL              OFF CACHE BOOL "" FORCE)
+set(GGML_BACKEND_DL            OFF CACHE BOOL "" FORCE)
+set(GGML_NATIVE                OFF CACHE BOOL "" FORCE)
+set(GGML_OPENMP                OFF CACHE BOOL "" FORCE)
+set(GGML_BLAS                  OFF CACHE BOOL "" FORCE)
+set(GGML_ACCELERATE            OFF CACHE BOOL "" FORCE)
+set(GGML_METAL                 OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(${PROJECT_SOURCE_DIR}/llama.cpp llama_build)
+
 if(WIN32)
     foreach(target usearch_c usearch_static_c test_c test_cpp)
         if(TARGET ${target})
@@ -81,9 +96,31 @@ set_target_properties(usearch_static_c PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_INSTALL_PREFIX}
 )
 
+add_library(dtlv_embed STATIC
+    dtlv_embed.cpp
+)
+
+target_include_directories(dtlv_embed PRIVATE
+    ${PROJECT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/llama.cpp/include
+    ${PROJECT_SOURCE_DIR}/llama.cpp/ggml/include
+)
+target_compile_features(dtlv_embed PRIVATE cxx_std_17)
+target_link_libraries(dtlv_embed PRIVATE llama ggml ggml-base ggml-cpu)
+
+set_target_properties(dtlv_embed PROPERTIES
+    OUTPUT_NAME dtlv_embed
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_INSTALL_PREFIX}
+)
+
 target_link_options(dtlv PRIVATE "/WHOLEARCHIVE:usearch_static_c")
 target_link_libraries(dtlv PRIVATE usearch_static_c)
 
 install(TARGETS usearch_static_c
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
+)
+
+install(TARGETS dtlv_embed llama ggml ggml-base ggml-cpu
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )

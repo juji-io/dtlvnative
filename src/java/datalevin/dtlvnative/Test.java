@@ -200,6 +200,19 @@ public class Test {
         pass("Passed LMDB tests.");
     }
 
+    static void testEmbed() {
+
+        System.err.println("Testing default embedding model ...");
+
+        try {
+            EmbedTest.runDefaultModelTest();
+        } catch (Exception e) {
+            throw new RuntimeException("default embedding smoke test failed", e);
+        }
+
+        pass("Passed default embedding test.");
+    }
+
     static void testLMDBCountedPrefix() {
 
         System.err.println("Testing counted/prefix compressed LMDB ...");
@@ -1746,5 +1759,7 @@ public class Test {
         runTest("LMDB suite", Test::testLMDB);
         System.out.println("----");
         runTest("usearch suite", Test::testUsearch);
+        System.out.println("----");
+        runTest("embed suite", Test::testEmbed);
     }
 }
