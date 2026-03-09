@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.17.0
 ### Added
 - llama.cpp integration to support a default text embedding path in DB
 
