@@ -21,10 +21,12 @@ endif()
 
 function(dtlv_stage_windows_lib target output_name)
     if(WIN32 AND TARGET ${target})
-        add_custom_command(TARGET ${target} POST_BUILD
+        string(REPLACE "-" "_" stage_target "stage_${target}")
+        add_custom_target(${stage_target} ALL
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "$<TARGET_LINKER_FILE:${target}>"
                 "${CMAKE_INSTALL_PREFIX}/${output_name}"
+            DEPENDS ${target}
             VERBATIM
         )
     endif()
@@ -139,6 +141,7 @@ foreach(target llama ggml ggml-base ggml-cpu)
         )
         install(TARGETS ${target}
             ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
+            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_PREFIX}
         )
         dtlv_stage_windows_lib(${target} "${target}.lib")
     endif()
