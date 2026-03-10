@@ -20,17 +20,6 @@ call :build_and_stage dlmdb dlmdb.lib
 if errorlevel 1 exit /b %errorlevel%
 call :build_and_stage usearch_static_c libusearch_static_c.lib
 if errorlevel 1 exit /b %errorlevel%
-call :build_and_stage ggml-base ggml-base.lib
-if errorlevel 1 exit /b %errorlevel%
-call :build_and_stage ggml-cpu ggml-cpu.lib
-if errorlevel 1 exit /b %errorlevel%
-call :build_and_stage ggml ggml.lib
-if errorlevel 1 exit /b %errorlevel%
-call :build_and_stage llama llama.lib
-if errorlevel 1 exit /b %errorlevel%
-call :build_and_stage dtlv dtlv.lib
-if errorlevel 1 exit /b %errorlevel%
-
 cmake --build build_dtlv --config Release --target test_cpp test_c
 if errorlevel 1 exit /b %errorlevel%
 
@@ -40,6 +29,17 @@ call :run_built_exe test_cpp.exe
 if errorlevel 1 exit /b %errorlevel%
 
 call :run_built_exe test_c.exe
+if errorlevel 1 exit /b %errorlevel%
+
+call :build_and_stage ggml-base ggml-base.lib
+if errorlevel 1 exit /b %errorlevel%
+call :build_and_stage ggml-cpu ggml-cpu.lib
+if errorlevel 1 exit /b %errorlevel%
+call :build_and_stage ggml ggml.lib
+if errorlevel 1 exit /b %errorlevel%
+call :build_and_stage llama llama.lib
+if errorlevel 1 exit /b %errorlevel%
+call :build_and_stage dtlv dtlv.lib
 if errorlevel 1 exit /b %errorlevel%
 
 cd %PWD%
@@ -98,6 +98,7 @@ if exist "build_dtlv\Release\%~1" goto run_built_exe_release
 if exist "build_dtlv\%~1" goto run_built_exe_root
 echo Missing %~1 after build.
 dir /s build_dtlv\%~1
+dir /s build_dtlv\test*.exe
 exit /b 1
 
 :run_built_exe_release
