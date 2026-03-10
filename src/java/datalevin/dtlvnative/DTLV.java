@@ -3602,6 +3602,64 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native void dtlv_list_rank_sample_iter_destroy(
             dtlv_list_rank_sample_iter iter);
 
+    /**
+     * Opaque llama.cpp embedding handle.
+     */
+    @Opaque
+    public static class dtlv_llama_embedder extends Pointer {
+        public dtlv_llama_embedder() {
+            super((Pointer) null);
+        }
+
+        public dtlv_llama_embedder(Pointer p) {
+            super(p);
+        }
+    }
+
+    public static native int dtlv_llama_embedder_create(
+            @Cast("dtlv_llama_embedder**") PointerPointer embedder,
+            @Cast("const char*") BytePointer model_path,
+            int n_ctx, int n_batch, int n_threads, int normalize);
+
+    public static native int dtlv_llama_embedder_create(
+            @ByPtrPtr dtlv_llama_embedder embedder,
+            @Cast("const char*") BytePointer model_path,
+            int n_ctx, int n_batch, int n_threads, int normalize);
+
+    public static native int dtlv_llama_embedder_create(
+            @Cast("dtlv_llama_embedder**") PointerPointer embedder,
+            String model_path,
+            int n_ctx, int n_batch, int n_threads, int normalize);
+
+    public static native int dtlv_llama_embedder_create(
+            @ByPtrPtr dtlv_llama_embedder embedder,
+            String model_path,
+            int n_ctx, int n_batch, int n_threads, int normalize);
+
+    public static native int dtlv_llama_embedder_n_embd(
+            dtlv_llama_embedder embedder);
+
+    public static native int dtlv_llama_embed(
+            dtlv_llama_embedder embedder,
+            @Cast("const char*") BytePointer text,
+            FloatPointer output,
+            @Cast("size_t") long output_len);
+
+    public static native int dtlv_llama_embed(
+            dtlv_llama_embedder embedder,
+            String text,
+            FloatPointer output,
+            @Cast("size_t") long output_len);
+
+    public static native int dtlv_llama_embed(
+            dtlv_llama_embedder embedder,
+            String text,
+            float[] output,
+            @Cast("size_t") long output_len);
+
+    public static native void dtlv_llama_embedder_destroy(
+            dtlv_llama_embedder embedder);
+
     // #ifdef __cplusplus
     // #endif
 

@@ -339,6 +339,59 @@ extern "C" {
    */
   void dtlv_list_rank_sample_iter_destroy(dtlv_list_rank_sample_iter *iter);
 
+  /**
+   * Opaque llama.cpp embedding handle.
+   */
+  typedef struct dtlv_llama_embedder dtlv_llama_embedder;
+
+  /**
+   * Create a CPU-only llama.cpp embedder backed by a GGUF model.
+   *
+   * @param embedder The address where the embedder will be stored.
+   * @param model_path Path to a GGUF embedding model.
+   * @param n_ctx Context size. Use 0 to default to the model training context.
+   * @param n_batch Max tokens accepted per embedding request. Use 0 to mirror
+   *                the context size.
+   * @param n_threads CPU thread count. Use 0 to keep llama.cpp defaults.
+   * @param normalize Non-zero to L2 normalize returned embeddings.
+   * @return MDB_SUCCESS or an error code.
+   */
+  int dtlv_llama_embedder_create(dtlv_llama_embedder **embedder,
+                                 const char *model_path,
+                                 int n_ctx,
+                                 int n_batch,
+                                 int n_threads,
+                                 int normalize);
+
+  /**
+   * Return the embedding width for this embedder.
+   *
+   * @param embedder The embedder handle.
+   * @return The number of floats in each embedding, or -1 on invalid input.
+   */
+  int dtlv_llama_embedder_n_embd(dtlv_llama_embedder *embedder);
+
+  /**
+   * Compute an embedding for a single UTF-8 string.
+   *
+   * @param embedder The embedder handle.
+   * @param text The UTF-8 text to embed.
+   * @param output Caller-owned float buffer.
+   * @param output_len Number of floats available in output.
+   * @return MDB_SUCCESS or an error code.
+   */
+  int dtlv_llama_embed(dtlv_llama_embedder *embedder,
+                       const char *text,
+                       float *output,
+                       size_t output_len);
+
+  /**
+   * Destroy a llama.cpp embedder.
+   *
+   * @param embedder The embedder handle.
+   */
+  void dtlv_llama_embedder_destroy(dtlv_llama_embedder *embedder);
+
 
 #ifdef __cplusplus
 }

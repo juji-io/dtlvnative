@@ -52,6 +52,29 @@ cmake --build build_release --config Release
 build_release/test_cpp
 build_release/test_c
 
+# build llama.cpp
+
+cd ../llama.cpp
+
+cmake \
+    -D CMAKE_OSX_SYSROOT="${SDKROOT}" \
+    -D CMAKE_BUILD_TYPE=Release \
+    -D CMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -D CMAKE_C_COMPILER="$(brew --prefix llvm)/bin/clang" \
+    -D CMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++" \
+    -D BUILD_SHARED_LIBS=OFF \
+    -D GGML_NATIVE=OFF \
+    -D GGML_METAL=OFF \
+    -D GGML_OPENMP=1 \
+    -D LLAMA_BUILD_COMMON=OFF \
+    -D LLAMA_BUILD_TESTS=OFF \
+    -D LLAMA_BUILD_TOOLS=OFF \
+    -D LLAMA_BUILD_EXAMPLES=OFF \
+    -D LLAMA_BUILD_SERVER=OFF \
+    -B build_release
+
+cmake --build build_release --config Release
+
 ## build lmdb and dtlv
 
 export OMP_LIB="-lomp"

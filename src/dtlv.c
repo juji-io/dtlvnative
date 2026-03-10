@@ -2,7 +2,15 @@
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
+#include <math.h>
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
 #include "dtlv.h"
+#include "llama.h"
 
 
 void val_in(MDB_val *this, MDB_val *other) {
@@ -25,6 +33,36 @@ static int dtlv_copy_indices(size_t **dst, size_t *src, int samples) {
   *dst = copy;
   return MDB_SUCCESS;
 }
+
+#if defined(_WIN32)
+static INIT_ONCE dtlv_llama_init_once = INIT_ONCE_STATIC_INIT;
+
+static BOOL CALLBACK dtlv_llama_backend_init_once(
+    PINIT_ONCE init_once, PVOID parameter, PVOID *context) {
+  (void)init_once;
+  (void)parameter;
+  (void)context;
+  llama_backend_init();
+  return TRUE;
+}
+
+static void dtlv_llama_backend_ensure_init(void) {
+  InitOnceExecuteOnce(&dtlv_llama_init_once,
+                      dtlv_llama_backend_init_once,
+                      NULL,
+                      NULL);
+}
+#else
+static pthread_once_t dtlv_llama_init_once = PTHREAD_ONCE_INIT;
+
+static void dtlv_llama_backend_init_once(void) {
+  llama_backend_init();
+}
+
+static void dtlv_llama_backend_ensure_init(void) {
+  pthread_once(&dtlv_llama_init_once, dtlv_llama_backend_init_once);
+}
+#endif
 struct dtlv_key_iter {
   MDB_cursor *cur;
   MDB_txn *txn;
@@ -1141,4 +1179,232 @@ void dtlv_list_rank_sample_iter_destroy(dtlv_list_rank_sample_iter *iter) {
     free(iter->indices);
     free(iter);
   }
+}
+
+struct dtlv_llama_embedder {
+  struct llama_model *model;
+  struct llama_context *ctx;
+  const struct llama_vocab *vocab;
+  int n_ctx;
+  int n_batch;
+  int n_embd;
+  int pooling_type;
+  int normalize;
+  int use_encode;
+};
+
+static void dtlv_llama_copy_embedding(
+    float *dst, const float *src, int n_embd, int normalize) {
+  if (normalize == DTLV_FALSE) {
+    memcpy(dst, src, (size_t)n_embd * sizeof(float));
+    return;
+  }
+
+  double norm = 0.0;
+  int i;
+  for (i = 0; i < n_embd; i++) {
+    norm += (double)src[i] * (double)src[i];
+  }
+
+  if (norm <= 0.0) {
+    memset(dst, 0, (size_t)n_embd * sizeof(float));
+    return;
+  }
+
+  float scale = (float)(1.0 / sqrt(norm));
+  for (i = 0; i < n_embd; i++) {
+    dst[i] = src[i] * scale;
+  }
+}
+
+static int dtlv_llama_prepare_batch(struct llama_batch *batch, int n_tokens) {
+  int i;
+  if (!batch || n_tokens <= 0) return EINVAL;
+
+  batch->n_tokens = n_tokens;
+  for (i = 0; i < n_tokens; i++) {
+    batch->pos[i] = i;
+    batch->n_seq_id[i] = 1;
+    batch->seq_id[i][0] = 0;
+    batch->logits[i] = 1;
+  }
+  return MDB_SUCCESS;
+}
+
+int dtlv_llama_embedder_create(dtlv_llama_embedder **embedder,
+                               const char *model_path,
+                               int n_ctx,
+                               int n_batch,
+                               int n_threads,
+                               int normalize) {
+  struct dtlv_llama_embedder *i;
+  struct llama_model_params model_params;
+  struct llama_context_params ctx_params;
+  int train_ctx;
+
+  if (!embedder || !model_path || !model_path[0]) return EINVAL;
+  *embedder = NULL;
+
+  dtlv_llama_backend_ensure_init();
+
+  i = calloc(1, sizeof(struct dtlv_llama_embedder));
+  if (!i) return ENOMEM;
+
+  model_params = llama_model_default_params();
+  model_params.n_gpu_layers = 0;
+
+  i->model = llama_model_load_from_file(model_path, model_params);
+  if (!i->model) {
+    free(i);
+    return EIO;
+  }
+
+  if (llama_model_has_encoder(i->model) && llama_model_has_decoder(i->model)) {
+    dtlv_llama_embedder_destroy(i);
+    return ENOTSUP;
+  }
+
+  i->vocab = llama_model_get_vocab(i->model);
+  if (!i->vocab) {
+    dtlv_llama_embedder_destroy(i);
+    return EINVAL;
+  }
+
+  train_ctx = llama_model_n_ctx_train(i->model);
+  i->n_ctx = n_ctx > 0 ? n_ctx : (train_ctx > 0 ? train_ctx : 512);
+  i->n_batch = n_batch > 0 ? n_batch : i->n_ctx;
+  i->n_embd = llama_model_n_embd_out(i->model);
+  if (i->n_embd <= 0) i->n_embd = llama_model_n_embd(i->model);
+  i->normalize = normalize ? DTLV_TRUE : DTLV_FALSE;
+  i->use_encode = llama_model_has_encoder(i->model) ? DTLV_TRUE : DTLV_FALSE;
+
+  if (i->n_ctx <= 0 || i->n_batch <= 0 || i->n_embd <= 0) {
+    dtlv_llama_embedder_destroy(i);
+    return EINVAL;
+  }
+
+  ctx_params = llama_context_default_params();
+  ctx_params.n_ctx = (uint32_t)i->n_ctx;
+  ctx_params.n_batch = (uint32_t)i->n_batch;
+  ctx_params.n_ubatch = (uint32_t)i->n_batch;
+  ctx_params.embeddings = true;
+  ctx_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+  ctx_params.offload_kqv = false;
+  ctx_params.op_offload = false;
+  if (n_threads > 0) {
+    ctx_params.n_threads = n_threads;
+    ctx_params.n_threads_batch = n_threads;
+  }
+
+  i->ctx = llama_init_from_model(i->model, ctx_params);
+  if (!i->ctx) {
+    dtlv_llama_embedder_destroy(i);
+    return EIO;
+  }
+
+  i->pooling_type = llama_pooling_type(i->ctx);
+  if (i->pooling_type == LLAMA_POOLING_TYPE_RANK) {
+    dtlv_llama_embedder_destroy(i);
+    return ENOTSUP;
+  }
+
+  *embedder = i;
+  return MDB_SUCCESS;
+}
+
+int dtlv_llama_embedder_n_embd(dtlv_llama_embedder *embedder) {
+  if (!embedder) return -1;
+  return embedder->n_embd;
+}
+
+int dtlv_llama_embed(dtlv_llama_embedder *embedder,
+                     const char *text,
+                     float *output,
+                     size_t output_len) {
+  size_t text_len;
+  int n_tokens;
+  int rc;
+  struct llama_batch batch;
+  const float *embedding;
+
+  if (!embedder || !text || !output) return EINVAL;
+  if (output_len < (size_t)embedder->n_embd) return EMSGSIZE;
+
+  text_len = strlen(text);
+  if (text_len > (size_t)INT32_MAX) return EOVERFLOW;
+
+  n_tokens = -llama_tokenize(embedder->vocab,
+                             text,
+                             (int32_t)text_len,
+                             NULL,
+                             0,
+                             true,
+                             true);
+  if (n_tokens == INT32_MIN) return EOVERFLOW;
+  if (n_tokens <= 0) return EINVAL;
+  if (n_tokens > embedder->n_batch || n_tokens > embedder->n_ctx)
+    return EMSGSIZE;
+
+  batch = llama_batch_init(n_tokens, 0, 1);
+  if (!batch.token || !batch.pos || !batch.n_seq_id || !batch.seq_id ||
+      !batch.logits) {
+    llama_batch_free(batch);
+    return ENOMEM;
+  }
+
+  rc = llama_tokenize(embedder->vocab,
+                      text,
+                      (int32_t)text_len,
+                      batch.token,
+                      n_tokens,
+                      true,
+                      true);
+  if (rc < 0) {
+    llama_batch_free(batch);
+    return EIO;
+  }
+  n_tokens = rc;
+
+  rc = dtlv_llama_prepare_batch(&batch, n_tokens);
+  if (rc != MDB_SUCCESS) {
+    llama_batch_free(batch);
+    return rc;
+  }
+
+  llama_memory_clear(llama_get_memory(embedder->ctx), true);
+
+  if (embedder->use_encode == DTLV_TRUE) {
+    rc = llama_encode(embedder->ctx, batch);
+  } else {
+    rc = llama_decode(embedder->ctx, batch);
+  }
+  if (rc != 0) {
+    llama_batch_free(batch);
+    return EIO;
+  }
+
+  llama_synchronize(embedder->ctx);
+
+  if (embedder->pooling_type == LLAMA_POOLING_TYPE_NONE) {
+    embedding = llama_get_embeddings_ith(embedder->ctx, -1);
+  } else {
+    embedding = llama_get_embeddings_seq(embedder->ctx, 0);
+  }
+
+  if (!embedding) {
+    llama_batch_free(batch);
+    return EIO;
+  }
+
+  dtlv_llama_copy_embedding(
+      output, embedding, embedder->n_embd, embedder->normalize);
+  llama_batch_free(batch);
+  return MDB_SUCCESS;
+}
+
+void dtlv_llama_embedder_destroy(dtlv_llama_embedder *embedder) {
+  if (!embedder) return;
+  if (embedder->ctx) llama_free(embedder->ctx);
+  if (embedder->model) llama_model_free(embedder->model);
+  free(embedder);
 }

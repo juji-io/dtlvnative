@@ -10,6 +10,8 @@ include_directories(
     ${PROJECT_SOURCE_DIR}
     ${PROJECT_SOURCE_DIR}/win32
     ${PROJECT_SOURCE_DIR}/lmdb/libraries/liblmdb
+    ${PROJECT_SOURCE_DIR}/llama.cpp/include
+    ${PROJECT_SOURCE_DIR}/llama.cpp/ggml/include
 )
 
 # Option to close warnings
@@ -65,6 +67,20 @@ set(USEARCH_BUILD_TEST_CPP     ON CACHE BOOL "" FORCE)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
 
+set(LLAMA_BUILD_COMMON         OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TESTS          OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TOOLS          OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_EXAMPLES       OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER         OFF CACHE BOOL "" FORCE)
+set(LLAMA_OPENSSL              OFF CACHE BOOL "" FORCE)
+set(GGML_NATIVE                OFF CACHE BOOL "" FORCE)
+set(GGML_METAL                 OFF CACHE BOOL "" FORCE)
+set(GGML_OPENMP                ON CACHE BOOL "" FORCE)
+set(GGML_BACKEND_DL            OFF CACHE BOOL "" FORCE)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+add_subdirectory(${PROJECT_SOURCE_DIR}/llama.cpp llama_static_build)
+
 if(WIN32)
     foreach(target usearch_c usearch_static_c test_c test_cpp)
         if(TARGET ${target})
@@ -82,8 +98,20 @@ set_target_properties(usearch_static_c PROPERTIES
 )
 
 target_link_options(dtlv PRIVATE "/WHOLEARCHIVE:usearch_static_c")
-target_link_libraries(dtlv PRIVATE usearch_static_c)
+target_link_libraries(dtlv PRIVATE usearch_static_c llama ggml ggml-base ggml-cpu)
 
 install(TARGETS usearch_static_c
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
+
+foreach(target llama ggml ggml-base ggml-cpu)
+    if(TARGET ${target})
+        set_target_properties(${target} PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+            ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_INSTALL_PREFIX}
+        )
+        install(TARGETS ${target}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
+        )
+    endif()
+endforeach()

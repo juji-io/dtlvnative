@@ -6,6 +6,10 @@ import java.util.*;
 import java.util.function.LongPredicate;
 import java.nio.file.*;
 import java.nio.charset.StandardCharsets;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 
@@ -15,6 +19,11 @@ public class Test {
 
     private static int completedTests = 0;
     private static final List<Pointer> cursorKeepAlive = new ArrayList<>();
+    private static final String E5_MODEL_NAME = "multilingual-e5-small-Q8_0.gguf";
+    private static final String E5_MODEL_URL =
+            "https://huggingface.co/keisuke-miyako/multilingual-e5-small-gguf-q8_0/"
+            + "resolve/e1da94460f223e3204e75dfe51350e5491c879d4/"
+            + "multilingual-e5-small-Q8_0.gguf?download=true";
 
     static void fail(String message) {
         System.err.println(message);
@@ -1335,6 +1344,105 @@ public class Test {
         }
     }
 
+    static Path repoRoot() {
+        Path cwd = Paths.get("").toAbsolutePath().normalize();
+        if (Files.isDirectory(cwd.resolve("src"))) {
+            return cwd;
+        }
+        Path parent = cwd.getParent();
+        if (parent != null && Files.isDirectory(parent.resolve("src"))) {
+            return parent;
+        }
+        fail("Could not locate repository root from " + cwd);
+        return cwd;
+    }
+
+    static Path ensureEmbeddingModel() {
+        Path root = repoRoot();
+        Path targetModel = root.resolve("target").resolve("embedding-models").resolve(E5_MODEL_NAME);
+        Path fallbackModel = root.resolve(E5_MODEL_NAME);
+
+        if (Files.isRegularFile(targetModel)) {
+            return targetModel;
+        }
+        if (Files.isRegularFile(fallbackModel)) {
+            return fallbackModel;
+        }
+
+        try {
+            Files.createDirectories(targetModel.getParent());
+
+            HttpClient client = HttpClient.newBuilder()
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .build();
+            HttpRequest request = HttpRequest.newBuilder(URI.create(E5_MODEL_URL))
+                    .header("User-Agent", "dtlvnative-test")
+                    .GET()
+                    .build();
+
+            Path tempFile = targetModel.resolveSibling(E5_MODEL_NAME + ".part");
+            HttpResponse<Path> response = client.send(
+                    request,
+                    HttpResponse.BodyHandlers.ofFile(tempFile));
+
+            expect(response.statusCode() == 200,
+                   "Failed to download embedding model from Hugging Face: HTTP " + response.statusCode());
+
+            Files.move(tempFile, targetModel,
+                       StandardCopyOption.REPLACE_EXISTING,
+                       StandardCopyOption.ATOMIC_MOVE);
+            return targetModel;
+        } catch (IOException e) {
+            fail("Failed to download embedding model from Hugging Face", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            fail("Interrupted while downloading embedding model", e);
+        }
+
+        return targetModel;
+    }
+
+    static void testLlamaEmbedding() {
+        System.err.println("Testing llama.cpp embedding ...");
+
+        Path modelPath = ensureEmbeddingModel();
+        DTLV.dtlv_llama_embedder embedder = new DTLV.dtlv_llama_embedder();
+        int rc = DTLV.dtlv_llama_embedder_create(embedder, modelPath.toString(), 0, 0, 4, 1);
+        expect(rc == 0, "Failed to create llama embedder: " + rc);
+
+        FloatPointer output = null;
+        try {
+            int nEmbd = DTLV.dtlv_llama_embedder_n_embd(embedder);
+            expect(nEmbd > 0, "Invalid embedding dimension: " + nEmbd);
+
+            output = new FloatPointer(nEmbd);
+            rc = DTLV.dtlv_llama_embed(embedder, "query: hello world", output, nEmbd);
+            expect(rc == 0, "Failed to generate embedding: " + rc);
+
+            double norm = 0.0;
+            boolean hasMagnitude = false;
+            for (int i = 0; i < nEmbd; i++) {
+                float value = output.get(i);
+                expect(Float.isFinite(value), "Embedding contains non-finite value at index " + i);
+                norm += value * value;
+                if (Math.abs(value) > 1.0e-6f) {
+                    hasMagnitude = true;
+                }
+            }
+
+            expect(hasMagnitude, "Embedding output is entirely zero");
+            expect(Math.abs(Math.sqrt(norm) - 1.0) < 1.0e-3,
+                   "Normalized embedding norm mismatch: " + Math.sqrt(norm));
+
+            pass("Passed llama embedding test.");
+        } finally {
+            if (output != null) {
+                output.close();
+            }
+            DTLV.dtlv_llama_embedder_destroy(embedder);
+        }
+    }
+
     static void fillValWithString(DTLV.MDB_val target, String value,
                                   List<BytePointer> arena) {
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
@@ -1746,5 +1854,7 @@ public class Test {
         runTest("LMDB suite", Test::testLMDB);
         System.out.println("----");
         runTest("usearch suite", Test::testUsearch);
+        System.out.println("----");
+        runTest("llama embedding", Test::testLlamaEmbedding);
     }
 }

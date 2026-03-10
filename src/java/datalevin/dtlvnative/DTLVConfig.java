@@ -10,6 +10,8 @@ import org.bytedeco.javacpp.tools.*;
                            includepath = {
                               "../../src/lmdb/libraries/liblmdb/",
                               "../../src/usearch/c/",
+                              "../../src/llama.cpp/include/",
+                              "../../src/llama.cpp/ggml/include/",
                               "../../src/" },
                            include = { "dlmdb.h", "usearch.h", "dtlv.h" },
                            linkpath = { "../../src/" }
@@ -20,7 +22,15 @@ import org.bytedeco.javacpp.tools.*;
                               "../../src/",
                               "../../src/Release/",
                               "../../src/build_dtlv/Release/" },
-                           link = { "dlmdb", "libusearch_static_c", "dtlv", "Advapi32" }
+                           link = {
+                              "dtlv",
+                              "llama",
+                              "ggml",
+                              "ggml-cpu",
+                              "ggml-base",
+                              "dlmdb",
+                              "libusearch_static_c",
+                              "Advapi32" }
                            ),
                 @Platform( // Linux
                            value = { "linux" },
