@@ -2,6 +2,18 @@
 
 set -eou pipefail
 
+ROOT_DIR=$(
+  CDPATH= cd -- "$(dirname "$0")/.." && pwd
+)
+
+cleanup() {
+  "$ROOT_DIR/script/llama-embed-only-patch.sh" revert >/dev/null 2>&1 || true
+}
+
+trap cleanup EXIT
+
+"$ROOT_DIR/script/llama-embed-only-patch.sh" apply
+
 export SOEXT=.dylib
 
 ## build usearch

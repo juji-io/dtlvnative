@@ -1,7 +1,24 @@
 
+@echo off
+setlocal
+
 set PWD=%cd%
 
 set CPATH=%PWD%\src
+set LLAMA_PATCH=%PWD%\script\patches\llama-embed-only.patch
+
+call :apply_llama_patch
+if errorlevel 1 exit /b %errorlevel%
+
+call :main
+set BUILD_STATUS=%errorlevel%
+
+call :revert_llama_patch
+if errorlevel 1 if "%BUILD_STATUS%"=="0" set BUILD_STATUS=%errorlevel%
+
+exit /b %BUILD_STATUS%
+
+:main
 
 del /q "%CPATH%\dtlv.lib" "%CPATH%\llama.lib" "%CPATH%\ggml.lib" "%CPATH%\ggml-base.lib" "%CPATH%\ggml-cpu.lib" "%CPATH%\dlmdb.lib" "%CPATH%\libusearch_static_c.lib" 2>nul
 
@@ -80,6 +97,18 @@ if errorlevel 1 exit /b %errorlevel%
 dir windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
 
 goto :eof
+
+:apply_llama_patch
+git -C "%CPATH%\llama.cpp" apply --reverse --check "%LLAMA_PATCH%" >nul 2>nul
+if not errorlevel 1 exit /b 0
+git -C "%CPATH%\llama.cpp" apply "%LLAMA_PATCH%"
+exit /b %errorlevel%
+
+:revert_llama_patch
+git -C "%CPATH%\llama.cpp" apply --reverse --check "%LLAMA_PATCH%" >nul 2>nul
+if errorlevel 1 exit /b 0
+git -C "%CPATH%\llama.cpp" apply --reverse "%LLAMA_PATCH%"
+exit /b %errorlevel%
 
 :build_and_stage
 echo Building %~1 and staging %~2...
