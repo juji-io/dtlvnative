@@ -19,19 +19,6 @@ if(CLOSE_WARNING)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
-function(dtlv_stage_windows_lib target output_name)
-    if(WIN32 AND TARGET ${target})
-        string(REPLACE "-" "_" stage_target "stage_${target}")
-        add_custom_target(${stage_target} ALL
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_LINKER_FILE:${target}>"
-                "${CMAKE_INSTALL_PREFIX}/${output_name}"
-            DEPENDS ${target}
-            VERBATIM
-        )
-    endif()
-endfunction()
-
 # DLMDB static
 add_library(dlmdb STATIC
     lmdb/libraries/liblmdb/mdb.c
@@ -48,7 +35,6 @@ set_target_properties(dlmdb PROPERTIES
 install(TARGETS dlmdb
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
-dtlv_stage_windows_lib(dlmdb "dlmdb.lib")
 
 # DTLV static
 add_library(dtlv STATIC
@@ -68,7 +54,6 @@ set_target_properties(dtlv PROPERTIES
 install(TARGETS dtlv
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
-dtlv_stage_windows_lib(dtlv "dtlv.lib")
 
 set(USEARCH_USE_FP16LIB        ON CACHE BOOL "" FORCE)
 set(USEARCH_USE_OPENMP         ON CACHE BOOL "" FORCE)
@@ -131,7 +116,6 @@ target_link_libraries(dtlv PRIVATE usearch_static_c llama ggml ggml-base ggml-cp
 install(TARGETS usearch_static_c
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
-dtlv_stage_windows_lib(usearch_static_c "libusearch_static_c.lib")
 
 foreach(target llama ggml ggml-base ggml-cpu)
     if(TARGET ${target})
@@ -143,6 +127,5 @@ foreach(target llama ggml ggml-base ggml-cpu)
             ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}
             PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_PREFIX}
         )
-        dtlv_stage_windows_lib(${target} "${target}.lib")
     endif()
 endforeach()
