@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.17.1
+### Added
+- Support text embedding with a trimmed down llama.cpp
+
 ## 0.16.6
 ### Fixed
 - DLMDB mdb_get_rank returns wrong key
