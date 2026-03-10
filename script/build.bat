@@ -27,6 +27,17 @@ cd %CPATH%
 
 dir %CPATH%
 
+for %%L in (dtlv.lib llama.lib ggml.lib ggml-base.lib ggml-cpu.lib dlmdb.lib libusearch_static_c.lib) do (
+  for /r build_dtlv %%F in (%%L) do copy /Y "%%F" "%CPATH%\%%L" >nul
+  if not exist "%CPATH%\%%L" (
+    echo Missing %%L after build_dtlv completed.
+    dir /s build_dtlv\%%L
+    exit /b 1
+  )
+)
+
+dir %CPATH%\*.lib
+
 cd java
 
 java -jar "%USERPROFILE%\.m2\repository\org\bytedeco\javacpp\1.5.13\javacpp-1.5.13.jar" ^

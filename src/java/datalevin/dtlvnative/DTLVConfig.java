@@ -20,8 +20,10 @@ import org.bytedeco.javacpp.tools.*;
                            value = "windows",
                            linkpath = {
                               "../../src/",
-                              "../../src/Release/",
-                              "../../src/build_dtlv/Release/" },
+                              "../../src/build_dtlv/Release/",
+                              "../../src/build_dtlv/llama_static_build/src/Release/",
+                              "../../src/build_dtlv/llama_static_build/ggml/src/Release/",
+                              "../../src/build_dtlv/usearch_static_c_build/c/Release/" },
                            link = {
                               "dtlv",
                               "llama",
