@@ -5,15 +5,6 @@ project(dtlv VERSION 0.11.3 LANGUAGES C)
 option(CLOSE_WARNING "Close warnings, default off" OFF)
 option(BUILD_TEST "Build test program, default off" OFF)
 
-# Include directories
-include_directories(
-    ${PROJECT_SOURCE_DIR}
-    ${PROJECT_SOURCE_DIR}/win32
-    ${PROJECT_SOURCE_DIR}/lmdb/libraries/liblmdb
-    ${PROJECT_SOURCE_DIR}/llama.cpp/include
-    ${PROJECT_SOURCE_DIR}/llama.cpp/ggml/include
-)
-
 # Option to close warnings
 if(CLOSE_WARNING)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
@@ -23,6 +14,11 @@ endif()
 add_library(dlmdb STATIC
     lmdb/libraries/liblmdb/mdb.c
     lmdb/libraries/liblmdb/midl.c
+)
+
+target_include_directories(dlmdb PRIVATE
+    ${PROJECT_SOURCE_DIR}/win32
+    ${PROJECT_SOURCE_DIR}/lmdb/libraries/liblmdb
 )
 
 set_target_properties(dlmdb PROPERTIES
@@ -39,6 +35,12 @@ install(TARGETS dlmdb
 # DTLV static
 add_library(dtlv STATIC
     dtlv.c
+)
+
+target_include_directories(dtlv PRIVATE
+    ${PROJECT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/llama.cpp/include
+    ${PROJECT_SOURCE_DIR}/llama.cpp/ggml/include
 )
 
 # Link the DLMDB static to DTLV
