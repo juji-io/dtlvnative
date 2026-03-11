@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.17.3
 ### Fixed
 - Ensure AVX2 on X86, as AVX512 is not universally available
 
