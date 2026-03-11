@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.17.2
 ### Improved
 - Remove llama print noise
 
