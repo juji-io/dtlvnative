@@ -16,20 +16,50 @@ trap cleanup EXIT
 
 export SOEXT=.so
 
+rewrite_usearch_arch_flags() {
+    build_dir=$1
+    replacement=$2
+    [ -n "$replacement" ] || return 0
+
+    flags_files=$(find "$build_dir" \( -name flags.make -o -name build.ninja \) -print)
+    if [ -z "$flags_files" ]; then
+        echo "No usearch build flag files found under $build_dir" >&2
+        exit 1
+    fi
+
+    for flags_file in $flags_files; do
+        perl -0pi -e "s/-march=native/$replacement/g" "$flags_file"
+    done
+
+    if grep -R -- '-march=native' "$build_dir" >/dev/null 2>&1; then
+        echo "usearch build still contains -march=native after baseline rewrite" >&2
+        exit 1
+    fi
+}
+
 # build usearch
 
 cd src/usearch
 
 # Use x86-64-v3 (AVX2) baseline for portable binaries on x86_64
 ARCH_FLAGS=""
+SIMSIMD_X86_FLAGS=""
 if [ "$(uname -m)" = "x86_64" ]; then
     ARCH_FLAGS="-march=x86-64-v3"
+    SIMSIMD_X86_FLAGS="-D SIMSIMD_TARGET_HASWELL=1 \
+    -D SIMSIMD_TARGET_SKYLAKE=0 \
+    -D SIMSIMD_TARGET_ICE=0 \
+    -D SIMSIMD_TARGET_GENOA=0 \
+    -D SIMSIMD_TARGET_SAPPHIRE=0 \
+    -D SIMSIMD_TARGET_TURIN=0 \
+    -D SIMSIMD_TARGET_SIERRA=0"
 fi
 
 cmake \
     -D CMAKE_BUILD_TYPE=Release \
     ${ARCH_FLAGS:+-D CMAKE_CXX_FLAGS="$ARCH_FLAGS"} \
     ${ARCH_FLAGS:+-D CMAKE_C_FLAGS="$ARCH_FLAGS"} \
+    ${SIMSIMD_X86_FLAGS:+$SIMSIMD_X86_FLAGS} \
     -D USEARCH_USE_FP16LIB=1 \
     -D USEARCH_USE_OPENMP=1 \
     -D USEARCH_USE_SIMSIMD=1 \
@@ -37,6 +67,8 @@ cmake \
     -D USEARCH_BUILD_TEST_C=1 \
     -D USEARCH_BUILD_LIB_C=1 \
     -B build_release
+
+rewrite_usearch_arch_flags build_release "$ARCH_FLAGS"
 
 cmake --build build_release --config Release
 

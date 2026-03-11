@@ -67,6 +67,19 @@ set(USEARCH_BUILD_LIB_C        ON CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_TEST_C       ON CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_TEST_CPP     ON CACHE BOOL "" FORCE)
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+    # Keep x86_64 release artifacts on a portable AVX2/Haswell baseline.
+    # The vendored usearch build enables newer SimSIMD x86 targets by default,
+    # which can cause host-dependent AVX-512 code generation in release binaries.
+    set(SIMSIMD_TARGET_HASWELL 1 CACHE STRING "" FORCE)
+    set(SIMSIMD_TARGET_SKYLAKE 0 CACHE STRING "" FORCE)
+    set(SIMSIMD_TARGET_ICE 0 CACHE STRING "" FORCE)
+    set(SIMSIMD_TARGET_GENOA 0 CACHE STRING "" FORCE)
+    set(SIMSIMD_TARGET_SAPPHIRE 0 CACHE STRING "" FORCE)
+    set(SIMSIMD_TARGET_TURIN 0 CACHE STRING "" FORCE)
+    set(SIMSIMD_TARGET_SIERRA 0 CACHE STRING "" FORCE)
+endif()
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/usearch usearch_static_c_build)
 
 set(LLAMA_BUILD_COMMON         OFF CACHE BOOL "" FORCE)

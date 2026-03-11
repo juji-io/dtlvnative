@@ -29,6 +29,13 @@ cd %CPATH%
 cmake -G "Visual Studio 17 2022" ^
       -DCLOSE_WARNING=on ^
       -DBUILD_TEST=off ^
+      -DSIMSIMD_TARGET_HASWELL=1 ^
+      -DSIMSIMD_TARGET_SKYLAKE=0 ^
+      -DSIMSIMD_TARGET_ICE=0 ^
+      -DSIMSIMD_TARGET_GENOA=0 ^
+      -DSIMSIMD_TARGET_SAPPHIRE=0 ^
+      -DSIMSIMD_TARGET_TURIN=0 ^
+      -DSIMSIMD_TARGET_SIERRA=0 ^
       -DCMAKE_INSTALL_PREFIX=%CPATH% ^
       -B build_dtlv
 if errorlevel 1 exit /b %errorlevel%
