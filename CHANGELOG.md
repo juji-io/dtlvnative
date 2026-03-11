@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Fixed
+- Ensure AVX2 on X86, as AVX512 is not universally available
+
 ## 0.17.2
 ### Improved
 - Remove llama print noise
