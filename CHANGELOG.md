@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Improved
+- Remove llama print noise
+
 ## 0.17.1
 ### Added
 - Support text embedding with a trimmed down llama.cpp

@@ -37,11 +37,20 @@ static int dtlv_copy_indices(size_t **dst, size_t *src, int samples) {
 #if defined(_WIN32)
 static INIT_ONCE dtlv_llama_init_once = INIT_ONCE_STATIC_INIT;
 
+static void dtlv_llama_log_callback(enum ggml_log_level level,
+                                    const char *text, void *user_data) {
+  (void)user_data;
+  if (level >= GGML_LOG_LEVEL_WARN) {
+    fprintf(stderr, "%s", text);
+  }
+}
+
 static BOOL CALLBACK dtlv_llama_backend_init_once(
     PINIT_ONCE init_once, PVOID parameter, PVOID *context) {
   (void)init_once;
   (void)parameter;
   (void)context;
+  llama_log_set(dtlv_llama_log_callback, NULL);
   llama_backend_init();
   return TRUE;
 }
@@ -55,7 +64,16 @@ static void dtlv_llama_backend_ensure_init(void) {
 #else
 static pthread_once_t dtlv_llama_init_once = PTHREAD_ONCE_INIT;
 
+static void dtlv_llama_log_callback(enum ggml_log_level level,
+                                    const char *text, void *user_data) {
+  (void)user_data;
+  if (level >= GGML_LOG_LEVEL_WARN) {
+    fprintf(stderr, "%s", text);
+  }
+}
+
 static void dtlv_llama_backend_init_once(void) {
+  llama_log_set(dtlv_llama_log_callback, NULL);
   llama_backend_init();
 }
 
