@@ -19,6 +19,7 @@ In addition to JavaCPP's JNI library, these native libraries are included:
 The following platforms are currently supported:
 
 * macosx-arm64
+* freebsd-x86_64
 * linux-arm64
 * linux-x86_64
 * windows-x86_64
