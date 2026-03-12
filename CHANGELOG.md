@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.17.4
 ### Improved
 - Exclude unneeded libs from windows jar
 
