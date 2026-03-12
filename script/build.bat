@@ -95,13 +95,18 @@ if errorlevel 1 exit /b %errorlevel%
 
 cd ..\..
 
-copy src\java\datalevin\dtlvnative\windows-x86_64\* windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
+set RESOURCE_DIR=windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
+if not exist "%RESOURCE_DIR%" mkdir "%RESOURCE_DIR%"
+del /q "%RESOURCE_DIR%\*" 2>nul
+
+REM Only ship runtime DLLs in the jar. Static .lib archives are link-time inputs.
+copy src\java\datalevin\dtlvnative\windows-x86_64\*.dll "%RESOURCE_DIR%\"
 if errorlevel 1 exit /b %errorlevel%
 
-copy src\*.lib windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64\
+call :bundle_openmp_runtime "%RESOURCE_DIR%"
 if errorlevel 1 exit /b %errorlevel%
 
-dir windows-x86_64\resources\datalevin\dtlvnative\windows-x86_64
+dir "%RESOURCE_DIR%"
 
 goto :eof
 
@@ -116,6 +121,25 @@ git -C "%CPATH%\llama.cpp" apply --reverse --check "%LLAMA_PATCH%" >nul 2>nul
 if errorlevel 1 exit /b 0
 git -C "%CPATH%\llama.cpp" apply --reverse "%LLAMA_PATCH%"
 exit /b %errorlevel%
+
+:bundle_openmp_runtime
+set OMP_DLL=
+if defined VCToolsRedistDir (
+  for %%F in ("%VCToolsRedistDir%x64\Microsoft.VC*.OpenMP\vcomp*.dll") do (
+    if exist "%%~fF" set OMP_DLL=%%~fF
+  )
+)
+if not defined OMP_DLL (
+  for /r "%ProgramFiles(x86)%\Microsoft Visual Studio" %%F in (vcomp140.dll) do (
+    if not defined OMP_DLL set OMP_DLL=%%~fF
+  )
+)
+if defined OMP_DLL (
+  copy /Y "%OMP_DLL%" "%~1\" >nul
+  exit /b %errorlevel%
+)
+echo OpenMP runtime vcomp140.dll not found; runtime must be present on target system.
+exit /b 0
 
 :build_and_stage
 echo Building %~1 and staging %~2...

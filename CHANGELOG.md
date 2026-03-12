@@ -1,5 +1,9 @@
 # Change Log
 
+## WIP
+### Improved
+- Exclude unneeded libs from windows jar
+
 ## 0.17.3
 ### Fixed
 - Ensure AVX2 on X86, as AVX512 is not universally available
