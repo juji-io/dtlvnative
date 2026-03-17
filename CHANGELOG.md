@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.17.6
 ### Added
 - Qwen3 model is now supported
 
