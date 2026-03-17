@@ -24,6 +24,8 @@ public class Test {
             "https://huggingface.co/keisuke-miyako/multilingual-e5-small-gguf-q8_0/"
             + "resolve/e1da94460f223e3204e75dfe51350e5491c879d4/"
             + "multilingual-e5-small-Q8_0.gguf?download=true";
+    private static Path embedModelOverride = null;
+    private static boolean llamaOnly = false;
 
     static void fail(String message) {
         System.err.println(message);
@@ -1358,6 +1360,12 @@ public class Test {
     }
 
     static Path ensureEmbeddingModel() {
+        if (embedModelOverride != null) {
+            expect(Files.isRegularFile(embedModelOverride),
+                   "Embedding model does not exist: " + embedModelOverride);
+            return embedModelOverride;
+        }
+
         Path root = repoRoot();
         Path targetModel = root.resolve("target").resolve("embedding-models").resolve(E5_MODEL_NAME);
         Path fallbackModel = root.resolve(E5_MODEL_NAME);
@@ -1400,6 +1408,24 @@ public class Test {
         }
 
         return targetModel;
+    }
+
+    static void configureEmbeddingArgs(String[] args) {
+        String envModel = System.getenv("DTLV_EMBED_MODEL_PATH");
+        if (envModel != null && !envModel.isBlank()) {
+            embedModelOverride = Paths.get(envModel).toAbsolutePath().normalize();
+        }
+
+        for (String arg : args) {
+            if ("--llama-only".equals(arg)) {
+                llamaOnly = true;
+            } else if (arg.startsWith("--embed-model=")) {
+                String path = arg.substring("--embed-model=".length());
+                embedModelOverride = Paths.get(path).toAbsolutePath().normalize();
+            } else if (!arg.startsWith("--")) {
+                embedModelOverride = Paths.get(arg).toAbsolutePath().normalize();
+            }
+        }
     }
 
     static void testLlamaEmbedding() {
@@ -1851,10 +1877,14 @@ public class Test {
     }
 
     public static void main(String[] args) {
-        runTest("LMDB suite", Test::testLMDB);
-        System.out.println("----");
-        runTest("usearch suite", Test::testUsearch);
-        System.out.println("----");
+        configureEmbeddingArgs(args);
+
+        if (!llamaOnly) {
+            runTest("LMDB suite", Test::testLMDB);
+            System.out.println("----");
+            runTest("usearch suite", Test::testUsearch);
+            System.out.println("----");
+        }
         runTest("llama embedding", Test::testLlamaEmbedding);
     }
 }

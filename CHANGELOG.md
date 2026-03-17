@@ -1,11 +1,14 @@
 # Change Log
 
+## WIP
+### Added
+- Qwen3 model is now supported
+
 ## 0.17.5
 ### Changed
 - Embedder now auto truncates input text by it's context length
 ### Added
 - Expose more embedding related functions
-- Qwen3 model is now supported
 
 ## 0.17.4
 ### Improved
