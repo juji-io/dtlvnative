@@ -41,10 +41,17 @@ applied by the parent build scripts with
 
 The exposed native/JavaCPP embedding API is:
 
-* `dtlv_llama_embedder_create`
-* `dtlv_llama_embedder_n_embd`
-* `dtlv_llama_embed`
-* `dtlv_llama_embedder_destroy`
+| Function | Description |
+|---|---|
+| `dtlv_llama_embedder_create` | Load a GGUF model and create an embedder |
+| `dtlv_llama_embedder_n_embd` | Return the embedding dimension |
+| `dtlv_llama_embedder_n_ctx` | Return the context size (max tokens) |
+| `dtlv_llama_token_count` | Count tokens for a string without allocating |
+| `dtlv_llama_tokenize` | Tokenize a string into a caller-owned `int[]` buffer |
+| `dtlv_llama_detokenize` | Convert tokens back to a UTF-8 string |
+| `dtlv_llama_embed` | Compute an embedding for a single string |
+| `dtlv_llama_embed_batch` | Compute embeddings for multiple strings in one call |
+| `dtlv_llama_embedder_destroy` | Free the embedder |
 
 The model must be a GGUF embedding model. The current smoke test uses
 `multilingual-e5-small-Q8_0.gguf`.
@@ -53,7 +60,7 @@ The model must be a GGUF embedding model. The current smoke test uses
 `n_threads`, and `normalize`. Pass `0` for `n_ctx` and `n_batch` to use model
 defaults. A non-zero `normalize` returns L2-normalized embeddings.
 
-Example from Java:
+### Single embedding
 
 ```java
 DTLV.dtlv_llama_embedder embedder = new DTLV.dtlv_llama_embedder();
@@ -67,6 +74,36 @@ float[] output = new float[nEmbd];
 rc = DTLV.dtlv_llama_embed(embedder, "query: hello world", output, nEmbd);
 
 DTLV.dtlv_llama_embedder_destroy(embedder);
+```
+
+### Token counting and tokenization
+
+```java
+// check token count before embedding
+int nTokens = DTLV.dtlv_llama_token_count(embedder, text);
+int maxTokens = DTLV.dtlv_llama_embedder_n_ctx(embedder);
+
+// tokenize, truncate, detokenize
+int[] tokens = new int[maxTokens];
+int actual = DTLV.dtlv_llama_tokenize(embedder, text, tokens, maxTokens);
+if (actual > maxTokens) {
+    // truncate to fit
+    actual = maxTokens;
+}
+byte[] buf = new byte[text.length() * 4];
+int len = DTLV.dtlv_llama_detokenize(embedder, tokens, actual, buf, buf.length);
+String truncated = new String(buf, 0, len, StandardCharsets.UTF_8);
+```
+
+### Batch embedding
+
+```java
+PointerPointer texts = new PointerPointer("query: hello", "query: world");
+int nTexts = 2;
+float[] output = new float[nTexts * nEmbd];
+rc = DTLV.dtlv_llama_embed_batch(embedder, texts, nTexts, output, output.length);
+// output[0..nEmbd-1] = embedding for "query: hello"
+// output[nEmbd..2*nEmbd-1] = embedding for "query: world"
 ```
 
 The Java test in `src/java/datalevin/dtlvnative/Test.java` will use

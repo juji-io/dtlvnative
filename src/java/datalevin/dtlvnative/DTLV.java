@@ -3639,6 +3639,56 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native int dtlv_llama_embedder_n_embd(
             dtlv_llama_embedder embedder);
 
+    public static native int dtlv_llama_token_count(
+            dtlv_llama_embedder embedder,
+            @Cast("const char*") BytePointer text);
+
+    public static native int dtlv_llama_token_count(
+            dtlv_llama_embedder embedder,
+            String text);
+
+    public static native int dtlv_llama_embedder_n_ctx(
+            dtlv_llama_embedder embedder);
+
+    public static native int dtlv_llama_tokenize(
+            dtlv_llama_embedder embedder,
+            @Cast("const char*") BytePointer text,
+            IntPointer tokens,
+            int n_tokens_max);
+
+    public static native int dtlv_llama_tokenize(
+            dtlv_llama_embedder embedder,
+            String text,
+            IntPointer tokens,
+            int n_tokens_max);
+
+    public static native int dtlv_llama_tokenize(
+            dtlv_llama_embedder embedder,
+            String text,
+            int[] tokens,
+            int n_tokens_max);
+
+    public static native int dtlv_llama_detokenize(
+            dtlv_llama_embedder embedder,
+            @Cast("const int*") IntPointer tokens,
+            int n_tokens,
+            @Cast("char*") BytePointer text,
+            int text_len_max);
+
+    public static native int dtlv_llama_detokenize(
+            dtlv_llama_embedder embedder,
+            @Cast("const int*") IntPointer tokens,
+            int n_tokens,
+            @Cast("char*") byte[] text,
+            int text_len_max);
+
+    public static native int dtlv_llama_detokenize(
+            dtlv_llama_embedder embedder,
+            int[] tokens,
+            int n_tokens,
+            @Cast("char*") byte[] text,
+            int text_len_max);
+
     public static native int dtlv_llama_embed(
             dtlv_llama_embedder embedder,
             @Cast("const char*") BytePointer text,
@@ -3654,6 +3704,20 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native int dtlv_llama_embed(
             dtlv_llama_embedder embedder,
             String text,
+            float[] output,
+            @Cast("size_t") long output_len);
+
+    public static native int dtlv_llama_embed_batch(
+            dtlv_llama_embedder embedder,
+            @Cast("const char**") PointerPointer texts,
+            int n_texts,
+            FloatPointer output,
+            @Cast("size_t") long output_len);
+
+    public static native int dtlv_llama_embed_batch(
+            dtlv_llama_embedder embedder,
+            @Cast("const char**") PointerPointer texts,
+            int n_texts,
             float[] output,
             @Cast("size_t") long output_len);
 

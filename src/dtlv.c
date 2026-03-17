@@ -1306,6 +1306,7 @@ int dtlv_llama_embedder_create(dtlv_llama_embedder **embedder,
   ctx_params.n_batch = (uint32_t)i->n_batch;
   ctx_params.n_ubatch = (uint32_t)i->n_batch;
   ctx_params.embeddings = true;
+  ctx_params.attention_type = LLAMA_ATTENTION_TYPE_NON_CAUSAL;
   ctx_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
   ctx_params.offload_kqv = false;
   ctx_params.op_offload = false;
@@ -1340,7 +1341,7 @@ int dtlv_llama_embed(dtlv_llama_embedder *embedder,
                      float *output,
                      size_t output_len) {
   size_t text_len;
-  int n_tokens;
+  int n_tokens, n_tokens_limit;
   int rc;
   struct llama_batch batch;
   const float *embedding;
@@ -1360,8 +1361,9 @@ int dtlv_llama_embed(dtlv_llama_embedder *embedder,
                              true);
   if (n_tokens == INT32_MIN) return EOVERFLOW;
   if (n_tokens <= 0) return EINVAL;
-  if (n_tokens > embedder->n_batch || n_tokens > embedder->n_ctx)
-    return EMSGSIZE;
+
+  n_tokens_limit = embedder->n_batch < embedder->n_ctx
+                   ? embedder->n_batch : embedder->n_ctx;
 
   batch = llama_batch_init(n_tokens, 0, 1);
   if (!batch.token || !batch.pos || !batch.n_seq_id || !batch.seq_id ||
@@ -1382,6 +1384,10 @@ int dtlv_llama_embed(dtlv_llama_embedder *embedder,
     return EIO;
   }
   n_tokens = rc;
+
+  /* auto-truncate to context/batch limit */
+  if (n_tokens > n_tokens_limit)
+    n_tokens = n_tokens_limit;
 
   rc = dtlv_llama_prepare_batch(&batch, n_tokens);
   if (rc != MDB_SUCCESS) {
@@ -1417,6 +1423,261 @@ int dtlv_llama_embed(dtlv_llama_embedder *embedder,
   dtlv_llama_copy_embedding(
       output, embedding, embedder->n_embd, embedder->normalize);
   llama_batch_free(batch);
+  return MDB_SUCCESS;
+}
+
+int dtlv_llama_token_count(dtlv_llama_embedder *embedder,
+                            const char *text) {
+  size_t text_len;
+  int n_tokens;
+
+  if (!embedder || !text) return -EINVAL;
+
+  text_len = strlen(text);
+  if (text_len > (size_t)INT32_MAX) return -EOVERFLOW;
+
+  n_tokens = -llama_tokenize(embedder->vocab,
+                              text,
+                              (int32_t)text_len,
+                              NULL,
+                              0,
+                              true,
+                              true);
+  if (n_tokens == INT32_MIN) return -EOVERFLOW;
+  if (n_tokens <= 0) return -EINVAL;
+
+  return n_tokens;
+}
+
+int dtlv_llama_embedder_n_ctx(dtlv_llama_embedder *embedder) {
+  if (!embedder) return -1;
+  return embedder->n_ctx;
+}
+
+int dtlv_llama_tokenize(dtlv_llama_embedder *embedder,
+                         const char *text,
+                         int *tokens,
+                         int n_tokens_max) {
+  size_t text_len;
+  int rc;
+
+  if (!embedder || !text || !tokens || n_tokens_max <= 0) return -EINVAL;
+
+  text_len = strlen(text);
+  if (text_len > (size_t)INT32_MAX) return -EOVERFLOW;
+
+  rc = llama_tokenize(embedder->vocab,
+                      text,
+                      (int32_t)text_len,
+                      (llama_token *)tokens,
+                      (int32_t)n_tokens_max,
+                      true,
+                      true);
+  if (rc == INT32_MIN) return -EOVERFLOW;
+  if (rc < 0) return rc; /* negative = needed size */
+
+  return rc;
+}
+
+int dtlv_llama_detokenize(dtlv_llama_embedder *embedder,
+                           const int *tokens,
+                           int n_tokens,
+                           char *text,
+                           int text_len_max) {
+  int rc;
+
+  if (!embedder || !tokens || n_tokens <= 0 || !text || text_len_max <= 0)
+    return -EINVAL;
+
+  rc = llama_detokenize(embedder->vocab,
+                        (const llama_token *)tokens,
+                        (int32_t)n_tokens,
+                        text,
+                        (int32_t)text_len_max,
+                        true,
+                        false);
+  if (rc < 0) return rc; /* negative = needed size */
+
+  /* null-terminate if room */
+  if (rc < text_len_max) text[rc] = '\0';
+
+  return rc;
+}
+
+int dtlv_llama_embed_batch(dtlv_llama_embedder *embedder,
+                            const char **texts,
+                            int n_texts,
+                            float *output,
+                            size_t output_len) {
+  int i, total_tokens, offset, rc;
+  int n_tokens_limit, max_full;
+  int *text_n_tokens = NULL;
+  int *text_n_full = NULL;
+  llama_token *tmp_tokens = NULL;
+  struct llama_batch batch;
+  const float *embedding;
+
+  if (!embedder || !texts || n_texts <= 0 || !output) return EINVAL;
+  if (output_len < (size_t)n_texts * (size_t)embedder->n_embd) return EMSGSIZE;
+
+  n_tokens_limit = embedder->n_batch < embedder->n_ctx
+                   ? embedder->n_batch : embedder->n_ctx;
+
+  /* count tokens for all texts */
+  text_n_tokens = (int *)malloc((size_t)n_texts * sizeof(int));
+  text_n_full = (int *)malloc((size_t)n_texts * sizeof(int));
+  if (!text_n_tokens || !text_n_full) {
+    free(text_n_tokens); free(text_n_full);
+    return ENOMEM;
+  }
+
+  total_tokens = 0;
+  max_full = 0;
+  for (i = 0; i < n_texts; i++) {
+    size_t tlen = strlen(texts[i]);
+    if (tlen > (size_t)INT32_MAX) {
+      free(text_n_tokens); free(text_n_full);
+      return EOVERFLOW;
+    }
+
+    text_n_full[i] = -llama_tokenize(embedder->vocab,
+                                      texts[i],
+                                      (int32_t)tlen,
+                                      NULL,
+                                      0,
+                                      true,
+                                      true);
+    if (text_n_full[i] == INT32_MIN) {
+      free(text_n_tokens); free(text_n_full);
+      return EOVERFLOW;
+    }
+    if (text_n_full[i] <= 0) {
+      free(text_n_tokens); free(text_n_full);
+      return EINVAL;
+    }
+
+    /* clamp per-text token count */
+    text_n_tokens[i] = text_n_full[i] > n_tokens_limit
+                       ? n_tokens_limit : text_n_full[i];
+    if (text_n_full[i] > max_full) max_full = text_n_full[i];
+    total_tokens += text_n_tokens[i];
+  }
+
+  if (total_tokens > embedder->n_batch || total_tokens > embedder->n_ctx) {
+    free(text_n_tokens); free(text_n_full);
+    return EMSGSIZE;
+  }
+
+  /* allocate temp buffer if any text needs truncation */
+  if (max_full > n_tokens_limit) {
+    tmp_tokens = (llama_token *)malloc((size_t)max_full * sizeof(llama_token));
+    if (!tmp_tokens) {
+      free(text_n_tokens); free(text_n_full);
+      return ENOMEM;
+    }
+  }
+
+  /* allocate batch for effective total tokens */
+  batch = llama_batch_init(total_tokens, 0, 1);
+  if (!batch.token || !batch.pos || !batch.n_seq_id || !batch.seq_id ||
+      !batch.logits) {
+    llama_batch_free(batch);
+    free(tmp_tokens); free(text_n_tokens); free(text_n_full);
+    return ENOMEM;
+  }
+
+  /* tokenize all texts into the batch with separate seq_ids */
+  offset = 0;
+  for (i = 0; i < n_texts; i++) {
+    size_t tlen = strlen(texts[i]);
+    int j;
+
+    if (text_n_full[i] > n_tokens_limit) {
+      /* truncation needed: tokenize into temp, copy clamped portion */
+      rc = llama_tokenize(embedder->vocab,
+                          texts[i],
+                          (int32_t)tlen,
+                          tmp_tokens,
+                          text_n_full[i],
+                          true,
+                          true);
+      if (rc < 0) {
+        llama_batch_free(batch);
+        free(tmp_tokens); free(text_n_tokens); free(text_n_full);
+        return EIO;
+      }
+      memcpy(batch.token + offset, tmp_tokens,
+             (size_t)text_n_tokens[i] * sizeof(llama_token));
+    } else {
+      /* no truncation: tokenize directly into batch */
+      rc = llama_tokenize(embedder->vocab,
+                          texts[i],
+                          (int32_t)tlen,
+                          batch.token + offset,
+                          text_n_tokens[i],
+                          true,
+                          true);
+      if (rc < 0) {
+        llama_batch_free(batch);
+        free(tmp_tokens); free(text_n_tokens); free(text_n_full);
+        return EIO;
+      }
+      text_n_tokens[i] = rc;
+    }
+
+    for (j = 0; j < text_n_tokens[i]; j++) {
+      batch.pos[offset + j] = j;
+      batch.n_seq_id[offset + j] = 1;
+      batch.seq_id[offset + j][0] = (llama_seq_id)i;
+      batch.logits[offset + j] = 1;
+    }
+    offset += text_n_tokens[i];
+  }
+  batch.n_tokens = offset;
+  free(tmp_tokens);
+  free(text_n_full);
+
+  llama_memory_clear(llama_get_memory(embedder->ctx), true);
+
+  if (embedder->use_encode == DTLV_TRUE) {
+    rc = llama_encode(embedder->ctx, batch);
+  } else {
+    rc = llama_decode(embedder->ctx, batch);
+  }
+  if (rc != 0) {
+    llama_batch_free(batch);
+    free(text_n_tokens);
+    return EIO;
+  }
+
+  llama_synchronize(embedder->ctx);
+
+  /* extract per-sequence embeddings */
+  for (i = 0; i < n_texts; i++) {
+    if (embedder->pooling_type == LLAMA_POOLING_TYPE_NONE) {
+      /* for non-pooled: use the last token of each sequence */
+      int last_token_idx = 0;
+      int j, pos = 0;
+      for (j = 0; j < i; j++) pos += text_n_tokens[j];
+      last_token_idx = pos + text_n_tokens[i] - 1;
+      embedding = llama_get_embeddings_ith(embedder->ctx, last_token_idx);
+    } else {
+      embedding = llama_get_embeddings_seq(embedder->ctx, (llama_seq_id)i);
+    }
+
+    if (!embedding) {
+      llama_batch_free(batch);
+      free(text_n_tokens);
+      return EIO;
+    }
+
+    dtlv_llama_copy_embedding(
+        output + (size_t)i * (size_t)embedder->n_embd,
+        embedding, embedder->n_embd, embedder->normalize);
+  }
+
+  llama_batch_free(batch);
+  free(text_n_tokens);
   return MDB_SUCCESS;
 }
 

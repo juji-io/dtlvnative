@@ -372,7 +372,62 @@ extern "C" {
   int dtlv_llama_embedder_n_embd(dtlv_llama_embedder *embedder);
 
   /**
+   * Return the number of tokens for a UTF-8 string.
+   *
+   * @param embedder The embedder handle.
+   * @param text The UTF-8 text to tokenize.
+   * @return The token count, or a negative errno on error.
+   */
+  int dtlv_llama_token_count(dtlv_llama_embedder *embedder,
+                              const char *text);
+
+  /**
+   * Return the context size (max tokens) for this embedder.
+   *
+   * @param embedder The embedder handle.
+   * @return The context size, or -1 on invalid input.
+   */
+  int dtlv_llama_embedder_n_ctx(dtlv_llama_embedder *embedder);
+
+  /**
+   * Tokenize a UTF-8 string into a caller-owned token buffer.
+   *
+   * @param embedder The embedder handle.
+   * @param text The UTF-8 text to tokenize.
+   * @param tokens Caller-owned token buffer.
+   * @param n_tokens_max Capacity of the token buffer.
+   * @return Number of tokens written, or a negative errno on error.
+   *         -EMSGSIZE if the buffer is too small (absolute value is
+   *         the required size).
+   */
+  int dtlv_llama_tokenize(dtlv_llama_embedder *embedder,
+                           const char *text,
+                           int *tokens,
+                           int n_tokens_max);
+
+  /**
+   * Convert tokens back to a UTF-8 string.
+   *
+   * @param embedder The embedder handle.
+   * @param tokens Array of token ids.
+   * @param n_tokens Number of tokens.
+   * @param text Caller-owned output buffer.
+   * @param text_len_max Capacity of the text buffer in bytes.
+   * @return Number of bytes written, or a negative errno on error.
+   *         -EMSGSIZE if the buffer is too small (absolute value is
+   *         the required size).
+   */
+  int dtlv_llama_detokenize(dtlv_llama_embedder *embedder,
+                             const int *tokens,
+                             int n_tokens,
+                             char *text,
+                             int text_len_max);
+
+  /**
    * Compute an embedding for a single UTF-8 string.
+   *
+   * Text that exceeds the context/batch token limit is automatically
+   * truncated (only the leading tokens are kept).
    *
    * @param embedder The embedder handle.
    * @param text The UTF-8 text to embed.
@@ -384,6 +439,27 @@ extern "C" {
                        const char *text,
                        float *output,
                        size_t output_len);
+
+  /**
+   * Compute embeddings for multiple UTF-8 strings in a single batch.
+   *
+   * Individual texts that exceed the context/batch token limit are
+   * automatically truncated (only the leading tokens are kept).
+   * EMSGSIZE is returned only when the combined token count of all
+   * (possibly truncated) texts still exceeds the batch/context capacity.
+   *
+   * @param embedder The embedder handle.
+   * @param texts Array of UTF-8 strings to embed.
+   * @param n_texts Number of strings.
+   * @param output Caller-owned float buffer of size n_texts * n_embd.
+   * @param output_len Total number of floats available in output.
+   * @return MDB_SUCCESS or an error code.
+   */
+  int dtlv_llama_embed_batch(dtlv_llama_embedder *embedder,
+                              const char **texts,
+                              int n_texts,
+                              float *output,
+                              size_t output_len);
 
   /**
    * Destroy a llama.cpp embedder.
