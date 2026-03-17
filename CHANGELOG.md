@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.17.5
 ### Changed
 - Embedder now auto truncates input text by it's context length
 ### Added
