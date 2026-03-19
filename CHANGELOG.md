@@ -1,6 +1,6 @@
 # Change Log
 
-## WIP
+## 0.18.0
 ### Added
 - llama.cpp text-generation and summarization APIs for decoder-only GGUF models
 - Java smoke test coverage for llama.cpp summarization via `DTLV_TEXT_MODEL_PATH` or `--text-model=...`
