@@ -1790,15 +1790,15 @@ static int dtlv_llama_append_token_piece(const struct llama_vocab *vocab,
                                          char *output,
                                          size_t output_len,
                                          size_t *used) {
-  char small[256];
-  char *buf = small;
+  char small_buf[256];
+  char *buf = small_buf;
   int rc;
   int need;
   int append_rc;
 
   if (!vocab || !output || !used) return EINVAL;
 
-  rc = llama_token_to_piece(vocab, token, buf, (int32_t)sizeof(small), 0, true);
+  rc = llama_token_to_piece(vocab, token, buf, (int32_t)sizeof(small_buf), 0, true);
   if (rc < 0) {
     need = -rc;
     if (need <= 0) return EIO;
@@ -1808,12 +1808,12 @@ static int dtlv_llama_append_token_piece(const struct llama_vocab *vocab,
   }
 
   if (rc < 0) {
-    if (buf != small) free(buf);
+    if (buf != small_buf) free(buf);
     return EIO;
   }
 
   append_rc = dtlv_llama_append_piece(output, output_len, used, buf, (size_t)rc);
-  if (buf != small) free(buf);
+  if (buf != small_buf) free(buf);
   return append_rc;
 }
 

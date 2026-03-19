@@ -1,7 +1,7 @@
 name: Build
 
 on:
-  # push:
+  push:
   # pull_request:
   release:
     types:
@@ -17,8 +17,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-14
-            platform: macosx-arm64
+          # - os: macos-14
+          #   platform: macosx-arm64
           - os: ubuntu-22.04
             platform: linux-x86_64
           - os: ubuntu-24.04-arm
