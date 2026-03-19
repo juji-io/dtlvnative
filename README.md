@@ -148,6 +148,19 @@ DTLV.dtlv_llama_generator_destroy(generator);
 If you want to supply your own instruction prompt instead of the built-in
 summary helper, call `dtlv_llama_generate` directly.
 
+### Local llama smoke test
+
+To refresh the JavaCPP platform libraries and run the local llama smoke tests
+with a real decoder model:
+
+```bash
+script/test-llama-summarization --text-model=target/text-models/qwen2.5-0.5b-instruct-q5_k_m.gguf
+```
+
+The script runs `Test.java` with `--llama-only`, so it covers both the llama
+embedding smoke test and the summarization flow. If you prefer, set
+`DTLV_TEXT_MODEL_PATH=/abs/path/model.gguf` instead of passing `--text-model`.
+
 ## Additional dependencies
 
 Right now, the included shared libraries depend on some system libraries.

@@ -1,0 +1,182 @@
+#!/bin/bash
+
+set -euo pipefail
+
+ROOT_DIR=$(
+  CDPATH= cd -- "$(dirname "$0")/.." && pwd
+)
+CALLER_DIR=$(pwd)
+JAVACPP_VERSION=1.5.13
+JAVACPP_JAR="${HOME}/.m2/repository/org/bytedeco/javacpp/${JAVACPP_VERSION}/javacpp-${JAVACPP_VERSION}.jar"
+
+usage() {
+  cat <<'EOF'
+Usage: script/test-llama-summarization [--text-model=PATH | PATH] [extra Test.java args]
+
+Refresh the JavaCPP platform libraries for the current machine, sync them into
+the platform resource directory, and run the llama smoke tests with
+`--llama-only`.
+
+Text model resolution order:
+1. `--text-model=PATH` or positional PATH
+2. `DTLV_TEXT_MODEL_PATH`
+3. A single `target/text-models/*.gguf` candidate
+
+Examples:
+  script/test-llama-summarization --text-model=target/text-models/qwen2.5-0.5b-instruct-q5_k_m.gguf
+  DTLV_TEXT_MODEL_PATH=/abs/path/model.gguf script/test-llama-summarization
+EOF
+}
+
+die() {
+  echo "$*" >&2
+  exit 1
+}
+
+resolve_path() {
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    *) printf '%s\n' "${CALLER_DIR}/$1" ;;
+  esac
+}
+
+detect_platform_dir() {
+  case "$(uname -s):$(uname -m)" in
+    Darwin:arm64|Darwin:aarch64) printf '%s\n' "macosx-arm64" ;;
+    Linux:x86_64|Linux:amd64) printf '%s\n' "linux-x86_64" ;;
+    Linux:arm64|Linux:aarch64) printf '%s\n' "linux-arm64" ;;
+    FreeBSD:x86_64|FreeBSD:amd64) printf '%s\n' "freebsd-x86_64" ;;
+    *) return 1 ;;
+  esac
+}
+
+sync_platform_libs() {
+  local generated_dir=$1
+  local resource_dir=$2
+  local copied=0
+  local lib
+
+  mkdir -p "$resource_dir"
+  for lib in "$generated_dir"/*; do
+    [ -f "$lib" ] || continue
+    cp -f "$lib" "$resource_dir"/
+    copied=1
+  done
+
+  [ "$copied" -eq 1 ] || die "No platform libraries were generated under $generated_dir"
+}
+
+ensure_javacpp_jar() {
+  local platform_dir=$1
+
+  if [ -f "$JAVACPP_JAR" ]; then
+    return 0
+  fi
+
+  (
+    cd "$ROOT_DIR/$platform_dir"
+    lein deps
+  )
+
+  [ -f "$JAVACPP_JAR" ] || die "Missing JavaCPP jar at $JAVACPP_JAR"
+}
+
+pick_default_model() {
+  local dir="$ROOT_DIR/target/text-models"
+  local model
+  local count=0
+
+  [ -d "$dir" ] || return 1
+
+  for model in "$dir"/*.gguf; do
+    [ -f "$model" ] || continue
+    count=$((count + 1))
+    default_model=$model
+  done
+
+  [ "$count" -eq 1 ]
+}
+
+PLATFORM_DIR=$(detect_platform_dir) || die "Unsupported platform: $(uname -s) $(uname -m)"
+PROJECT_DIR="$ROOT_DIR/$PLATFORM_DIR"
+GENERATED_DIR="$ROOT_DIR/src/java/datalevin/dtlvnative/$PLATFORM_DIR"
+RESOURCE_DIR="$PROJECT_DIR/resources/datalevin/dtlvnative/$PLATFORM_DIR"
+
+[ -d "$PROJECT_DIR" ] || die "Missing platform project directory: $PROJECT_DIR"
+
+TEXT_MODEL="${DTLV_TEXT_MODEL_PATH:-}"
+PASS_THROUGH_ARGS=()
+default_model=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --text-model=*)
+      TEXT_MODEL=${1#*=}
+      ;;
+    --text-model)
+      shift
+      [ "$#" -gt 0 ] || die "Missing path after --text-model"
+      TEXT_MODEL=$1
+      ;;
+    --)
+      shift
+      while [ "$#" -gt 0 ]; do
+        PASS_THROUGH_ARGS+=("$1")
+        shift
+      done
+      break
+      ;;
+    -*)
+      PASS_THROUGH_ARGS+=("$1")
+      ;;
+    *)
+      if [ -z "$TEXT_MODEL" ]; then
+        TEXT_MODEL=$1
+      else
+        PASS_THROUGH_ARGS+=("$1")
+      fi
+      ;;
+  esac
+  shift
+done
+
+if [ -z "$TEXT_MODEL" ]; then
+  if pick_default_model; then
+    TEXT_MODEL=$default_model
+  else
+    die "No text model selected. Pass --text-model=... or set DTLV_TEXT_MODEL_PATH."
+  fi
+fi
+
+TEXT_MODEL=$(resolve_path "$TEXT_MODEL")
+[ -f "$TEXT_MODEL" ] || die "Text model does not exist: $TEXT_MODEL"
+
+if [ ! -f "$ROOT_DIR/src/libdtlv.dylib" ] && [ ! -f "$ROOT_DIR/src/libdtlv.so" ]; then
+  die "Missing native dtlv library under src/. Build the native libs before running this test."
+fi
+
+ensure_javacpp_jar "$PLATFORM_DIR"
+
+(
+  cd "$ROOT_DIR/src/java"
+  java -jar "$JAVACPP_JAR" datalevin/dtlvnative/DTLV.java
+)
+
+[ -d "$GENERATED_DIR" ] || die "Missing generated platform directory: $GENERATED_DIR"
+sync_platform_libs "$GENERATED_DIR" "$RESOURCE_DIR"
+
+echo "Running llama smoke tests on $PLATFORM_DIR"
+echo "Using text model: $TEXT_MODEL"
+
+(
+  cd "$PROJECT_DIR"
+  if [ "${#PASS_THROUGH_ARGS[@]}" -gt 0 ]; then
+    lein run --llama-only "--text-model=$TEXT_MODEL" "${PASS_THROUGH_ARGS[@]}"
+  else
+    lein run --llama-only "--text-model=$TEXT_MODEL"
+  fi
+)
