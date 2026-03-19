@@ -1687,3 +1687,460 @@ void dtlv_llama_embedder_destroy(dtlv_llama_embedder *embedder) {
   if (embedder->model) llama_model_free(embedder->model);
   free(embedder);
 }
+
+struct dtlv_llama_generator {
+  struct llama_model *model;
+  struct llama_context *ctx;
+  const struct llama_vocab *vocab;
+  struct llama_sampler *sampler;
+  int n_ctx;
+  int n_batch;
+};
+
+static int dtlv_llama_count_tokens_raw(
+    const struct llama_vocab *vocab, const char *text, int *n_tokens_out) {
+  size_t text_len;
+  int n_tokens;
+
+  if (!vocab || !text || !n_tokens_out) return EINVAL;
+
+  text_len = strlen(text);
+  if (text_len > (size_t)INT32_MAX) return EOVERFLOW;
+
+  n_tokens = -llama_tokenize(vocab,
+                             text,
+                             (int32_t)text_len,
+                             NULL,
+                             0,
+                             true,
+                             true);
+  if (n_tokens == INT32_MIN) return EOVERFLOW;
+  if (n_tokens <= 0) return EINVAL;
+
+  *n_tokens_out = n_tokens;
+  return MDB_SUCCESS;
+}
+
+static int dtlv_llama_tokenize_copy(
+    const struct llama_vocab *vocab,
+    const char *text,
+    llama_token **tokens_out,
+    int *n_tokens_out) {
+  size_t text_len;
+  llama_token *tokens;
+  int n_tokens;
+  int rc;
+
+  if (!vocab || !text || !tokens_out || !n_tokens_out) return EINVAL;
+
+  rc = dtlv_llama_count_tokens_raw(vocab, text, &n_tokens);
+  if (rc != MDB_SUCCESS) return rc;
+
+  text_len = strlen(text);
+  tokens = (llama_token *)malloc((size_t)n_tokens * sizeof(llama_token));
+  if (!tokens) return ENOMEM;
+
+  rc = llama_tokenize(vocab,
+                      text,
+                      (int32_t)text_len,
+                      tokens,
+                      n_tokens,
+                      true,
+                      true);
+  if (rc < 0) {
+    free(tokens);
+    return EIO;
+  }
+
+  *tokens_out = tokens;
+  *n_tokens_out = rc;
+  return MDB_SUCCESS;
+}
+
+static int dtlv_llama_append_piece(char *output,
+                                   size_t output_len,
+                                   size_t *used,
+                                   const char *piece,
+                                   size_t piece_len) {
+  size_t avail;
+  size_t copied = 0;
+
+  if (!output || !used || !piece) return EINVAL;
+  if (output_len == 0) return EMSGSIZE;
+
+  if (*used >= output_len) {
+    output[output_len - 1] = '\0';
+    return EMSGSIZE;
+  }
+
+  avail = output_len - 1 - *used;
+  if (piece_len > avail) copied = avail;
+  else copied = piece_len;
+
+  if (copied > 0) memcpy(output + *used, piece, copied);
+  *used += copied;
+  output[*used] = '\0';
+
+  if (copied < piece_len) return EMSGSIZE;
+  return MDB_SUCCESS;
+}
+
+static int dtlv_llama_append_token_piece(const struct llama_vocab *vocab,
+                                         llama_token token,
+                                         char *output,
+                                         size_t output_len,
+                                         size_t *used) {
+  char small[256];
+  char *buf = small;
+  int rc;
+  int need;
+  int append_rc;
+
+  if (!vocab || !output || !used) return EINVAL;
+
+  rc = llama_token_to_piece(vocab, token, buf, (int32_t)sizeof(small), 0, true);
+  if (rc < 0) {
+    need = -rc;
+    if (need <= 0) return EIO;
+    buf = (char *)malloc((size_t)need);
+    if (!buf) return ENOMEM;
+    rc = llama_token_to_piece(vocab, token, buf, need, 0, true);
+  }
+
+  if (rc < 0) {
+    if (buf != small) free(buf);
+    return EIO;
+  }
+
+  append_rc = dtlv_llama_append_piece(output, output_len, used, buf, (size_t)rc);
+  if (buf != small) free(buf);
+  return append_rc;
+}
+
+static int dtlv_llama_eval_prompt(dtlv_llama_generator *generator,
+                                  const llama_token *tokens,
+                                  int n_tokens) {
+  int offset = 0;
+  int chunk;
+  struct llama_batch batch;
+
+  if (!generator || !tokens || n_tokens <= 0) return EINVAL;
+
+  while (offset < n_tokens) {
+    chunk = n_tokens - offset;
+    if (chunk > generator->n_batch) chunk = generator->n_batch;
+
+    batch = llama_batch_get_one((llama_token *)(tokens + offset), chunk);
+    if (llama_decode(generator->ctx, batch) != 0) return EIO;
+
+    offset += chunk;
+  }
+
+  return MDB_SUCCESS;
+}
+
+static int dtlv_llama_build_plain_summary_prompt(const char *text,
+                                                 char **prompt_out) {
+  static const char prefix[] =
+      "You are a concise assistant. Write a faithful abstractive summary in "
+      "one or two short sentences. Mention the main point using different "
+      "wording. Do not copy the source text verbatim. Return only the "
+      "summary.\n\n"
+      "Text:\n";
+  static const char suffix[] = "\n\nSummary:\n";
+  size_t text_len;
+  size_t total_len;
+  char *prompt;
+
+  if (!text || !prompt_out) return EINVAL;
+
+  text_len = strlen(text);
+  total_len = sizeof(prefix) - 1 + text_len + sizeof(suffix) - 1;
+  prompt = (char *)malloc(total_len + 1);
+  if (!prompt) return ENOMEM;
+
+  memcpy(prompt, prefix, sizeof(prefix) - 1);
+  memcpy(prompt + sizeof(prefix) - 1, text, text_len);
+  memcpy(prompt + sizeof(prefix) - 1 + text_len, suffix, sizeof(suffix) - 1);
+  prompt[total_len] = '\0';
+
+  *prompt_out = prompt;
+  return MDB_SUCCESS;
+}
+
+static int dtlv_llama_build_templated_summary_prompt(
+    dtlv_llama_generator *generator,
+    const char *text,
+    char **prompt_out) {
+  static const char system_prompt[] =
+      "You write terse, faithful abstractive summaries of database text. "
+      "Mention the main point using different wording. Do not repeat the "
+      "source verbatim. Return only the summary.";
+  static const char user_prefix[] =
+      "Summarize the main point of the following text in one or two short "
+      "sentences using different wording:\n\n";
+  const char *tmpl;
+  struct llama_chat_message messages[2];
+  char *user_prompt = NULL;
+  char *prompt = NULL;
+  size_t text_len;
+  size_t user_len;
+  int rc;
+
+  if (!generator || !text || !prompt_out) return EINVAL;
+
+  tmpl = llama_model_chat_template(generator->model, NULL);
+  if (!tmpl || !tmpl[0]) return ENOTSUP;
+
+  text_len = strlen(text);
+  user_len = sizeof(user_prefix) - 1 + text_len;
+  user_prompt = (char *)malloc(user_len + 1);
+  if (!user_prompt) return ENOMEM;
+
+  memcpy(user_prompt, user_prefix, sizeof(user_prefix) - 1);
+  memcpy(user_prompt + sizeof(user_prefix) - 1, text, text_len);
+  user_prompt[user_len] = '\0';
+
+  messages[0].role = "system";
+  messages[0].content = system_prompt;
+  messages[1].role = "user";
+  messages[1].content = user_prompt;
+
+  rc = llama_chat_apply_template(tmpl, messages, 2, true, NULL, 0);
+  if (rc <= 0) {
+    free(user_prompt);
+    return EIO;
+  }
+
+  prompt = (char *)malloc((size_t)rc + 1);
+  if (!prompt) {
+    free(user_prompt);
+    return ENOMEM;
+  }
+
+  rc = llama_chat_apply_template(tmpl, messages, 2, true, prompt, rc);
+  free(user_prompt);
+  if (rc < 0) {
+    free(prompt);
+    return EIO;
+  }
+
+  prompt[rc] = '\0';
+  *prompt_out = prompt;
+  return MDB_SUCCESS;
+}
+
+static int dtlv_llama_build_summary_prompt(dtlv_llama_generator *generator,
+                                           const char *text,
+                                           char **prompt_out) {
+  int rc;
+
+  rc = dtlv_llama_build_templated_summary_prompt(generator, text, prompt_out);
+  if (rc == MDB_SUCCESS) return MDB_SUCCESS;
+
+  return dtlv_llama_build_plain_summary_prompt(text, prompt_out);
+}
+
+static int dtlv_llama_generate_internal(dtlv_llama_generator *generator,
+                                        const char *prompt,
+                                        int n_predict,
+                                        char *output,
+                                        size_t output_len) {
+  llama_token *prompt_tokens = NULL;
+  int n_prompt = 0;
+  int max_predict;
+  int rc;
+  size_t used = 0;
+  int append_rc = MDB_SUCCESS;
+  int i;
+
+  if (!generator || !prompt || !output) return -EINVAL;
+  if (output_len == 0) return -EMSGSIZE;
+
+  output[0] = '\0';
+
+  rc = dtlv_llama_tokenize_copy(generator->vocab, prompt, &prompt_tokens, &n_prompt);
+  if (rc != MDB_SUCCESS) return -rc;
+
+  if (n_prompt >= generator->n_ctx) n_prompt = generator->n_ctx - 1;
+  if (n_prompt <= 0) {
+    free(prompt_tokens);
+    return -EMSGSIZE;
+  }
+
+  max_predict = n_predict > 0 ? n_predict : 128;
+  if (max_predict > generator->n_ctx - n_prompt) {
+    max_predict = generator->n_ctx - n_prompt;
+  }
+  if (max_predict <= 0) {
+    free(prompt_tokens);
+    return -EMSGSIZE;
+  }
+
+  llama_memory_clear(llama_get_memory(generator->ctx), true);
+  llama_sampler_reset(generator->sampler);
+
+  rc = dtlv_llama_eval_prompt(generator, prompt_tokens, n_prompt);
+  free(prompt_tokens);
+  if (rc != MDB_SUCCESS) return -rc;
+
+  for (i = 0; i < max_predict; i++) {
+    llama_token token = llama_sampler_sample(generator->sampler, generator->ctx, -1);
+
+    if (llama_vocab_is_eog(generator->vocab, token)) break;
+
+    rc = dtlv_llama_append_token_piece(
+        generator->vocab, token, output, output_len, &used);
+    if (rc != MDB_SUCCESS) {
+      append_rc = rc;
+      break;
+    }
+
+    llama_sampler_accept(generator->sampler, token);
+
+    {
+      struct llama_batch batch = llama_batch_get_one(&token, 1);
+      if (llama_decode(generator->ctx, batch) != 0) {
+        return -EIO;
+      }
+    }
+  }
+
+  if (append_rc != MDB_SUCCESS) return -append_rc;
+  if (used > (size_t)INT_MAX) return -EOVERFLOW;
+  return (int)used;
+}
+
+int dtlv_llama_generator_create(dtlv_llama_generator **generator,
+                                const char *model_path,
+                                int n_ctx,
+                                int n_batch,
+                                int n_threads) {
+  struct dtlv_llama_generator *i;
+  struct llama_model_params model_params;
+  struct llama_context_params ctx_params;
+  struct llama_sampler *greedy = NULL;
+  int train_ctx;
+
+  if (!generator || !model_path || !model_path[0]) return EINVAL;
+  *generator = NULL;
+
+  dtlv_llama_backend_ensure_init();
+
+  i = calloc(1, sizeof(struct dtlv_llama_generator));
+  if (!i) return ENOMEM;
+
+  model_params = llama_model_default_params();
+  model_params.n_gpu_layers = 0;
+
+  i->model = llama_model_load_from_file(model_path, model_params);
+  if (!i->model) {
+    free(i);
+    return EIO;
+  }
+
+  if (llama_model_has_encoder(i->model) || !llama_model_has_decoder(i->model)) {
+    dtlv_llama_generator_destroy(i);
+    return ENOTSUP;
+  }
+
+  i->vocab = llama_model_get_vocab(i->model);
+  if (!i->vocab) {
+    dtlv_llama_generator_destroy(i);
+    return EINVAL;
+  }
+
+  train_ctx = llama_model_n_ctx_train(i->model);
+  i->n_ctx = n_ctx > 0 ? n_ctx : (train_ctx > 0 ? train_ctx : 2048);
+  i->n_batch = n_batch > 0 ? n_batch : i->n_ctx;
+  if (i->n_ctx <= 1 || i->n_batch <= 0) {
+    dtlv_llama_generator_destroy(i);
+    return EINVAL;
+  }
+
+  ctx_params = llama_context_default_params();
+  ctx_params.n_ctx = (uint32_t)i->n_ctx;
+  ctx_params.n_batch = (uint32_t)i->n_batch;
+  ctx_params.n_ubatch = (uint32_t)i->n_batch;
+  ctx_params.embeddings = false;
+  ctx_params.attention_type = LLAMA_ATTENTION_TYPE_CAUSAL;
+  ctx_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+  ctx_params.offload_kqv = false;
+  ctx_params.op_offload = false;
+  if (n_threads > 0) {
+    ctx_params.n_threads = n_threads;
+    ctx_params.n_threads_batch = n_threads;
+  }
+
+  i->ctx = llama_init_from_model(i->model, ctx_params);
+  if (!i->ctx) {
+    dtlv_llama_generator_destroy(i);
+    return EIO;
+  }
+
+  i->sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
+  greedy = llama_sampler_init_greedy();
+  if (!i->sampler || !greedy) {
+    if (greedy) llama_sampler_free(greedy);
+    dtlv_llama_generator_destroy(i);
+    return ENOMEM;
+  }
+
+  llama_sampler_chain_add(i->sampler, greedy);
+
+  *generator = i;
+  return MDB_SUCCESS;
+}
+
+int dtlv_llama_generator_n_ctx(dtlv_llama_generator *generator) {
+  if (!generator) return -1;
+  return generator->n_ctx;
+}
+
+int dtlv_llama_generator_token_count(dtlv_llama_generator *generator,
+                                     const char *text) {
+  int n_tokens;
+  int rc;
+
+  if (!generator || !text) return -EINVAL;
+
+  rc = dtlv_llama_count_tokens_raw(generator->vocab, text, &n_tokens);
+  if (rc != MDB_SUCCESS) return -rc;
+
+  return n_tokens;
+}
+
+int dtlv_llama_generate(dtlv_llama_generator *generator,
+                        const char *prompt,
+                        int n_predict,
+                        char *output,
+                        size_t output_len) {
+  return dtlv_llama_generate_internal(
+      generator, prompt, n_predict, output, output_len);
+}
+
+int dtlv_llama_summarize(dtlv_llama_generator *generator,
+                         const char *text,
+                         int n_predict,
+                         char *output,
+                         size_t output_len) {
+  char *prompt = NULL;
+  int rc;
+
+  if (!generator || !text || !output) return -EINVAL;
+
+  rc = dtlv_llama_build_summary_prompt(generator, text, &prompt);
+  if (rc != MDB_SUCCESS) return -rc;
+
+  rc = dtlv_llama_generate_internal(generator, prompt, n_predict, output, output_len);
+  free(prompt);
+  return rc;
+}
+
+void dtlv_llama_generator_destroy(dtlv_llama_generator *generator) {
+  if (!generator) return;
+  if (generator->sampler) llama_sampler_free(generator->sampler);
+  if (generator->ctx) llama_free(generator->ctx);
+  if (generator->model) llama_model_free(generator->model);
+  free(generator);
+}

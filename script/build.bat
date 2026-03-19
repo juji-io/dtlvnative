@@ -5,18 +5,9 @@ setlocal
 set PWD=%cd%
 
 set CPATH=%PWD%\src
-set LLAMA_PATCH=%PWD%\script\patches\llama-embed-only.patch
-
-call :apply_llama_patch
-if errorlevel 1 exit /b %errorlevel%
 
 call :main
-set BUILD_STATUS=%errorlevel%
-
-call :revert_llama_patch
-if errorlevel 1 if "%BUILD_STATUS%"=="0" set BUILD_STATUS=%errorlevel%
-
-exit /b %BUILD_STATUS%
+exit /b %errorlevel%
 
 :main
 
@@ -109,18 +100,6 @@ if errorlevel 1 exit /b %errorlevel%
 dir "%RESOURCE_DIR%"
 
 goto :eof
-
-:apply_llama_patch
-git -C "%CPATH%\llama.cpp" apply --reverse --check "%LLAMA_PATCH%" >nul 2>nul
-if not errorlevel 1 exit /b 0
-git -C "%CPATH%\llama.cpp" apply "%LLAMA_PATCH%"
-exit /b %errorlevel%
-
-:revert_llama_patch
-git -C "%CPATH%\llama.cpp" apply --reverse --check "%LLAMA_PATCH%" >nul 2>nul
-if errorlevel 1 exit /b 0
-git -C "%CPATH%\llama.cpp" apply --reverse "%LLAMA_PATCH%"
-exit /b %errorlevel%
 
 :bundle_openmp_runtime
 set OMP_DLL=

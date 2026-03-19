@@ -3724,6 +3724,96 @@ public class DTLV extends datalevin.dtlvnative.DTLVConfig {
     public static native void dtlv_llama_embedder_destroy(
             dtlv_llama_embedder embedder);
 
+    /**
+     * Opaque llama.cpp text-generation handle.
+     */
+    @Opaque
+    public static class dtlv_llama_generator extends Pointer {
+        public dtlv_llama_generator() {
+            super((Pointer) null);
+        }
+
+        public dtlv_llama_generator(Pointer p) {
+            super(p);
+        }
+    }
+
+    public static native int dtlv_llama_generator_create(
+            @Cast("dtlv_llama_generator**") PointerPointer generator,
+            @Cast("const char*") BytePointer model_path,
+            int n_ctx, int n_batch, int n_threads);
+
+    public static native int dtlv_llama_generator_create(
+            @ByPtrPtr dtlv_llama_generator generator,
+            @Cast("const char*") BytePointer model_path,
+            int n_ctx, int n_batch, int n_threads);
+
+    public static native int dtlv_llama_generator_create(
+            @Cast("dtlv_llama_generator**") PointerPointer generator,
+            String model_path,
+            int n_ctx, int n_batch, int n_threads);
+
+    public static native int dtlv_llama_generator_create(
+            @ByPtrPtr dtlv_llama_generator generator,
+            String model_path,
+            int n_ctx, int n_batch, int n_threads);
+
+    public static native int dtlv_llama_generator_n_ctx(
+            dtlv_llama_generator generator);
+
+    public static native int dtlv_llama_generator_token_count(
+            dtlv_llama_generator generator,
+            @Cast("const char*") BytePointer text);
+
+    public static native int dtlv_llama_generator_token_count(
+            dtlv_llama_generator generator,
+            String text);
+
+    public static native int dtlv_llama_generate(
+            dtlv_llama_generator generator,
+            @Cast("const char*") BytePointer prompt,
+            int n_predict,
+            @Cast("char*") BytePointer output,
+            @Cast("size_t") long output_len);
+
+    public static native int dtlv_llama_generate(
+            dtlv_llama_generator generator,
+            String prompt,
+            int n_predict,
+            @Cast("char*") BytePointer output,
+            @Cast("size_t") long output_len);
+
+    public static native int dtlv_llama_generate(
+            dtlv_llama_generator generator,
+            String prompt,
+            int n_predict,
+            @Cast("char*") byte[] output,
+            @Cast("size_t") long output_len);
+
+    public static native int dtlv_llama_summarize(
+            dtlv_llama_generator generator,
+            @Cast("const char*") BytePointer text,
+            int n_predict,
+            @Cast("char*") BytePointer output,
+            @Cast("size_t") long output_len);
+
+    public static native int dtlv_llama_summarize(
+            dtlv_llama_generator generator,
+            String text,
+            int n_predict,
+            @Cast("char*") BytePointer output,
+            @Cast("size_t") long output_len);
+
+    public static native int dtlv_llama_summarize(
+            dtlv_llama_generator generator,
+            String text,
+            int n_predict,
+            @Cast("char*") byte[] output,
+            @Cast("size_t") long output_len);
+
+    public static native void dtlv_llama_generator_destroy(
+            dtlv_llama_generator generator);
+
     // #ifdef __cplusplus
     // #endif
 

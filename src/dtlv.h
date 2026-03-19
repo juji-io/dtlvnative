@@ -468,6 +468,101 @@ extern "C" {
    */
   void dtlv_llama_embedder_destroy(dtlv_llama_embedder *embedder);
 
+  /**
+   * Opaque llama.cpp text-generation handle.
+   */
+  typedef struct dtlv_llama_generator dtlv_llama_generator;
+
+  /**
+   * Create a CPU-only llama.cpp generator backed by a decoder-only GGUF model.
+   *
+   * This API is intended for prompt-based text generation such as document
+   * summarization. Encoder-only embedding models are not supported here.
+   *
+   * @param generator The address where the generator will be stored.
+   * @param model_path Path to a GGUF decoder-only text model.
+   * @param n_ctx Context size. Use 0 to default to the model training context.
+   * @param n_batch Max prompt tokens processed per decode call. Use 0 to mirror
+   *                the context size.
+   * @param n_threads CPU thread count. Use 0 to keep llama.cpp defaults.
+   * @return MDB_SUCCESS or an error code.
+   */
+  int dtlv_llama_generator_create(dtlv_llama_generator **generator,
+                                  const char *model_path,
+                                  int n_ctx,
+                                  int n_batch,
+                                  int n_threads);
+
+  /**
+   * Return the context size (max tokens) for this generator.
+   *
+   * @param generator The generator handle.
+   * @return The context size, or -1 on invalid input.
+   */
+  int dtlv_llama_generator_n_ctx(dtlv_llama_generator *generator);
+
+  /**
+   * Return the number of tokens for a UTF-8 string.
+   *
+   * @param generator The generator handle.
+   * @param text The UTF-8 text to tokenize.
+   * @return The token count, or a negative errno on error.
+   */
+  int dtlv_llama_generator_token_count(dtlv_llama_generator *generator,
+                                       const char *text);
+
+  /**
+   * Generate text for a raw prompt.
+   *
+   * Prompt text that exceeds the context size is automatically truncated
+   * (only the leading tokens are kept). When n_predict <= 0, a default budget
+   * of 128 generated tokens is used.
+   *
+   * @param generator The generator handle.
+   * @param prompt The UTF-8 prompt text.
+   * @param n_predict Maximum number of tokens to generate.
+   * @param output Caller-owned output buffer.
+   * @param output_len Capacity of the output buffer in bytes.
+   * @return Number of bytes written, or a negative errno on error.
+   *         -EMSGSIZE if the output buffer is too small.
+   */
+  int dtlv_llama_generate(dtlv_llama_generator *generator,
+                          const char *prompt,
+                          int n_predict,
+                          char *output,
+                          size_t output_len);
+
+  /**
+   * Generate a summary for a UTF-8 document.
+   *
+   * This helper formats a concise summarization prompt, using the model's
+   * built-in chat template when one is present.
+   *
+   * Text that exceeds the context size is automatically truncated
+   * (only the leading tokens are kept). When n_predict <= 0, a default budget
+   * of 128 generated tokens is used.
+   *
+   * @param generator The generator handle.
+   * @param text The UTF-8 source document.
+   * @param n_predict Maximum number of tokens to generate.
+   * @param output Caller-owned output buffer.
+   * @param output_len Capacity of the output buffer in bytes.
+   * @return Number of bytes written, or a negative errno on error.
+   *         -EMSGSIZE if the output buffer is too small.
+   */
+  int dtlv_llama_summarize(dtlv_llama_generator *generator,
+                           const char *text,
+                           int n_predict,
+                           char *output,
+                           size_t output_len);
+
+  /**
+   * Destroy a llama.cpp generator.
+   *
+   * @param generator The generator handle.
+   */
+  void dtlv_llama_generator_destroy(dtlv_llama_generator *generator);
+
 
 #ifdef __cplusplus
 }

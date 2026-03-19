@@ -1,8 +1,13 @@
 # Change Log
 
+## WIP
+### Added
+- llama.cpp text-generation and summarization APIs for decoder-only GGUF models
+- Java smoke test coverage for llama.cpp summarization via `DTLV_TEXT_MODEL_PATH` or `--text-model=...`
+
 ## 0.17.6
 ### Added
-- Qwen3 model is now supported
+- Qwen3 embedding model is now supported
 
 ## 0.17.5
 ### Changed

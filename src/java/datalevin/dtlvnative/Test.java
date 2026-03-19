@@ -25,6 +25,7 @@ public class Test {
             + "resolve/e1da94460f223e3204e75dfe51350e5491c879d4/"
             + "multilingual-e5-small-Q8_0.gguf?download=true";
     private static Path embedModelOverride = null;
+    private static Path textModelOverride = null;
     private static boolean llamaOnly = false;
 
     static void fail(String message) {
@@ -1415,6 +1416,10 @@ public class Test {
         if (envModel != null && !envModel.isBlank()) {
             embedModelOverride = Paths.get(envModel).toAbsolutePath().normalize();
         }
+        String envTextModel = System.getenv("DTLV_TEXT_MODEL_PATH");
+        if (envTextModel != null && !envTextModel.isBlank()) {
+            textModelOverride = Paths.get(envTextModel).toAbsolutePath().normalize();
+        }
 
         for (String arg : args) {
             if ("--llama-only".equals(arg)) {
@@ -1422,6 +1427,9 @@ public class Test {
             } else if (arg.startsWith("--embed-model=")) {
                 String path = arg.substring("--embed-model=".length());
                 embedModelOverride = Paths.get(path).toAbsolutePath().normalize();
+            } else if (arg.startsWith("--text-model=")) {
+                String path = arg.substring("--text-model=".length());
+                textModelOverride = Paths.get(path).toAbsolutePath().normalize();
             } else if (!arg.startsWith("--")) {
                 embedModelOverride = Paths.get(arg).toAbsolutePath().normalize();
             }
@@ -1466,6 +1474,50 @@ public class Test {
                 output.close();
             }
             DTLV.dtlv_llama_embedder_destroy(embedder);
+        }
+    }
+
+    static Path maybeTextModel() {
+        if (textModelOverride == null) {
+            return null;
+        }
+
+        expect(Files.isRegularFile(textModelOverride),
+               "Text model does not exist: " + textModelOverride);
+        return textModelOverride;
+    }
+
+    static void testLlamaSummarization() {
+        System.err.println("Testing llama.cpp summarization ...");
+
+        Path modelPath = maybeTextModel();
+        if (modelPath == null) {
+            pass("Skipped llama summarization test. Set DTLV_TEXT_MODEL_PATH or --text-model=...");
+            return;
+        }
+
+        DTLV.dtlv_llama_generator generator = new DTLV.dtlv_llama_generator();
+        int rc = DTLV.dtlv_llama_generator_create(generator, modelPath.toString(), 2048, 0, 4);
+        expect(rc == 0, "Failed to create llama generator: " + rc);
+
+        byte[] output = new byte[4096];
+        String text =
+                "Datalevin stores data locally, supports Datalog queries, and can manage "
+                + "vector search in the same application process. The goal of this test is "
+                + "to verify that the native llama.cpp generator can summarize a short "
+                + "database-oriented document without crashing or returning an empty result.";
+
+        try {
+            int len = DTLV.dtlv_llama_summarize(generator, text, 96, output, output.length);
+            expect(len >= 0, "Failed to summarize text: " + len);
+
+            String summary = new String(output, 0, len, StandardCharsets.UTF_8).trim();
+            expect(!summary.isBlank(), "Summary output is blank");
+            expect(!summary.equals(text), "Summary output matches the source text exactly");
+
+            pass("Passed llama summarization test.");
+        } finally {
+            DTLV.dtlv_llama_generator_destroy(generator);
         }
     }
 
@@ -1886,5 +1938,6 @@ public class Test {
             System.out.println("----");
         }
         runTest("llama embedding", Test::testLlamaEmbedding);
+        runTest("llama summarization", Test::testLlamaSummarization);
     }
 }
